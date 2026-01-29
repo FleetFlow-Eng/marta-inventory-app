@@ -1,265 +1,236 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebaseConfig'; 
-import { 
-  collection, addDoc, onSnapshot, query, orderBy, 
-  deleteDoc, doc, serverTimestamp, updateDoc, getDoc, setDoc, getDocs, writeBatch 
-} from "firebase/firestore";
-import { 
-  onAuthStateChanged, signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, signOut, User 
-} from "firebase/auth";
+import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
 export default function MartaInventory() {
-  const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState('fleet'); 
-  const [viewMode, setViewMode] = useState('list'); 
-  const [sortKey, setSortKey] = useState('timestamp'); 
-  const [historySortKey, setHistorySortKey] = useState('timestamp'); 
-  const [isApproved, setIsApproved] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false); 
+  const [user, setUser] = useState<any>(null);
+  const [buses, setBuses] = useState<any[]>([]);
+  const [expandedBus, setExpandedBus] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [view, setView] = useState('login');
-  const [authMsg, setAuthMsg] = useState('');
 
-  const [buses, setBuses] = useState<any[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
-  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const getBusSpecs = (num: string) => {
+    const n = parseInt(num);
+    const thirtyFt = [1951, 1958, 1959];
+    const thirtyFiveFt = [1887, 1888, 1889, 1895, 1909, 1912, 1913, 1921, 1922, 1923, 1924, 1925, 1926, 1927, 1928, 1929, 1930, 1931, 1932, 1933, 1935, 2326, 2343];
+    if (thirtyFt.includes(n)) return { length: "30'", type: "S" };
+    if (thirtyFiveFt.includes(n)) return { length: "35'", type: "M" };
+    return { length: "40'", type: "L" };
+  };
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [historySearchTerm, setHistorySearchTerm] = useState(''); 
-  const [busNumber, setBusNumber] = useState('');
-  const [status, setStatus] = useState('Active');
-  const [notes, setNotes] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        const adminEmail = 'anetowestfield@gmail.com'; 
-        const userSnap = await getDoc(doc(db, "users", currentUser.uid));
-        const isSuperAdmin = currentUser.email === adminEmail;
-        const isApprovedFromDb = userSnap.exists() && userSnap.data().approved;
-
-        if (!isApprovedFromDb && !isSuperAdmin) {
-          setAuthMsg("Access Pending Verification. Please contact a superintendent.");
-          await signOut(auth);
-          setUser(null);
-          setIsAdmin(false);
-          return;
-        }
-
-        setUser(currentUser);
-        setAuthMsg('');
-        if (userSnap.exists()) {
-          setIsAdmin(userSnap.data().role === 'admin' || isSuperAdmin);
-          setIsApproved(true);
-        } else if (isSuperAdmin) {
-          await setDoc(doc(db, "users", currentUser.uid), { 
-            email: currentUser.email, approved: true, role: 'admin' 
-          });
-          setIsAdmin(true);
-          setIsApproved(true);
-        }
-      } else {
-        setUser(null);
-        setIsAdmin(false);
-        setIsApproved(false);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!user || !isApproved) return;
-    const unsubBuses = onSnapshot(query(collection(db, "buses"), orderBy("timestamp", "desc")), (snap) => {
-      setBuses(snap.docs.map(doc => ({ ...doc.data(), docId: doc.id })));
-    });
-    const unsubHistory = onSnapshot(query(collection(db, "history"), orderBy("timestamp", "desc")), (snap) => {
-      setHistory(snap.docs.map(doc => ({ ...doc.data(), docId: doc.id })));
-    });
-    if (isAdmin) {
-      onSnapshot(collection(db, "users"), (snap) => {
-        setAllUsers(snap.docs.map(doc => ({ ...doc.data(), uid: doc.id })));
-      });
-    }
-  }, [user, isApproved, isAdmin]);
-
-  const clearHistory = async () => {
-    if (!window.confirm("ERASE ALL LOGS? This cannot be undone.")) return;
-    const batch = writeBatch(db);
-    const snap = await getDocs(collection(db, "history"));
-    snap.docs.forEach((d) => batch.delete(d.ref));
-    await batch.commit();
+  const calculateDaysOOS = (start: string, end: string) => {
+    if (!start || !end) return 0;
+    const s = new Date(start);
+    const e = new Date(end);
+    return Math.max(0, Math.ceil((e.getTime() - s.getTime()) / (1000 * 3600 * 24)));
   };
 
   const exportToExcel = async () => {
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('MARTA Fleet');
+    const worksheet = workbook.addWorksheet('Vehicle OOS Details');
     worksheet.columns = [
-      { header: 'Unit #', key: 'number', width: 12, style: { alignment: { horizontal: 'center' } } },
-      { header: 'Status', key: 'status', width: 15, style: { alignment: { horizontal: 'center' } } },
-      { header: 'Notes', key: 'notes', width: 60, style: { alignment: { wrapText: true } } },
+      { header: 'Vehicle Number', key: 'number', width: 15 },
+      { header: 'Vehicle Type', key: 'type', width: 12 },
+      { header: 'Current Location', key: 'location', width: 20 },
+      { header: 'OOS Start Date', key: 'oosStart', width: 25 },
+      { header: 'Fault Details', key: 'fault', width: 50 }, 
+      { header: 'Expected Return', key: 'expReturn', width: 30 },
+      { header: 'Days OOS', key: 'daysOOS', width: 12 }
     ];
-    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFF' } };
-    worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '002D72' } };
-    buses.forEach(bus => worksheet.addRow({ number: bus.number, status: bus.status.toUpperCase(), notes: bus.notes || '---' }));
-    const now = new Date();
-    const ts = `${now.getMonth() + 1}-${now.getDate()}_${now.getHours() % 12 || 12}${now.getMinutes()}${now.getHours() >= 12 ? 'PM' : 'AM'}`;
+    
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '002D72' } };
+
+    buses.forEach(bus => {
+      const specs = getBusSpecs(bus.number);
+      worksheet.addRow({
+        number: bus.number,
+        type: specs.length,
+        location: bus.location || '---',
+        oosStart: bus.oosStartDate || '---',
+        fault: bus.notes || '---',
+        expReturn: bus.expectedReturnDate || '---',
+        daysOOS: calculateDaysOOS(bus.oosStartDate, new Date().toISOString().split('T')[0])
+      }).getCell('fault').alignment = { wrapText: true, vertical: 'top' };
+    });
+
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `MARTA_Report_${ts}.xlsx`);
+    saveAs(new Blob([buffer]), `MARTA_Fleet_Report.xlsx`);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!/^[a-zA-Z0-9]{4}$/.test(busNumber)) return;
-    const data = { number: busNumber.toUpperCase(), status, notes, modifiedBy: user?.email, timestamp: serverTimestamp() };
-    if (editingId) {
-      await updateDoc(doc(db, "buses", editingId), data);
-      await addDoc(collection(db, "history"), { ...data, action: "EDIT" });
-      setEditingId(null);
-    } else {
-      await addDoc(collection(db, "buses"), data);
-      await addDoc(collection(db, "history"), { ...data, action: "NEW" });
-    }
-    setBusNumber(''); setNotes(''); setStatus('Active');
-  };
+  useEffect(() => {
+    return onAuthStateChanged(auth, (currentUser) => setUser(currentUser));
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "buses"), orderBy("number", "asc"));
+    return onSnapshot(q, (snap) => {
+      setBuses(snap.docs.map(doc => ({ ...doc.data(), docId: doc.id })));
+    });
+  }, [user]);
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#002d72] p-4 text-slate-900">
-        <form onSubmit={async (e) => {
-          e.preventDefault();
-          setAuthMsg('');
-          try {
-            if (view === 'login') await signInWithEmailAndPassword(auth, email, password);
-            else {
-              const res = await createUserWithEmailAndPassword(auth, email, password);
-              await setDoc(doc(db, "users", res.user.uid), { email, approved: false, role: 'user' });
-              setAuthMsg("Access Pending Verification. Please contact a superintendent.");
-              await signOut(auth);
-            }
-          } catch (err: any) { setAuthMsg(err.message); }
-        }} className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 border-[#ef7c00]">
-          <h2 className="text-2xl font-black text-center mb-6 uppercase text-[#002d72]">{view === 'login' ? 'Login' : 'Register'}</h2>
-          {authMsg && <div className="bg-amber-50 border-2 border-amber-200 text-amber-800 p-4 rounded-xl mb-6 text-xs font-black uppercase text-center">{authMsg}</div>}
-          <input type="email" placeholder="Email" className="w-full p-4 border-2 rounded-xl mb-4 font-bold" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <input type="password" placeholder="Password" className="w-full p-4 border-2 rounded-xl mb-6 font-bold" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          <button className="w-full bg-[#ef7c00] text-white font-black py-4 rounded-xl uppercase">{view === 'login' ? 'Enter Portal' : 'Register Account'}</button>
-          <button type="button" onClick={() => { setView(view === 'login' ? 'signup' : 'login'); setAuthMsg(''); }} className="w-full mt-4 text-[10px] uppercase font-bold text-[#002d72] underline text-center block">
-            {view === 'login' ? 'No account? Create one' : 'Back to Login'}
-          </button>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <form onSubmit={async (e) => { e.preventDefault(); try { await signInWithEmailAndPassword(auth, email, password); } catch (err) {} }} 
+          className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-sm border-t-8 border-[#ef7c00]">
+          <h2 className="text-2xl font-black text-center mb-8 uppercase text-[#002d72] tracking-tighter italic">MARTA Ops</h2>
+          <input type="email" placeholder="Email" className="w-full p-4 border-2 rounded-xl mb-4 font-bold outline-none" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input type="password" placeholder="Password" className="w-full p-4 border-2 rounded-xl mb-8 font-bold outline-none" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <button className="w-full bg-[#002d72] text-white font-black py-4 rounded-xl uppercase tracking-widest hover:bg-[#ef7c00] transition-all">Login</button>
         </form>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-20 font-sans">
-      <nav className="bg-[#002d72] text-white p-4 flex justify-between items-center sticky top-0 z-[1001] shadow-lg">
-        <span className="font-black text-lg tracking-tighter uppercase italic">MARTA Fleet Portal</span>
-        <div className="flex bg-slate-800 p-1 rounded-lg">
-          {['fleet', 'history', 'admin'].map((tab) => (
-            (tab !== 'admin' || isAdmin) && (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-1.5 rounded-md text-[10px] font-black uppercase ${activeTab === tab ? 'bg-[#ef7c00]' : ''}`}>
-                {tab}
-              </button>
-            )
-          ))}
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-[#ef7c00] selection:text-white">
+      <nav className="bg-white border-b border-slate-200 sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm">
+        <div className="flex items-center gap-3">
+            <div className="w-2 h-6 bg-[#002d72] rounded-full"></div>
+            <span className="font-black text-lg italic uppercase tracking-tighter text-[#002d72]">Fleet Manager</span>
         </div>
-        <button onClick={() => signOut(auth)} className="text-[10px] bg-red-600 px-3 py-1 rounded font-bold uppercase">Logout</button>
+        <div className="flex gap-4">
+          <button onClick={exportToExcel} className="text-[#002d72] hover:text-[#ef7c00] text-[10px] font-black uppercase transition-all tracking-widest">Export Excel</button>
+          <button onClick={() => signOut(auth)} className="text-red-500 hover:text-red-700 text-[10px] font-black uppercase transition-all tracking-widest">Logout</button>
+        </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto p-4 md:p-10">
-        {activeTab === 'fleet' ? (
-          <>
-            {/* RESTORED SUMMARY CARDS */}
-            <div className="flex flex-wrap gap-4 mb-10">
-              <div className="flex-1 bg-white p-4 rounded-xl shadow-sm border-b-4 border-[#002d72] min-w-[120px]"><p className="text-[9px] font-black text-slate-400 uppercase">Total Fleet</p><p className="text-xl font-black">{buses.length}</p></div>
-              <div className="flex-1 bg-white p-4 rounded-xl shadow-sm border-b-4 border-green-500 min-w-[120px]"><p className="text-[9px] font-black text-slate-400 uppercase">Ready</p><p className="text-xl font-black text-green-600">{buses.filter(b=>b.status==='Active').length}</p></div>
-              <div className="flex-1 bg-white p-4 rounded-xl shadow-sm border-b-4 border-red-600 min-w-[120px]"><p className="text-[9px] font-black text-slate-400 uppercase">On Hold</p><p className="text-xl font-black text-red-600">{buses.filter(b=>b.status==='On Hold').length}</p></div>
-              <div className="flex-1 bg-white p-4 rounded-xl shadow-sm border-b-4 border-amber-500 min-w-[120px]"><p className="text-[9px] font-black text-slate-400 uppercase">In Shop</p><p className="text-xl font-black text-amber-600">{buses.filter(b=>b.status==='In Shop').length}</p></div>
+      <main className="max-w-7xl mx-auto p-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+          {[
+            { label: 'Total Fleet', val: buses.length, color: 'text-slate-900' },
+            { label: 'Ready', val: buses.filter(b => b.status === 'Active').length, color: 'text-green-600' },
+            { label: 'On Hold', val: buses.filter(b => b.status === 'On Hold').length, color: 'text-red-600' },
+            { label: 'In Shop', val: buses.filter(b => b.status === 'In Shop').length, color: 'text-[#ef7c00]' }
+          ].map((m, i) => (
+            <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center">
+                <p className="text-[9px] font-black uppercase text-slate-400 mb-1 tracking-widest">{m.label}</p>
+                <p className={`text-4xl font-black tabular-nums ${m.color}`}>{m.val}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mb-6 flex justify-between items-end">
+            <div className="relative w-full max-w-md">
+                <input type="text" placeholder="Search Unit #..." 
+                  className="w-full pl-4 pr-10 py-3 bg-white border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-[#002d72] transition-all" 
+                  value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 font-black text-xs">🔍</span>
+            </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* UPDATED HEADER: Added Fault Column and increased grid cols to 8 */}
+            <div className="grid grid-cols-8 gap-4 p-5 border-b border-slate-100 bg-slate-50/50 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                <div className="col-span-1">Unit #</div>
+                <div className="col-span-1">Series</div>
+                <div className="col-span-1">Status</div>
+                <div className="col-span-1">Location</div>
+                <div className="col-span-2">Fault Preview</div>
+                <div className="col-span-1">Days OOS</div>
+                <div className="col-span-1 text-right">Action</div>
             </div>
 
-            <section className="bg-white p-6 rounded-2xl shadow-xl mb-12 border border-slate-200">
-              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <input type="text" placeholder="Unit #" maxLength={4} className="p-4 border-2 border-slate-100 rounded-xl font-black uppercase text-slate-900" value={busNumber} onChange={(e) => setBusNumber(e.target.value)} required />
-                <select className="p-4 border-2 border-slate-100 rounded-xl font-bold bg-slate-50 text-slate-900" value={status} onChange={(e) => setStatus(e.target.value)}>
-                  <option value="Active">Ready</option><option value="On Hold">Hold</option><option value="In Shop">Shop</option>
-                </select>
-                <input type="text" placeholder="Diagnostics..." className="p-4 border-2 border-slate-100 rounded-xl text-slate-900" value={notes} onChange={(e) => setNotes(e.target.value)} />
-                <button type="submit" className="bg-[#ef7c00] text-white font-black py-4 rounded-xl shadow-lg uppercase">{editingId ? "Save Change" : "Update Fleet"}</button>
-              </form>
-            </section>
+            <div className="divide-y divide-slate-100">
+                {buses.filter(b => b.number.includes(searchTerm)).map((bus) => {
+                    const specs = getBusSpecs(bus.number);
+                    const isDown = bus.status !== 'Active';
+                    const isExpanded = expandedBus === bus.docId;
+                    const days = calculateDaysOOS(bus.oosStartDate, new Date().toISOString().split('T')[0]);
+                    const rowClass = bus.status === 'Active' ? 'bg-white hover:bg-slate-50 border-l-4 border-l-green-500' :
+                                     bus.status === 'On Hold' ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-500' :
+                                     'bg-orange-50 hover:bg-orange-100 border-l-4 border-l-orange-500';
 
-            <div className="mb-6 flex flex-col md:flex-row gap-4 items-center">
-              <input type="text" placeholder="🔍 Search Unit #..." className="flex-1 p-4 border-2 border-slate-200 rounded-xl shadow-sm outline-none text-slate-900 font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-              <div className="flex bg-slate-200 p-1 rounded-xl w-full md:w-auto">
-                {['card', 'list'].map((mode) => (
-                  <button key={mode} onClick={() => setViewMode(mode)} className={`flex-1 px-6 py-2 rounded-lg text-[10px] font-black uppercase ${viewMode === mode ? 'bg-white shadow-sm text-[#002d72]' : 'text-slate-400'}`}>
-                    {mode}
-                  </button>
-                ))}
-              </div>
-              <button onClick={exportToExcel} className="w-full md:w-auto bg-[#002d72] text-white px-8 py-4 rounded-xl font-black text-[10px] uppercase shadow-lg">Export Report</button>
+                    return (
+                        <div key={bus.docId} className={`group transition-all duration-200 ${rowClass}`}>
+                            {/* UPDATED ROW: Increased grid cols to 8 to fit Fault Preview */}
+                            <div onClick={() => setExpandedBus(isExpanded ? null : bus.docId)} className="grid grid-cols-8 gap-4 p-5 items-center cursor-pointer">
+                                <div className={`col-span-1 text-lg font-black ${bus.status === 'On Hold' ? 'text-red-700' : bus.status === 'In Shop' ? 'text-orange-700' : 'text-[#002d72]'}`}>#{bus.number}</div>
+                                <div className="col-span-1"><span className="bg-white/50 border border-black/5 text-slate-500 text-[9px] font-bold px-2 py-1 rounded-md">{specs.length}</span></div>
+                                <div className="col-span-1"><span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full border ${
+                                    bus.status === 'Active' ? 'bg-green-100 text-green-700 border-green-200' : 
+                                    bus.status === 'On Hold' ? 'bg-red-100 text-red-700 border-red-200' : 
+                                    'bg-orange-100 text-orange-700 border-orange-200'}`}>{bus.status}</span></div>
+                                <div className="col-span-1 text-xs font-bold text-slate-600">{bus.location || '---'}</div>
+                                
+                                {/* FAULT PREVIEW COLUMN */}
+                                <div className="col-span-2 text-xs font-bold text-slate-500 truncate pr-4 italic">
+                                    {bus.notes ? bus.notes : <span className="opacity-30">No active faults</span>}
+                                </div>
+
+                                <div className="col-span-1 text-xs font-bold text-slate-600">{isDown ? `${days} days` : '-'}</div>
+                                <div className="col-span-1 text-right"><span className="text-[#002d72] font-black text-[10px] uppercase opacity-50 group-hover:opacity-100 transition-opacity">{isExpanded ? 'Close' : 'Edit'}</span></div>
+                            </div>
+
+                            {isExpanded && (
+                                <div className="bg-white/50 border-t border-black/5 p-6 animate-in slide-in-from-top-2">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-[9px] font-black uppercase text-slate-400">Change Status</label>
+                                                <select className="w-full p-3 bg-white border border-slate-200 rounded-lg text-xs font-bold mt-1 outline-none focus:border-[#002d72]" 
+                                                    value={bus.status}
+                                                    onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { status: e.target.value, timestamp: serverTimestamp() }, { merge: true })}>
+                                                    <option value="Active">Ready for Service</option><option value="On Hold">Maintenance Hold</option><option value="In Shop">In Shop</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-black uppercase text-slate-400">Location</label>
+                                                <input type="text" className="w-full p-3 bg-white border border-slate-200 rounded-lg text-xs font-bold mt-1 outline-none focus:border-[#002d72]" 
+                                                    value={bus.location || ''} placeholder="e.g. Hamilton"
+                                                    onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { location: e.target.value }, { merge: true })} />
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-black uppercase text-slate-400">OOS Start Date</label>
+                                                <input type="date" className="w-full p-3 bg-white border border-slate-200 rounded-lg text-xs font-bold mt-1 outline-none focus:border-[#002d72]" 
+                                                    value={bus.oosStartDate || ''}
+                                                    onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { oosStartDate: e.target.value }, { merge: true })} />
+                                            </div>
+                                        </div>
+                                        <div className="md:col-span-2 flex flex-col">
+                                            <label className="text-[9px] font-black uppercase text-slate-400 mb-1">Fault Details / Notes</label>
+                                            <textarea className="flex-1 w-full p-4 bg-white border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-[#002d72] leading-relaxed" 
+                                                placeholder="Enter technical details here..." value={bus.notes || ''}
+                                                onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { notes: e.target.value }, { merge: true })} />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-200/50">
+                                        <button 
+                                            onClick={async () => {
+                                                if(confirm('Are you sure you want to clear all data for this unit?')) {
+                                                    await updateDoc(doc(db, "buses", bus.docId), {
+                                                        notes: '', location: '', oosStartDate: '', 
+                                                        expectedReturnDate: '', actualReturnDate: ''
+                                                    });
+                                                }
+                                            }}
+                                            className="px-4 py-2 text-red-500 hover:bg-red-50 rounded-lg text-[10px] font-black uppercase transition-colors"
+                                        >
+                                            Clear Form
+                                        </button>
+                                        <button 
+                                            onClick={() => setExpandedBus(null)} 
+                                            className="px-6 py-2 bg-[#002d72] hover:bg-[#001a3d] text-white rounded-lg text-[10px] font-black uppercase transition-colors shadow-md"
+                                        >
+                                            Save & Close
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
-            
-            <div className={viewMode === 'card' ? "grid grid-cols-1 md:grid-cols-3 gap-6" : "space-y-3"}>
-              {buses.filter(b => b.number.includes(searchTerm.toUpperCase())).map((bus) => (
-                <div key={bus.docId} className={`bg-white p-4 rounded-xl shadow-sm border-l-8 ${bus.status === 'Active' ? 'border-green-500' : bus.status === 'On Hold' ? 'border-red-600' : 'border-amber-500'} ${viewMode === 'list' ? 'flex justify-between items-center' : ''}`}>
-                  <span className="text-2xl font-black text-[#002d72] w-20 tracking-tighter">#{bus.number}</span>
-                  <p className="flex-1 px-8 text-slate-500 text-xs italic">"{bus.notes || "---"}"</p>
-                  <div className="flex gap-4 items-center">
-                    <span className="text-[9px] font-bold text-slate-300 uppercase">{bus.modifiedBy?.split('@')[0]}</span>
-                    {isAdmin && (
-                      <div className="flex gap-3">
-                         <button onClick={() => { setEditingId(bus.docId); setBusNumber(bus.number); setStatus(bus.status); setNotes(bus.notes); window.scrollTo({top: 0, behavior: 'smooth'}); }} className="text-[#002d72] font-black text-[10px] uppercase">Edit</button>
-                         <button onClick={() => deleteDoc(doc(db, "buses", bus.docId))} className="text-red-300 font-bold text-[10px] uppercase">Del</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : activeTab === 'history' ? (
-          <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 text-slate-900">
-            <div className="flex justify-between items-center mb-8 border-b pb-4">
-                <h2 className="text-xl font-black text-[#002d72] uppercase tracking-widest italic">Timeline</h2>
-                {isAdmin && <button onClick={clearHistory} className="bg-red-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase shadow-md">Clear Logs</button>}
-            </div>
-            <div className="space-y-4">
-              {history.slice(0, 50).map((log, i) => (
-                <div key={i} className="flex flex-col md:flex-row items-center justify-between p-4 bg-slate-50 rounded-xl border-l-4 border-slate-200">
-                  <span className="text-lg font-black text-[#002d72] w-16">#{log.number}</span>
-                  <p className="flex-1 px-4 text-slate-400 text-[10px] italic break-all">"{log.notes || "---"}"</p>
-                  <span className="font-mono text-[9px] text-slate-300">{(log.timestamp?.toDate().toLocaleString())}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 text-slate-900">
-            <h2 className="text-xl font-black text-[#002d72] uppercase mb-8 tracking-widest border-b pb-4">Team</h2>
-            <div className="space-y-4">
-              {allUsers.filter(u => u.email !== 'anetowestfield@gmail.com').map((member, i) => (
-                <div key={i} className="flex flex-col md:flex-row items-center justify-between p-6 bg-slate-50 rounded-2xl gap-6">
-                  <div className="flex-1">
-                    <span className="font-black text-[#002d72] text-lg">{member.email}</span>
-                    <p className="text-[9px] font-black uppercase text-slate-400">Role: {member.role || 'user'}</p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button onClick={async () => await updateDoc(doc(db, "users", member.uid), { approved: !member.approved })} className={`px-4 py-2 rounded-lg font-black text-[10px] uppercase ${member.approved ? 'bg-red-500 text-white' : 'bg-green-600 text-white'}`}>{member.approved ? 'Revoke' : 'Approve'}</button>
-                    <button onClick={async () => await updateDoc(doc(db, "users", member.uid), { role: member.role === 'admin' ? 'user' : 'admin' })} className={`px-4 py-2 rounded-lg font-black text-[10px] uppercase bg-amber-500 text-white`}>{member.role === 'admin' ? 'Demote' : 'Promote'}</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        </div>
       </main>
     </div>
   );

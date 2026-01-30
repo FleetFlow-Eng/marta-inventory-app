@@ -15,7 +15,7 @@ export default function MartaInventory() {
   const [password, setPassword] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'number', direction: 'asc' });
 
-  // UPDATED: Added 'Safety' to the On Hold group
+  // Statuses that count as RED (On Hold)
   const holdStatuses = ['On Hold', 'Engine', 'Body Shop', 'Vendor', 'Brakes', 'Safety'];
 
   const getBusSpecs = (num: string) => {
@@ -90,7 +90,7 @@ export default function MartaInventory() {
 
     sortedBuses.forEach(bus => {
       const specs = getBusSpecs(bus.number);
-      worksheet.addRow({
+      const row = worksheet.addRow({
         number: bus.number,
         type: specs.length,
         location: bus.location || '---',
@@ -99,7 +99,26 @@ export default function MartaInventory() {
         expReturn: bus.expectedReturnDate || '---',
         actReturn: bus.actualReturnDate || '---',
         daysOOS: calculateDaysOOS(bus.oosStartDate, new Date().toISOString().split('T')[0])
-      }).getCell('fault').alignment = { wrapText: true, vertical: 'top' };
+      });
+
+      // APPLY COLOR CODING
+      let fillColor = 'FFFFFFFF'; // Default White
+      if (bus.status === 'Active') {
+          fillColor = 'FFC6EFCE'; // Light Green (Good)
+      } else if (holdStatuses.includes(bus.status)) {
+          fillColor = 'FFFFC7CE'; // Light Red (Bad/Hold)
+      } else {
+          fillColor = 'FFFFEB9C'; // Light Yellow (In Shop)
+      }
+
+      row.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: fillColor }
+      };
+
+      // Wrap Text Alignment
+      row.getCell('fault').alignment = { wrapText: true, vertical: 'top' };
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -150,7 +169,6 @@ export default function MartaInventory() {
           {[
             { label: 'Total Fleet', val: buses.length, color: 'text-slate-900' },
             { label: 'Ready', val: buses.filter(b => b.status === 'Active').length, color: 'text-green-600' },
-            /* UPDATED: Metric Card counts all 'holdStatuses' as "On Hold" */
             { label: 'On Hold', val: buses.filter(b => holdStatuses.includes(b.status)).length, color: 'text-red-600' },
             { label: 'In Shop', val: buses.filter(b => b.status === 'In Shop').length, color: 'text-[#ef7c00]' }
           ].map((m, i) => (
@@ -225,7 +243,6 @@ export default function MartaInventory() {
                                         <div className="space-y-4">
                                             <div>
                                                 <label className="text-[9px] font-black uppercase text-slate-400">Change Status</label>
-                                                {/* ADDED NEW SAFETY OPTION */}
                                                 <select className="w-full p-3 bg-white border border-slate-200 rounded-lg text-xs font-bold mt-1 outline-none focus:border-[#002d72]" 
                                                     value={bus.status}
                                                     onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { status: e.target.value, timestamp: serverTimestamp() }, { merge: true })}>

@@ -13,6 +13,9 @@ export default function MartaInventory() {
   const [searchTerm, setSearchTerm] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  // NEW: State for sorting
+  const [sortConfig, setSortConfig] = useState({ key: 'number', direction: 'asc' });
 
   const getBusSpecs = (num: string) => {
     const n = parseInt(num);
@@ -30,6 +33,48 @@ export default function MartaInventory() {
     return Math.max(0, Math.ceil((e.getTime() - s.getTime()) / (1000 * 3600 * 24)));
   };
 
+  // NEW: Sorting Logic Handler
+  const requestSort = (key: string) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // NEW: Sort the buses based on configuration
+  const sortedBuses = [...buses].filter(b => b.number.includes(searchTerm)).sort((a, b) => {
+    let aValue: any = a[sortConfig.key];
+    let bValue: any = b[sortConfig.key];
+
+    // Special sort for 'Days OOS' (calculated)
+    if (sortConfig.key === 'daysOOS') {
+        const today = new Date().toISOString().split('T')[0];
+        aValue = calculateDaysOOS(a.oosStartDate, today);
+        bValue = calculateDaysOOS(b.oosStartDate, today);
+    }
+    // Special sort for 'Series'
+    else if (sortConfig.key === 'series') {
+        aValue = getBusSpecs(a.number).length;
+        bValue = getBusSpecs(b.number).length;
+    }
+    // Default handle nulls
+    else {
+        aValue = aValue ? aValue.toLowerCase() : '';
+        bValue = bValue ? bValue.toLowerCase() : '';
+    }
+
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Helper to render sort arrow
+  const getSortIcon = (key: string) => {
+      if (sortConfig.key !== key) return <span className="opacity-20 ml-1">⇅</span>;
+      return <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
+  };
+
   const exportToExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Vehicle OOS Details');
@@ -40,6 +85,7 @@ export default function MartaInventory() {
       { header: 'OOS Start Date', key: 'oosStart', width: 25 },
       { header: 'Fault Details', key: 'fault', width: 50 }, 
       { header: 'Expected Return', key: 'expReturn', width: 30 },
+      { header: 'Actual Return', key: 'actReturn', width: 30 },
       { header: 'Days OOS', key: 'daysOOS', width: 12 }
     ];
     
@@ -47,7 +93,8 @@ export default function MartaInventory() {
     headerRow.font = { bold: true, color: { argb: 'FFFFFF' } };
     headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '002D72' } };
 
-    buses.forEach(bus => {
+    // Use sortedBuses for export so Excel matches screen
+    sortedBuses.forEach(bus => {
       const specs = getBusSpecs(bus.number);
       worksheet.addRow({
         number: bus.number,
@@ -56,6 +103,7 @@ export default function MartaInventory() {
         oosStart: bus.oosStartDate || '---',
         fault: bus.notes || '---',
         expReturn: bus.expectedReturnDate || '---',
+        actReturn: bus.actualReturnDate || '---',
         daysOOS: calculateDaysOOS(bus.oosStartDate, new Date().toISOString().split('T')[0])
       }).getCell('fault').alignment = { wrapText: true, vertical: 'top' };
     });
@@ -103,7 +151,7 @@ export default function MartaInventory() {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto p-6">
+      <main className="max-w-[1600px] mx-auto p-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           {[
             { label: 'Total Fleet', val: buses.length, color: 'text-slate-900' },
@@ -128,19 +176,22 @@ export default function MartaInventory() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            {/* UPDATED HEADER: Added Fault Column and increased grid cols to 8 */}
-            <div className="grid grid-cols-8 gap-4 p-5 border-b border-slate-100 bg-slate-50/50 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                <div className="col-span-1">Unit #</div>
-                <div className="col-span-1">Series</div>
-                <div className="col-span-1">Status</div>
-                <div className="col-span-1">Location</div>
+            {/* UPDATED HEADER: Clickable Columns with Sort Icons */}
+            <div className="grid grid-cols-10 gap-4 p-5 border-b border-slate-100 bg-slate-50/50 text-[9px] font-black uppercase tracking-widest text-slate-400 select-none">
+                <div onClick={() => requestSort('number')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Unit # {getSortIcon('number')}</div>
+                <div onClick={() => requestSort('series')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Series {getSortIcon('series')}</div>
+                <div onClick={() => requestSort('status')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Status {getSortIcon('status')}</div>
+                <div onClick={() => requestSort('location')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Location {getSortIcon('location')}</div>
                 <div className="col-span-2">Fault Preview</div>
-                <div className="col-span-1">Days OOS</div>
+                <div onClick={() => requestSort('expectedReturnDate')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Exp Return {getSortIcon('expectedReturnDate')}</div>
+                <div onClick={() => requestSort('actualReturnDate')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Act Return {getSortIcon('actualReturnDate')}</div>
+                <div onClick={() => requestSort('daysOOS')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Days OOS {getSortIcon('daysOOS')}</div>
                 <div className="col-span-1 text-right">Action</div>
             </div>
 
             <div className="divide-y divide-slate-100">
-                {buses.filter(b => b.number.includes(searchTerm)).map((bus) => {
+                {/* MAPPING OVER SORTED BUSES NOW */}
+                {sortedBuses.map((bus) => {
                     const specs = getBusSpecs(bus.number);
                     const isDown = bus.status !== 'Active';
                     const isExpanded = expandedBus === bus.docId;
@@ -151,8 +202,7 @@ export default function MartaInventory() {
 
                     return (
                         <div key={bus.docId} className={`group transition-all duration-200 ${rowClass}`}>
-                            {/* UPDATED ROW: Increased grid cols to 8 to fit Fault Preview */}
-                            <div onClick={() => setExpandedBus(isExpanded ? null : bus.docId)} className="grid grid-cols-8 gap-4 p-5 items-center cursor-pointer">
+                            <div onClick={() => setExpandedBus(isExpanded ? null : bus.docId)} className="grid grid-cols-10 gap-4 p-5 items-center cursor-pointer">
                                 <div className={`col-span-1 text-lg font-black ${bus.status === 'On Hold' ? 'text-red-700' : bus.status === 'In Shop' ? 'text-orange-700' : 'text-[#002d72]'}`}>#{bus.number}</div>
                                 <div className="col-span-1"><span className="bg-white/50 border border-black/5 text-slate-500 text-[9px] font-bold px-2 py-1 rounded-md">{specs.length}</span></div>
                                 <div className="col-span-1"><span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full border ${
@@ -160,11 +210,10 @@ export default function MartaInventory() {
                                     bus.status === 'On Hold' ? 'bg-red-100 text-red-700 border-red-200' : 
                                     'bg-orange-100 text-orange-700 border-orange-200'}`}>{bus.status}</span></div>
                                 <div className="col-span-1 text-xs font-bold text-slate-600">{bus.location || '---'}</div>
+                                <div className="col-span-2 text-xs font-bold text-slate-500 truncate pr-4 italic">{bus.notes ? bus.notes : <span className="opacity-30">No faults</span>}</div>
                                 
-                                {/* FAULT PREVIEW COLUMN */}
-                                <div className="col-span-2 text-xs font-bold text-slate-500 truncate pr-4 italic">
-                                    {bus.notes ? bus.notes : <span className="opacity-30">No active faults</span>}
-                                </div>
+                                <div className="col-span-1 text-xs font-bold text-slate-700">{bus.expectedReturnDate || '--'}</div>
+                                <div className="col-span-1 text-xs font-bold text-slate-700">{bus.actualReturnDate || '--'}</div>
 
                                 <div className="col-span-1 text-xs font-bold text-slate-600">{isDown ? `${days} days` : '-'}</div>
                                 <div className="col-span-1 text-right"><span className="text-[#002d72] font-black text-[10px] uppercase opacity-50 group-hover:opacity-100 transition-opacity">{isExpanded ? 'Close' : 'Edit'}</span></div>
@@ -195,21 +244,36 @@ export default function MartaInventory() {
                                                     onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { oosStartDate: e.target.value }, { merge: true })} />
                                             </div>
                                         </div>
-                                        <div className="md:col-span-2 flex flex-col">
-                                            <label className="text-[9px] font-black uppercase text-slate-400 mb-1">Fault Details / Notes</label>
-                                            <textarea className="flex-1 w-full p-4 bg-white border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-[#002d72] leading-relaxed" 
-                                                placeholder="Enter technical details here..." value={bus.notes || ''}
-                                                onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { notes: e.target.value }, { merge: true })} />
+                                        <div className="md:col-span-2 flex flex-col space-y-4">
+                                            <div>
+                                                <label className="text-[9px] font-black uppercase text-slate-400 mb-1">Fault Details / Notes</label>
+                                                <textarea className="w-full p-4 bg-white border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-[#002d72] h-24" 
+                                                    placeholder="Enter technical details here..." value={bus.notes || ''}
+                                                    onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { notes: e.target.value }, { merge: true })} />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-[9px] font-black uppercase text-slate-400">Expected Return</label>
+                                                    <input type="date" className="w-full p-3 bg-white border border-slate-200 rounded-lg text-xs font-bold mt-1 outline-none focus:border-[#002d72]" 
+                                                        value={bus.expectedReturnDate || ''}
+                                                        onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { expectedReturnDate: e.target.value }, { merge: true })} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] font-black uppercase text-slate-400">Actual Return</label>
+                                                    <input type="date" className="w-full p-3 bg-white border border-slate-200 rounded-lg text-xs font-bold mt-1 outline-none focus:border-[#002d72]" 
+                                                        value={bus.actualReturnDate || ''}
+                                                        onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { actualReturnDate: e.target.value }, { merge: true })} />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                     
                                     <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-200/50">
                                         <button 
                                             onClick={async () => {
-                                                if(confirm('Are you sure you want to clear all data for this unit?')) {
+                                                if(confirm('Clear data for this unit?')) {
                                                     await updateDoc(doc(db, "buses", bus.docId), {
-                                                        notes: '', location: '', oosStartDate: '', 
-                                                        expectedReturnDate: '', actualReturnDate: ''
+                                                        notes: '', location: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: ''
                                                     });
                                                 }
                                             }}

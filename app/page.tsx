@@ -15,6 +15,9 @@ export default function MartaInventory() {
   const [password, setPassword] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'number', direction: 'asc' });
 
+  // UPDATED: Added 'Safety' to the On Hold group
+  const holdStatuses = ['On Hold', 'Engine', 'Body Shop', 'Vendor', 'Brakes', 'Safety'];
+
   const getBusSpecs = (num: string) => {
     const n = parseInt(num);
     const thirtyFt = [1951, 1958, 1959];
@@ -62,7 +65,6 @@ export default function MartaInventory() {
     return 0;
   });
 
-  // UPDATED: Bigger, Bolder Sort Icons
   const getSortIcon = (key: string) => {
       if (sortConfig.key !== key) return <span className="opacity-20 ml-2 text-lg">⇅</span>;
       return <span className="ml-2 text-lg font-black text-[#ef7c00]">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
@@ -130,8 +132,6 @@ export default function MartaInventory() {
     );
   }
 
-  const shopStatuses = ['In Shop', 'Engine', 'Body Shop', 'Vendor', 'Brakes'];
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-[#ef7c00] selection:text-white">
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm">
@@ -150,8 +150,9 @@ export default function MartaInventory() {
           {[
             { label: 'Total Fleet', val: buses.length, color: 'text-slate-900' },
             { label: 'Ready', val: buses.filter(b => b.status === 'Active').length, color: 'text-green-600' },
-            { label: 'On Hold', val: buses.filter(b => b.status === 'On Hold').length, color: 'text-red-600' },
-            { label: 'In Shop', val: buses.filter(b => shopStatuses.includes(b.status)).length, color: 'text-[#ef7c00]' }
+            /* UPDATED: Metric Card counts all 'holdStatuses' as "On Hold" */
+            { label: 'On Hold', val: buses.filter(b => holdStatuses.includes(b.status)).length, color: 'text-red-600' },
+            { label: 'In Shop', val: buses.filter(b => b.status === 'In Shop').length, color: 'text-[#ef7c00]' }
           ].map((m, i) => (
             <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center">
                 <p className="text-[9px] font-black uppercase text-slate-400 mb-1 tracking-widest">{m.label}</p>
@@ -189,15 +190,17 @@ export default function MartaInventory() {
                     const isExpanded = expandedBus === bus.docId;
                     const days = calculateDaysOOS(bus.oosStartDate, new Date().toISOString().split('T')[0]);
 
+                    const isHoldGroup = holdStatuses.includes(bus.status);
+                    
                     const rowClass = bus.status === 'Active' ? 'bg-white hover:bg-slate-50 border-l-4 border-l-green-500' :
-                                     bus.status === 'On Hold' ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-500' :
+                                     isHoldGroup ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-500' :
                                      'bg-orange-50 hover:bg-orange-100 border-l-4 border-l-orange-500';
 
-                    const statusTextColor = bus.status === 'On Hold' ? 'text-red-700' : 
+                    const statusTextColor = isHoldGroup ? 'text-red-700' : 
                                             bus.status === 'Active' ? 'text-[#002d72]' : 'text-orange-700';
 
                     const statusBadgeClass = bus.status === 'Active' ? 'bg-green-100 text-green-700 border-green-200' : 
-                                             bus.status === 'On Hold' ? 'bg-red-100 text-red-700 border-red-200' : 
+                                             isHoldGroup ? 'bg-red-100 text-red-700 border-red-200' : 
                                              'bg-orange-100 text-orange-700 border-orange-200';
 
                     return (
@@ -222,6 +225,7 @@ export default function MartaInventory() {
                                         <div className="space-y-4">
                                             <div>
                                                 <label className="text-[9px] font-black uppercase text-slate-400">Change Status</label>
+                                                {/* ADDED NEW SAFETY OPTION */}
                                                 <select className="w-full p-3 bg-white border border-slate-200 rounded-lg text-xs font-bold mt-1 outline-none focus:border-[#002d72]" 
                                                     value={bus.status}
                                                     onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { status: e.target.value, timestamp: serverTimestamp() }, { merge: true })}>
@@ -232,6 +236,7 @@ export default function MartaInventory() {
                                                     <option value="Body Shop">Body Shop</option>
                                                     <option value="Vendor">Vendor</option>
                                                     <option value="Brakes">Brakes</option>
+                                                    <option value="Safety">Safety</option>
                                                 </select>
                                             </div>
                                             <div>

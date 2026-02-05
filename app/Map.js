@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Tooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -32,7 +32,7 @@ const redIcon = L.icon({
 function MapController({ selectedBus }) {
   const map = useMap();
   useEffect(() => {
-    if (selectedBus) {
+    if (selectedBus?.vehicle?.position) {
       map.flyTo(
         [selectedBus.vehicle.position.latitude, selectedBus.vehicle.position.longitude], 
         15, { duration: 2 }
@@ -42,11 +42,11 @@ function MapController({ selectedBus }) {
   return null;
 }
 
-export default function Map({ buses, selectedId, pinnedIds = [] }) {
+// ADDED 'routes' prop here to receive your routes.json data
+export default function Map({ buses, selectedId, pinnedIds = [], routes = {} }) {
   const position = [33.7490, -84.3880];
-  const selectedBus = buses.find(b => b.vehicle.vehicle.id === selectedId);
+  const selectedBus = buses.find(b => b.vehicle?.vehicle?.id === selectedId);
   
-  // Force map to re-render every minute so the colors update
   const [, setTick] = useState(0);
   useEffect(() => {
     const timer = setInterval(() => setTick(t => t + 1), 60000);
@@ -62,8 +62,18 @@ export default function Map({ buses, selectedId, pinnedIds = [] }) {
       <MapController selectedBus={selectedBus} />
       
       {buses.map((bus) => {
-        const id = bus.vehicle.vehicle.id;
-        const busNumber = bus.vehicle.vehicle.label || id;
+        const vehicle = bus.vehicle?.vehicle;
+        const id = vehicle?.id;
+        if (!id) return null;
+
+        // --- PROPER DECODING ---
+        // 1. Bus Number (Uses Label like #2316)
+        const busNumber = vehicle?.label || id;
+        
+        // 2. Route Number (Look up in your routes.json dictionary)
+        const rawRouteId = bus.vehicle?.trip?.route_id;
+        const properRouteNumber = routes[rawRouteId] || "??";
+
         const isSelected = id === selectedId;
         const isPinned = pinnedIds.includes(id); 
         const lat = bus.vehicle.position.latitude;
@@ -73,10 +83,10 @@ export default function Map({ buses, selectedId, pinnedIds = [] }) {
         const trail = bus.trail && bus.trail.length > 0 ? bus.trail : [[lat, lon]];
 
         // --- GHOST LOGIC ---
-        // 5 Minutes = 300,000 milliseconds
-        // If no signal for 5 mins, turn it GRAY.
-        const isStale = (Date.now() - bus.lastUpdated) > 300000;
-        const timeString = new Date(bus.lastUpdated).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        // MARTA timestamp is in seconds, JavaScript needs milliseconds
+        const lastSeen = bus.vehicle?.timestamp ? bus.vehicle.timestamp * 1000 : Date.now();
+        const isStale = (Date.now() - lastSeen) > 300000;
+        const timeString = new Date(lastSeen).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
         let currentIcon = blueIcon;
         let trailColor = "#3388ff"; 
@@ -85,7 +95,7 @@ export default function Map({ buses, selectedId, pinnedIds = [] }) {
             currentIcon = redIcon;
             trailColor = "red"; 
         } else if (isStale) {
-            currentIcon = greyIcon; // Turns Gray immediately
+            currentIcon = greyIcon;
             trailColor = "grey";
         }
 
@@ -102,47 +112,54 @@ export default function Map({ buses, selectedId, pinnedIds = [] }) {
                 opacity={isSelected ? 1.0 : (isStale && !isPinned ? 0.6 : 0.9)}
                 zIndexOffset={isPinned ? 1000 : 0} 
             >
-                <Popup>
-                <strong>Bus #{busNumber}</strong> 
-                {isPinned && <span style={{color: "red", fontWeight: "bold"}}> (WORK ORDER)</span>}
-                <br />
-                Route: {bus.humanRouteName || "N/A"} <br />
-                
-                <div style={{fontWeight: "bold", color: "#d9534f", margin: "4px 0"}}>
-                    {miles} miles from garage
-                </div>
-                
-                {/* Visual Status Label in Popup */}
-                {isStale ? (
-                   <span style={{ fontSize: "12px", color: "gray", fontWeight: "bold" }}>
-                     👻 GHOST (Offline {timeString})
-                   </span>
-                ) : (
-                   <span style={{ fontSize: "12px", color: "green", fontWeight: "bold" }}>
-                     🟢 LIVE ({timeString})
-                   </span>
-                )}
+                {/* TOOLTIP: Now shows proper Unit and Route on hover */}
+                <Tooltip direction="top" offset={[0, -40]}>
+                    <span className="font-black text-[#002d72]">#{busNumber} | RT {properRouteNumber}</span>
+                </Tooltip>
 
-                <div style={{ marginTop: "10px", borderTop: "1px solid #eee", paddingTop: "8px" }}>
-                    <a 
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                        display: "block",
-                        backgroundColor: "#4285F4",
-                        color: "white",
-                        textAlign: "center",
-                        padding: "6px 10px",
-                        borderRadius: "4px",
-                        textDecoration: "none",
-                        fontSize: "13px",
-                        fontWeight: "bold"
-                    }}
-                    >
-                    🚗 Navigate to Bus
-                    </a>
-                </div>
+                <Popup>
+                    <div className="font-sans">
+                        <strong className="text-lg">Bus #{busNumber}</strong> 
+                        {isPinned && <span style={{color: "red", fontWeight: "bold"}}> (OOS/WORK ORDER)</span>}
+                        <br />
+                        <span className="font-bold text-[#ef7c00]">Route: {properRouteNumber}</span>
+                        <br />
+                        
+                        <div style={{fontWeight: "bold", color: "#d9534f", margin: "4px 0"}}>
+                            {miles} miles from garage
+                        </div>
+                        
+                        {isStale ? (
+                           <span style={{ fontSize: "12px", color: "gray", fontWeight: "bold" }}>
+                             👻 GHOST (Offline {timeString})
+                           </span>
+                        ) : (
+                           <span style={{ fontSize: "12px", color: "green", fontWeight: "bold" }}>
+                             🟢 LIVE ({timeString})
+                           </span>
+                        )}
+
+                        <div style={{ marginTop: "10px", borderTop: "1px solid #eee", paddingTop: "8px" }}>
+                            <a 
+                            href={`https://www.google.com/maps/search/?api=1&query=${lat},${lon}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                                display: "block",
+                                backgroundColor: "#4285F4",
+                                color: "white",
+                                textAlign: "center",
+                                padding: "8px 10px",
+                                borderRadius: "4px",
+                                textDecoration: "none",
+                                fontSize: "12px",
+                                fontWeight: "bold"
+                            }}
+                            >
+                            🚗 Navigate to Unit
+                            </a>
+                        </div>
+                    </div>
                 </Popup>
             </Marker>
           </div>

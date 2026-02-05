@@ -45,8 +45,8 @@ function MapController({ selectedBus }) {
 export default function Map({ buses = [], selectedId, pinnedIds = [], routes = {} }) {
   const position = [33.7490, -84.3880];
   
-  // SAFETY: Added ?. to prevent the "find of undefined" crash
-  const selectedBus = buses?.find?.(b => b.vehicle?.vehicle?.id === selectedId);
+  // Safety guard for finding the selected bus
+  const selectedBus = Array.isArray(buses) ? buses.find(b => b.vehicle?.vehicle?.id === selectedId) : null;
   
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -62,18 +62,21 @@ export default function Map({ buses = [], selectedId, pinnedIds = [], routes = {
       />
       <MapController selectedBus={selectedBus} />
       
-      {/* SAFETY: Ensure buses is an array before mapping */}
       {Array.isArray(buses) && buses.map((bus) => {
         const vehicle = bus.vehicle?.vehicle;
         const id = vehicle?.id;
         if (!id) return null;
 
         // --- PROPER DECODING ---
+        // 1. Bus Number: Uses Label (e.g., #2316) or falls back to technical ID
         const busNumber = vehicle?.label || id;
-        const rawRouteId = bus.vehicle?.trip?.route_id;
         
-        // Use your routes.json dictionary lookup
-        const properRouteNumber = routes[rawRouteId] || "??";
+        // 2. Route Number: Looks up the 5-digit code in your provided dictionary
+        const rawRouteId = bus.vehicle?.trip?.route_id;
+        const fullRouteName = routes[String(rawRouteId)] || "Route " + rawRouteId;
+        
+        // Split "191 - Riverdale" into just "191" for the small map labels
+        const routeShortNumber = fullRouteName.split(' - ')[0];
 
         const isSelected = id === selectedId;
         const isPinned = pinnedIds.includes(id); 
@@ -86,6 +89,7 @@ export default function Map({ buses = [], selectedId, pinnedIds = [], routes = {
         const trail = bus.trail && bus.trail.length > 0 ? bus.trail : [[lat, lon]];
 
         // --- GHOST LOGIC ---
+        // MARTA sends seconds; JavaScript needs milliseconds (* 1000)
         const lastSeen = bus.vehicle?.timestamp ? bus.vehicle.timestamp * 1000 : Date.now();
         const isStale = (Date.now() - lastSeen) > 300000;
         const timeString = new Date(lastSeen).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -114,16 +118,17 @@ export default function Map({ buses = [], selectedId, pinnedIds = [], routes = {
                 opacity={isSelected ? 1.0 : (isStale && !isPinned ? 0.6 : 0.9)}
                 zIndexOffset={isPinned ? 1000 : 0} 
             >
+                {/* TOOLTIP: Decoded Unit and Route number on hover */}
                 <Tooltip direction="top" offset={[0, -40]}>
-                    <span className="font-black text-[#002d72]">#{busNumber} | RT {properRouteNumber}</span>
+                    <span className="font-black text-[#002d72]">#{busNumber} | RT {routeShortNumber}</span>
                 </Tooltip>
 
                 <Popup>
                     <div className="font-sans">
-                        <strong className="text-lg">Bus #{busNumber}</strong> 
-                        {isPinned && <span style={{color: "red", fontWeight: "bold"}}> (OOS/WORK ORDER)</span>}
+                        <strong className="text-lg text-[#002d72]">Unit #{busNumber}</strong> 
+                        {isPinned && <span style={{color: "red", fontWeight: "bold"}}> (WORK ORDER)</span>}
                         <br />
-                        <span className="font-bold text-[#ef7c00]">Route: {properRouteNumber}</span>
+                        <span className="font-bold text-[#ef7c00]">{fullRouteName}</span>
                         <br />
                         
                         <div style={{fontWeight: "bold", color: "#d9534f", margin: "4px 0"}}>
@@ -142,7 +147,7 @@ export default function Map({ buses = [], selectedId, pinnedIds = [], routes = {
 
                         <div style={{ marginTop: "10px", borderTop: "1px solid #eee", paddingTop: "8px" }}>
                             <a 
-                            href={`https://www.google.com/maps?q=${lat},${lon}`}
+                            href={`https://www.google.com/maps/search/?api=1&query=${lat},${lon}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{

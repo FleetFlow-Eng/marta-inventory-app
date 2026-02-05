@@ -109,8 +109,9 @@ const EditBusForm = ({ bus, onClose }) => {
 export default function MartaInventory() {
   const [user, setUser] = useState<any>(null);
   const [view, setView] = useState<'inventory' | 'tracker'>('inventory');
-  // NEW: Toggle between List and Grid view
-  const [inventoryMode, setInventoryMode] = useState<'list' | 'grid'>('list');
+  
+  // FIXED: Set Grid View as default
+  const [inventoryMode, setInventoryMode] = useState<'list' | 'grid'>('grid');
   
   const [buses, setBuses] = useState<any[]>([]);
   const [expandedBus, setExpandedBus] = useState<string | null>(null);
@@ -181,7 +182,6 @@ export default function MartaInventory() {
   const exportToExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Vehicle OOS Details');
-    // ... (Excel logic unchanged) ...
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), `MARTA_Fleet_Report.xlsx`);
   };
@@ -212,14 +212,12 @@ export default function MartaInventory() {
     );
   }
 
-  // Find the currently expanded bus object for the Modal
   const expandedBusObj = expandedBus ? buses.find(b => b.docId === expandedBus) : null;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-[#ef7c00] selection:text-white relative">
       
-      {/* --- GRID VIEW MODAL --- */}
-      {/* If we are in grid mode and a bus is expanded, show this overlay */}
+      {/* GRID VIEW MODAL */}
       {inventoryMode === 'grid' && expandedBus && expandedBusObj && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -280,7 +278,6 @@ export default function MartaInventory() {
                 </div>
                 
                 <div className="flex items-center gap-4">
-                    {/* VIEW TOGGLE BUTTONS */}
                     <div className="bg-white border border-slate-200 rounded-lg p-1 flex">
                         <button 
                             onClick={() => setInventoryMode('list')}
@@ -306,10 +303,7 @@ export default function MartaInventory() {
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
-                {/* --- CONDITIONAL RENDERING: LIST VS GRID --- */}
-                
                 {inventoryMode === 'list' ? (
-                    // --- LIST VIEW ---
                     <>
                         <div className="grid grid-cols-10 gap-4 p-5 border-b border-slate-100 bg-slate-50/50 text-[9px] font-black uppercase tracking-widest text-slate-400 select-none">
                             <div onClick={() => requestSort('number')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Unit # {getSortIcon('number')}</div>
@@ -333,15 +327,11 @@ export default function MartaInventory() {
                                     const isExpanded = expandedBus === bus.docId;
                                     const days = calculateDaysOOS(bus.oosStartDate, new Date().toISOString().split('T')[0]);
                                     const isHoldGroup = holdStatuses.includes(bus.status);
-                                    
-                                    // Row Colors
                                     const rowClass = bus.status === 'Active' ? 'bg-white hover:bg-slate-50 border-l-4 border-l-green-500' :
                                                     isHoldGroup ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-500' :
                                                     'bg-orange-50 hover:bg-orange-100 border-l-4 border-l-orange-500';
-                                    
                                     const statusTextColor = isHoldGroup ? 'text-red-700' : 
                                                             bus.status === 'Active' ? 'text-[#002d72]' : 'text-orange-700';
-                                    
                                     const statusBadgeClass = bus.status === 'Active' ? 'bg-green-100 text-green-700 border-green-200' : 
                                                             isHoldGroup ? 'bg-red-100 text-red-700 border-red-200' : 
                                                             'bg-orange-100 text-orange-700 border-orange-200';
@@ -359,8 +349,6 @@ export default function MartaInventory() {
                                                 <div className="col-span-1 text-xs font-bold text-slate-600">{isDown ? `${days} days` : '-'}</div>
                                                 <div className="col-span-1 text-right"><span className="text-[#002d72] font-black text-[10px] uppercase opacity-50 group-hover:opacity-100 transition-opacity">{isExpanded ? 'Close' : 'Edit'}</span></div>
                                             </div>
-
-                                            {/* Expand Row in List Mode */}
                                             {isExpanded && (
                                                 <div className="bg-white/50 border-t border-black/5 p-6 animate-in slide-in-from-top-2">
                                                     <EditBusForm bus={bus} onClose={() => setExpandedBus(null)} />
@@ -373,7 +361,6 @@ export default function MartaInventory() {
                         </div>
                     </>
                 ) : (
-                    // --- GRID VIEW ---
                     <div className="p-8">
                         {sortedBuses.length === 0 ? (
                             <div className="text-center text-slate-400 italic">No buses found.</div>
@@ -381,11 +368,8 @@ export default function MartaInventory() {
                             <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-4">
                                 {sortedBuses.map((bus) => {
                                     const isHoldGroup = holdStatuses.includes(bus.status);
-                                    
-                                    // Card Colors (Matching List View)
                                     let cardClass = "";
                                     let textClass = "";
-                                    
                                     if (bus.status === 'Active') {
                                         cardClass = "bg-green-50 border-green-200 hover:bg-green-100 hover:border-green-400";
                                         textClass = "text-green-800";
@@ -393,7 +377,6 @@ export default function MartaInventory() {
                                         cardClass = "bg-red-50 border-red-200 hover:bg-red-100 hover:border-red-400";
                                         textClass = "text-red-800";
                                     } else {
-                                        // In Shop / Orange
                                         cardClass = "bg-orange-50 border-orange-200 hover:bg-orange-100 hover:border-orange-400";
                                         textClass = "text-orange-800";
                                     }

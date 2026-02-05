@@ -19,16 +19,10 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
   )
 });
 
-// --- COMPONENT: Read-Only Bus Details (Inventory Tab) ---
+// --- COMPONENT: Read-Only Bus Details ---
 const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
     const [showHistory, setShowHistory] = useState(false);
-
-    // Placeholder history data - in a real app this would query a sub-collection
-    const historyLog = [
-        { date: '2026-01-28', event: 'Imported from Daily Report', type: 'System' },
-        { date: '2025-11-20', event: 'Brake Replacement', type: 'Repair' },
-        { date: '2025-08-05', event: 'AC Unit Service', type: 'Vendor' }
-    ];
+    const historyLog: any[] = []; 
 
     if (showHistory) {
         return (
@@ -38,16 +32,22 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
                     <button onClick={() => setShowHistory(false)} className="text-sm font-bold text-slate-400 hover:text-[#002d72]">Back</button>
                 </div>
                 <div className="flex-grow overflow-y-auto space-y-3">
-                    {historyLog.map((log, i) => (
-                        <div key={i} className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                            <div className="flex justify-between text-[10px] font-black uppercase text-slate-400 mb-1">
-                                <span>{log.date}</span>
-                                <span>{log.type}</span>
-                            </div>
-                            <p className="text-sm font-bold text-slate-700">{log.event}</p>
+                    {historyLog.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-48 text-slate-300">
+                            <span className="text-4xl mb-2">📂</span>
+                            <p className="text-[10px] font-black uppercase tracking-widest">No History Records Found</p>
                         </div>
-                    ))}
-                    <div className="text-center text-xs text-slate-400 italic mt-4">End of recent records</div>
+                    ) : (
+                        historyLog.map((log, i) => (
+                            <div key={i} className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                <div className="flex justify-between text-[10px] font-black uppercase text-slate-400 mb-1">
+                                    <span>{log.date}</span>
+                                    <span>{log.type}</span>
+                                </div>
+                                <p className="text-sm font-bold text-slate-700">{log.event}</p>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
         );
@@ -103,7 +103,7 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
     );
 };
 
-// --- COMPONENT: Data Entry Form (With Clear All) ---
+// --- COMPONENT: Data Entry Form ---
 const BusInputForm = () => {
     const [formData, setFormData] = useState({
         number: '',
@@ -247,7 +247,7 @@ export default function MartaInventory() {
 
   const holdStatuses = ['On Hold', 'Engine', 'Body Shop', 'Vendor', 'Brakes', 'Safety'];
 
-  // --- NEW EXCEL PARSER FOR DAILY REPORT FORMAT ---
+  // --- REFINED EXCEL PARSER ---
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -260,28 +260,26 @@ export default function MartaInventory() {
         const buffer = reader.result as ArrayBuffer;
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(buffer);
-        const worksheet = workbook.getWorksheet(1); // Assuming 1st sheet
+        const worksheet = workbook.getWorksheet(1); 
 
         const uploadQueue: any[] = [];
         const currentYear = new Date().getFullYear();
 
-        // Mappings based on Visual Header Keywords in Image
-        // Key = exact Excel header string, Value = App Status
+        // 1. STRICT MAPPING (Ignores "SAFETY 1ST" and unrecognized cols)
         const categoryMap: { [key: string]: string } = {
             'ENGINE': 'Engine',
             'VENDOR': 'Vendor',
             'HOLD': 'On Hold',
             'BODY SHOP': 'Body Shop',
             'CODE 1 BRAKES': 'Brakes',
-            'NEW BRAKES': 'Brakes', // Just in case
-            'SAFETY 1ST': 'Safety',
+            'NEW BRAKES': 'Brakes',
+            // Note: 'SAFETY 1ST' is removed so it will be ignored
+            // 'SAFETY': 'Safety', // Removed based on request to ignore vague safety headers
             'SERVICE CALLS': 'In Shop'
         };
 
-        // Helper to format 1.28 -> 2026-01-28
         const formatOOSDate = (raw: string) => {
             if (!raw) return '';
-            // Match 1.28 or 10.5 pattern
             const match = raw.match(/(\d{1,2})\.(\d{1,2})/);
             if (match) {
                 const month = match[1].padStart(2, '0');
@@ -291,50 +289,45 @@ export default function MartaInventory() {
             return '';
         };
 
-        // Iterate through columns to find categories
-        // We scan first 20 columns to be safe
         for (let col = 1; col <= 20; col++) {
             let currentStatus = '';
-            
-            // Scan down the rows in this column
             worksheet?.getColumn(col).eachCell((cell, rowNumber) => {
                 const val = cell.value ? cell.value.toString().trim().toUpperCase() : '';
                 
-                // 1. Detect Header Change
+                // Header detection
                 if (categoryMap[val]) {
                     currentStatus = categoryMap[val];
-                    return; // Skip the header cell itself
+                    return;
+                } else if (val.length > 3 && !/^\d{4}/.test(val)) {
+                    // Reset if we hit a header NOT in our map (like SAFETY 1ST or RETORQUES)
+                    currentStatus = '';
                 }
 
-                // 2. Detect Bus Entry (Start with 4 digits)
-                // Example: "1820 11.2 (H)" or "1640 TRANSMISSION 1.28"
                 if (currentStatus && /^\d{4}/.test(val)) {
                     const busNumber = val.substring(0, 4);
                     const remainingText = val.substring(4).trim();
-                    
-                    // Extract Date if present (looks for number.number at end)
                     let oosDate = '';
                     let notes = remainingText;
 
-                    // Regex for date at end (e.g. 1.28)
                     const dateMatch = remainingText.match(/(\d{1,2}\.\d{1,2})/);
                     if (dateMatch) {
                         oosDate = formatOOSDate(dateMatch[0]);
-                        // Remove date from notes to clean it up
                         notes = notes.replace(dateMatch[0], '').trim();
                     }
 
-                    // Cleanup notes: remove parens like (H) or (A)
                     notes = notes.replace(/\([A-Z]\)/g, '').trim();
-
-                    // If notes are empty after cleanup, default to Category Name (e.g. "Engine")
-                    if (!notes || notes.length < 2) {
-                        notes = currentStatus; 
+                    
+                    // 2. SAFETY HOLD CHECK: If text contains "SAFETY HOLD", override status
+                    let finalStatus = currentStatus;
+                    if (remainingText.toUpperCase().includes('SAFETY HOLD')) {
+                        finalStatus = 'Safety';
                     }
+
+                    if (!notes || notes.length < 2) notes = finalStatus; 
 
                     uploadQueue.push({
                         number: busNumber,
-                        status: currentStatus,
+                        status: finalStatus,
                         notes: notes,
                         oosStartDate: oosDate,
                         timestamp: serverTimestamp()
@@ -344,11 +337,10 @@ export default function MartaInventory() {
         }
 
         if (uploadQueue.length === 0) {
-            alert("No recognizable bus data found. Check column headers matches: ENGINE, VENDOR, HOLD, etc.");
+            alert("No recognized bus data found. Check your column headers.");
             return;
         }
 
-        // Upload to Firestore
         const batch = writeBatch(db);
         uploadQueue.forEach((data) => {
             const ref = doc(db, "buses", data.number);
@@ -356,11 +348,11 @@ export default function MartaInventory() {
         });
         await batch.commit();
 
-        alert(`Success! Parsed and updated ${uploadQueue.length} buses from Daily Report.`);
+        alert(`Success! Updated ${uploadQueue.length} buses from authorized categories.`);
         
       } catch (err) {
         console.error("Parsing Error:", err);
-        alert("Failed to parse Daily Report. Ensure format matches the template.");
+        alert("Failed to parse file.");
       }
     };
   };
@@ -528,7 +520,8 @@ export default function MartaInventory() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               {[
                 { label: 'Total Fleet', val: buses.length, color: 'text-slate-900' },
-                { label: 'Ready', val: buses.filter(b => b.status === 'Active').length, color: 'text-green-600' },
+                // FIX: "Ready" now explicitly adds Active + In Shop counts
+                { label: 'Ready', val: buses.filter(b => b.status === 'Active' || b.status === 'In Shop').length, color: 'text-green-600' },
                 { label: 'On Hold', val: buses.filter(b => holdStatuses.includes(b.status)).length, color: 'text-red-600' },
                 { label: 'In Shop', val: buses.filter(b => b.status === 'In Shop').length, color: 'text-[#ef7c00]' }
               ].map((m, i) => (

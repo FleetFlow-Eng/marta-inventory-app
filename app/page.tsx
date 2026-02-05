@@ -25,9 +25,9 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
 
     // Placeholder history data - in a real app this would query a sub-collection
     const historyLog = [
-        { date: '2025-01-15', event: 'Preventative Maintenance', type: 'Routine' },
-        { date: '2024-11-20', event: 'Brake Replacement', type: 'Repair' },
-        { date: '2024-08-05', event: 'AC Unit Service', type: 'Vendor' }
+        { date: '2026-01-28', event: 'Imported from Daily Report', type: 'System' },
+        { date: '2025-11-20', event: 'Brake Replacement', type: 'Repair' },
+        { date: '2025-08-05', event: 'AC Unit Service', type: 'Vendor' }
     ];
 
     if (showHistory) {
@@ -138,7 +138,6 @@ const BusInputForm = () => {
         }
     };
 
-    // --- NEW: Global Clear Function ---
     const handleGlobalReset = async () => {
         if (!confirm("⚠️ DANGER: This will set EVERY bus in the fleet to 'Active' status and clear all fault notes.\n\nAre you absolutely sure?")) return;
         
@@ -224,7 +223,6 @@ const BusInputForm = () => {
                     </button>
                 </form>
 
-                {/* CLEAR ALL BUTTON */}
                 <div className="mt-12 pt-8 border-t border-slate-100 text-center">
                     <button onClick={handleGlobalReset} className="text-red-500 hover:text-red-700 hover:bg-red-50 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">
                         ⚠️ Reset Entire Fleet to Ready
@@ -240,7 +238,7 @@ export default function MartaInventory() {
   const [view, setView] = useState<'inventory' | 'tracker' | 'input'>('inventory');
   const [inventoryMode, setInventoryMode] = useState<'list' | 'grid'>('grid');
   const [buses, setBuses] = useState<any[]>([]);
-  const [selectedBusDetail, setSelectedBusDetail] = useState<any>(null); // For Read-Only Modal
+  const [selectedBusDetail, setSelectedBusDetail] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -248,6 +246,124 @@ export default function MartaInventory() {
   const [activeFilter, setActiveFilter] = useState<string>('Total Fleet');
 
   const holdStatuses = ['On Hold', 'Engine', 'Body Shop', 'Vendor', 'Brakes', 'Safety'];
+
+  // --- NEW EXCEL PARSER FOR DAILY REPORT FORMAT ---
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.readAsArrayBuffer(file);
+    
+    reader.onload = async () => {
+      try {
+        const buffer = reader.result as ArrayBuffer;
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
+        const worksheet = workbook.getWorksheet(1); // Assuming 1st sheet
+
+        const uploadQueue: any[] = [];
+        const currentYear = new Date().getFullYear();
+
+        // Mappings based on Visual Header Keywords in Image
+        // Key = exact Excel header string, Value = App Status
+        const categoryMap: { [key: string]: string } = {
+            'ENGINE': 'Engine',
+            'VENDOR': 'Vendor',
+            'HOLD': 'On Hold',
+            'BODY SHOP': 'Body Shop',
+            'CODE 1 BRAKES': 'Brakes',
+            'NEW BRAKES': 'Brakes', // Just in case
+            'SAFETY 1ST': 'Safety',
+            'SERVICE CALLS': 'In Shop'
+        };
+
+        // Helper to format 1.28 -> 2026-01-28
+        const formatOOSDate = (raw: string) => {
+            if (!raw) return '';
+            // Match 1.28 or 10.5 pattern
+            const match = raw.match(/(\d{1,2})\.(\d{1,2})/);
+            if (match) {
+                const month = match[1].padStart(2, '0');
+                const day = match[2].padStart(2, '0');
+                return `${currentYear}-${month}-${day}`;
+            }
+            return '';
+        };
+
+        // Iterate through columns to find categories
+        // We scan first 20 columns to be safe
+        for (let col = 1; col <= 20; col++) {
+            let currentStatus = '';
+            
+            // Scan down the rows in this column
+            worksheet?.getColumn(col).eachCell((cell, rowNumber) => {
+                const val = cell.value ? cell.value.toString().trim().toUpperCase() : '';
+                
+                // 1. Detect Header Change
+                if (categoryMap[val]) {
+                    currentStatus = categoryMap[val];
+                    return; // Skip the header cell itself
+                }
+
+                // 2. Detect Bus Entry (Start with 4 digits)
+                // Example: "1820 11.2 (H)" or "1640 TRANSMISSION 1.28"
+                if (currentStatus && /^\d{4}/.test(val)) {
+                    const busNumber = val.substring(0, 4);
+                    const remainingText = val.substring(4).trim();
+                    
+                    // Extract Date if present (looks for number.number at end)
+                    let oosDate = '';
+                    let notes = remainingText;
+
+                    // Regex for date at end (e.g. 1.28)
+                    const dateMatch = remainingText.match(/(\d{1,2}\.\d{1,2})/);
+                    if (dateMatch) {
+                        oosDate = formatOOSDate(dateMatch[0]);
+                        // Remove date from notes to clean it up
+                        notes = notes.replace(dateMatch[0], '').trim();
+                    }
+
+                    // Cleanup notes: remove parens like (H) or (A)
+                    notes = notes.replace(/\([A-Z]\)/g, '').trim();
+
+                    // If notes are empty after cleanup, default to Category Name (e.g. "Engine")
+                    if (!notes || notes.length < 2) {
+                        notes = currentStatus; 
+                    }
+
+                    uploadQueue.push({
+                        number: busNumber,
+                        status: currentStatus,
+                        notes: notes,
+                        oosStartDate: oosDate,
+                        timestamp: serverTimestamp()
+                    });
+                }
+            });
+        }
+
+        if (uploadQueue.length === 0) {
+            alert("No recognizable bus data found. Check column headers matches: ENGINE, VENDOR, HOLD, etc.");
+            return;
+        }
+
+        // Upload to Firestore
+        const batch = writeBatch(db);
+        uploadQueue.forEach((data) => {
+            const ref = doc(db, "buses", data.number);
+            batch.set(ref, data, { merge: true });
+        });
+        await batch.commit();
+
+        alert(`Success! Parsed and updated ${uploadQueue.length} buses from Daily Report.`);
+        
+      } catch (err) {
+        console.error("Parsing Error:", err);
+        alert("Failed to parse Daily Report. Ensure format matches the template.");
+      }
+    };
+  };
 
   const getBusSpecs = (num: string) => {
     const n = parseInt(num);
@@ -269,49 +385,6 @@ export default function MartaInventory() {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
     setSortConfig({ key, direction });
-  };
-
-  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.readAsArrayBuffer(file);
-    
-    reader.onload = async () => {
-      try {
-        const buffer = reader.result as ArrayBuffer;
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(buffer);
-        const worksheet = workbook.getWorksheet(1);
-
-        const uploadQueue: any[] = [];
-        worksheet?.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) return; 
-          
-          const busNum = row.getCell(1).value?.toString();
-          if (busNum) {
-            uploadQueue.push({
-              number: busNum,
-              status: row.getCell(3).value || 'Active',
-              location: row.getCell(4).value || '',
-              notes: row.getCell(5).value || '',
-              expectedReturnDate: row.getCell(6).value || '',
-              actReturnDate: row.getCell(7).value || '',
-              oosStartDate: row.getCell(8).value || ''
-            });
-          }
-        });
-
-        for (const data of uploadQueue) {
-          await setDoc(doc(db, "buses", data.number), data, { merge: true });
-        }
-        alert(`Successfully synced ${uploadQueue.length} units from Excel.`);
-      } catch (err) {
-        console.error("Upload Error:", err);
-        alert("Failed to process Excel file.");
-      }
-    };
   };
 
   const exportToExcel = async () => {
@@ -435,7 +508,7 @@ export default function MartaInventory() {
           
           <div className="flex gap-4">
               <label className="text-green-600 hover:text-green-800 text-[10px] font-black uppercase transition-all tracking-widest cursor-pointer">
-                Upload Excel
+                Upload Report
                 <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleExcelUpload} />
               </label>
               <button onClick={exportToExcel} className="text-[#002d72] hover:text-[#ef7c00] text-[10px] font-black uppercase transition-all tracking-widest">Export Excel</button>
@@ -492,7 +565,6 @@ export default function MartaInventory() {
                             <div onClick={() => requestSort('expectedReturnDate')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Exp Return {getSortIcon('expectedReturnDate')}</div>
                             <div onClick={() => requestSort('actualReturnDate')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Act Return {getSortIcon('actualReturnDate')}</div>
                             <div onClick={() => requestSort('daysOOS')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Days OOS {getSortIcon('daysOOS')}</div>
-                            {/* No action column */}
                         </div>
 
                         <div className="divide-y divide-slate-100">

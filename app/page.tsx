@@ -19,6 +19,7 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
   )
 });
 
+// --- COMPONENT: Read-Only Bus Details ---
 const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
     const [showHistory, setShowHistory] = useState(false);
     const historyLog: any[] = []; 
@@ -102,6 +103,7 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
     );
 };
 
+// --- COMPONENT: Data Entry Form ---
 const BusInputForm = () => {
     const [formData, setFormData] = useState({
         number: '',
@@ -245,7 +247,7 @@ export default function MartaInventory() {
 
   const holdStatuses = ['On Hold', 'Engine', 'Body Shop', 'Vendor', 'Brakes', 'Safety'];
 
-  // --- REFINED EXCEL PARSER WITH "RED LINE" STOPPER ---
+  // --- REFINED EXCEL PARSER (Fixed Order of Operations) ---
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -263,7 +265,6 @@ export default function MartaInventory() {
         const uploadQueue: any[] = [];
         const currentYear = new Date().getFullYear();
 
-        // VALID CATEGORIES
         const categoryMap: { [key: string]: string } = {
             'ENGINE': 'Engine',
             'VENDOR': 'Vendor',
@@ -276,11 +277,11 @@ export default function MartaInventory() {
             'TRIPPERS': 'Active'
         };
 
-        // EXPLICIT IGNORE LIST (Stops accidental captures)
-        const ignoreHeaders = ['RETORQUES', 'SHOP REPORT', 'WEEKEND LIST', 'SAFETY 1ST', 'SAFETY'];
-
-        // THE "RED LINE" STOP WORDS (Stops reading the column entirely)
+        // Words that KILL the column processing (Red Line)
         const stopWords = ['TOTAL', 'STEAM CLEAN', 'MAJOR CLEAN', 'HYAC INSPECTION', 'DAY SHIFT'];
+        
+        // Headers that RESET the current category to null (Ignore List)
+        const ignoreHeaders = ['RETORQUES', 'SHOP REPORT', 'WEEKEND LIST', 'SAFETY 1ST', 'SAFETY'];
 
         const formatOOSDate = (raw: string) => {
             if (!raw) return '';
@@ -296,72 +297,68 @@ export default function MartaInventory() {
         for (let col = 1; col <= 20; col++) {
             let currentStatus = '';
             
-            // Iterate cells in column
             worksheet?.getColumn(col).eachCell((cell, rowNumber) => {
-                // HARD STOP: If we hit the "Red Line" area (Total, Steam Clean, or Row > 40)
-                if (rowNumber > 40) return; // Explicit row limit based on image
-
+                // HARD STOP: Row 40 Limit or Stop Words
                 const val = cell.value ? cell.value.toString().trim().toUpperCase() : '';
                 
-                // CHECK FOR STOP WORDS (The "Red Line" Logic)
-                if (stopWords.some(word => val.includes(word))) {
-                    currentStatus = ''; // Stop capturing for this column
+                if (rowNumber > 40 || stopWords.some(word => val.includes(word))) {
+                    if (stopWords.some(word => val.includes(word))) currentStatus = ''; 
                     return;
                 }
 
-                // HEADER DETECTION
+                // --- PRIORITY 1: IS THIS A BUS? (Data) ---
+                // We check this BEFORE checking for ignore-headers to prevent "SAFETY HOLD" notes from killing the capture
+                if (/^\d{4}/.test(val)) {
+                    if (currentStatus) {
+                        const busNumber = val.substring(0, 4);
+                        const remainingText = val.substring(4).trim();
+                        let oosDate = '';
+                        let notes = remainingText;
+
+                        const dateMatch = remainingText.match(/(\d{1,2}\.\d{1,2})/);
+                        if (dateMatch) {
+                            oosDate = formatOOSDate(dateMatch[0]);
+                            notes = notes.replace(dateMatch[0], '').trim();
+                        }
+
+                        notes = notes.replace(/\([A-Z]\)/g, '').trim();
+                        
+                        // Safety Override logic for specific buses
+                        let finalStatus = currentStatus;
+                        if (remainingText.toUpperCase().includes('SAFETY HOLD')) {
+                            finalStatus = 'Safety';
+                        }
+
+                        if (!notes || notes.length < 2) notes = finalStatus; 
+
+                        uploadQueue.push({
+                            number: busNumber,
+                            status: finalStatus,
+                            notes: notes,
+                            oosStartDate: oosDate,
+                            timestamp: serverTimestamp()
+                        });
+                    }
+                    return; // Move to next row
+                }
+
+                // --- PRIORITY 2: IS THIS A HEADER? (Category Switch) ---
                 if (categoryMap[val]) {
                     currentStatus = categoryMap[val];
                     return;
-                } 
-                
-                // IGNORE LIST (Retorques, etc.)
-                if (ignoreHeaders.some(header => val.includes(header))) {
+                }
+
+                // --- PRIORITY 3: IS THIS TRASH? (Ignore List) ---
+                // Now safe to check "SAFETY" because we know it's not a bus data row
+                if (ignoreHeaders.some(header => val.includes(header)) || val.length > 3) {
                     currentStatus = '';
                     return;
-                }
-                
-                // If text is present but not a bus number and not a known header, reset status
-                if (val.length > 3 && !/^\d{4}/.test(val)) {
-                    currentStatus = '';
-                }
-
-                // PROCESS DATA ROW
-                if (currentStatus && /^\d{4}/.test(val)) {
-                    const busNumber = val.substring(0, 4);
-                    const remainingText = val.substring(4).trim();
-                    let oosDate = '';
-                    let notes = remainingText;
-
-                    const dateMatch = remainingText.match(/(\d{1,2}\.\d{1,2})/);
-                    if (dateMatch) {
-                        oosDate = formatOOSDate(dateMatch[0]);
-                        notes = notes.replace(dateMatch[0], '').trim();
-                    }
-
-                    notes = notes.replace(/\([A-Z]\)/g, '').trim();
-                    
-                    // SAFETY HOLD CHECK
-                    let finalStatus = currentStatus;
-                    if (remainingText.toUpperCase().includes('SAFETY HOLD')) {
-                        finalStatus = 'Safety';
-                    }
-
-                    if (!notes || notes.length < 2) notes = finalStatus; 
-
-                    uploadQueue.push({
-                        number: busNumber,
-                        status: finalStatus,
-                        notes: notes,
-                        oosStartDate: oosDate,
-                        timestamp: serverTimestamp()
-                    });
                 }
             });
         }
 
         if (uploadQueue.length === 0) {
-            alert("No recognized bus data found.");
+            alert("No recognized bus data found. Please check Excel headers.");
             return;
         }
 

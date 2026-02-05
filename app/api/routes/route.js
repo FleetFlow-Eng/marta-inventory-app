@@ -4,22 +4,14 @@ import path from 'path';
 
 export async function GET() {
   try {
-    // Look for the dictionary file
-    const filePath = path.join(process.cwd(), 'routes.json');
+    // This fetches the static route info (Short Name, Long Name, etc.)
+    const res = await fetch("https://gtfs-static.itsmarta.com/google_transit.zip"); // or your specific MARTA static JSON endpoint
+    const data = await res.json();
     
-    // If missing, return empty (don't crash)
-    if (!fs.existsSync(filePath)) {
-      return NextResponse.json({});
-    }
-
-    // Read and send the names
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    const data = JSON.parse(fileContent);
-
-    return NextResponse.json(data);
-
+    // Ensure we are sending a clean array of route objects
+    const routes = data.routes || data; 
+    return Response.json(routes);
   } catch (error) {
-    console.error("Route API Error:", error);
-    return NextResponse.json({});
+    return Response.json({ error: "Failed to fetch routes" }, { status: 500 });
   }
 }

@@ -21,7 +21,7 @@ export default function BusTracker() {
         const routeData = await routeRes.json();
         
         setVehicles(prev => {
-          // Renamed to 'fleetMap' to avoid conflict with the Map component
+          // fleetMap stores unique buses to keep maintenance "Ghosts" visible
           const fleetMap = new window.Map(prev.map(v => [v.id, v]));
           vehicleData.entity?.forEach(v => fleetMap.set(v.id, v));
           return Array.from(fleetMap.values());
@@ -39,14 +39,12 @@ export default function BusTracker() {
     return () => clearInterval(interval);
   }, []);
 
-  // Professional Metrics (Persistent from Inventory)
   const stats = useMemo(() => {
     const total = vehicles.length;
     const active = vehicles.filter(v => (Date.now() - (v.vehicle?.timestamp * 1000)) < 300000).length;
     return { total, active, hold: total - active };
   }, [vehicles]);
 
-  // Search & Sorting Logic
   const processedVehicles = useMemo(() => {
     let filtered = vehicles.filter(v => {
       const busNum = (v.vehicle?.vehicle?.label || v.vehicle?.vehicle?.id || "").toLowerCase();
@@ -55,9 +53,11 @@ export default function BusTracker() {
 
     return filtered.sort((a, b) => {
       if (sortBy === "route") {
-        const routeA = routes[a.vehicle?.trip?.route_id] || "999";
-        const routeB = routes[b.vehicle?.trip?.route_id] || "999";
-        return routeA.localeCompare(routeB);
+        const idA = a.vehicle?.trip?.route_id || a.vehicle?.trip?.routeId || "";
+        const idB = b.vehicle?.trip?.route_id || b.vehicle?.trip?.routeId || "";
+        const nameA = routes[String(idA)] || "999";
+        const nameB = routes[String(idB)] || "999";
+        return nameA.localeCompare(nameB);
       }
       return (a.vehicle?.vehicle?.label || "").localeCompare(b.vehicle?.vehicle?.label || "");
     });
@@ -93,13 +93,13 @@ export default function BusTracker() {
       </div>
 
       <div className="flex flex-grow overflow-hidden">
-        {/* ENHANCED SIDEBAR */}
         <div className="w-80 bg-slate-50 border-r border-slate-200 flex flex-col shadow-inner">
           <div className="flex-grow overflow-y-auto">
             {processedVehicles.map((v) => {
               const vehicle = v.vehicle;
               const busNum = vehicle?.vehicle?.label || vehicle?.vehicle?.id;
-              const routeInfo = routes[vehicle?.trip?.route_id] || "Special / Yard Move";
+              const rId = vehicle?.trip?.route_id || vehicle?.trip?.routeId;
+              const routeInfo = (rId && routes[String(rId)]) ? routes[String(rId)] : "No Route Data";
               const lastSeenMs = vehicle?.timestamp * 1000;
               const isStale = (Date.now() - lastSeenMs) > 300000;
 

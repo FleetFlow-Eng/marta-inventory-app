@@ -27,35 +27,39 @@ export default function Map({ buses = [], selectedId, routes = {} }) {
       <MapController selectedBus={selectedBus} />
       
       {buses.map((bus) => {
-        const vehicleData = bus.vehicle;
-        const id = vehicleData?.vehicle?.id;
-        if (!id || !vehicleData?.position) return null;
+        const vData = bus.vehicle;
+        const id = vData?.vehicle?.id;
+        if (!id || !vData?.position) return null;
 
-        const busNumber = vehicleData?.vehicle?.label || id;
-        const rawRouteId = vehicleData?.trip?.route_id;
-        const fullRouteName = routes[rawRouteId] || "Special / Yard Move";
-        const routeNum = fullRouteName.split(' - ')[0];
-
-        const lastSeenMs = vehicleData?.timestamp * 1000;
+        // --- AGGRESSIVE ROUTE LOOKUP ---
+        const rId = vData?.trip?.route_id || vData?.trip?.routeId;
+        const cleanId = rId ? String(rId).trim() : "";
+        
+        // Final fallback chain to prevent "Yard Move" unless ID is truly blank
+        const fullRouteName = (routes && cleanId && routes[cleanId]) 
+            ? routes[cleanId] 
+            : (cleanId ? `ID: ${cleanId}` : "Special / Yard Move");
+        
+        const routeNum = fullRouteName.includes(" - ") ? fullRouteName.split(' - ')[0] : fullRouteName;
+        const busNum = vData?.vehicle?.label || id;
+        const lastSeenMs = vData?.timestamp * 1000;
         const isStale = (Date.now() - lastSeenMs) > 300000;
         const timeString = new Date(lastSeenMs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
         return (
-          <Marker key={id} position={[vehicleData.position.latitude, vehicleData.position.longitude]} icon={isStale ? greyIcon : blueIcon}>
+          <Marker key={id} position={[vData.position.latitude, vData.position.longitude]} icon={isStale ? greyIcon : blueIcon}>
             <Tooltip direction="top" offset={[0, -40]} opacity={1}>
-              <span className="font-black text-[10px] text-[#002d72]">#{busNumber} | RT {routeNum}</span>
+              <span className="font-black text-[10px] text-[#002d72]">#{busNum} | {routeNum}</span>
             </Tooltip>
             <Popup>
               <div className="p-2 min-w-[200px] font-sans">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-2">
-                   <p className="font-black text-[#002d72] uppercase italic text-sm">Unit #{busNumber}</p>
-                   <p className="bg-[#ef7c00] text-white text-[9px] font-black px-2 py-0.5 rounded tracking-tighter">ROUTE {routeNum}</p>
+                   <p className="font-black text-[#002d72] uppercase italic text-sm">Unit #{busNum}</p>
+                   <p className="bg-[#ef7c00] text-white text-[9px] font-black px-2 py-0.5 rounded tracking-tighter">RT {routeNum}</p>
                 </div>
-                
                 <p className="text-[10px] font-bold text-slate-500 uppercase leading-tight mb-3">
                     {fullRouteName.split(' - ')[1] || fullRouteName}
                 </p>
-
                 <div className="flex items-center justify-between">
                    <div className="flex items-center gap-1.5">
                       <div className={`w-2 h-2 rounded-full ${isStale ? 'bg-slate-300' : 'bg-green-500 animate-pulse'}`}></div>

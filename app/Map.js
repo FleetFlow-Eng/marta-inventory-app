@@ -32,16 +32,27 @@ export default function Map({ buses = [], selectedId, routes = {} }) {
         if (!id || !vData?.position) return null;
 
         const busNumber = vData?.vehicle?.label || id;
+        
+        // --- ROUTE FIX LOGIC ---
         const rId = vData?.trip?.route_id || vData?.trip?.routeId;
-        const fullRouteName = (routes && rId && routes[String(rId)]) ? routes[String(rId)] : "Special";
-        const routeNum = fullRouteName.split(' - ')[0];
+        const cleanId = rId ? String(rId).trim() : "";
+        
+        let fullRouteName = "Special / Yard Move";
+        let routeNum = "N/A";
 
-        const lastSeenMs = vData.timestamp * 1000;
+        if (routes && cleanId && routes[cleanId]) {
+            fullRouteName = routes[cleanId];
+            routeNum = fullRouteName.split(' - ')[0];
+        } else if (cleanId) {
+            fullRouteName = `Route ${cleanId}`;
+            routeNum = cleanId;
+        }
+
+        const lastSeenMs = vData?.timestamp * 1000;
         const isStale = (Date.now() - lastSeenMs) > 300000;
 
         return (
           <Marker key={id} position={[vData.position.latitude, vData.position.longitude]} icon={isStale ? greyIcon : blueIcon}>
-            {/* Route instead of RT */}
             <Tooltip direction="top" offset={[0, -40]} opacity={1}>
               <span className="font-black text-[10px] text-[#002d72]">Bus #{busNumber} | Route {routeNum}</span>
             </Tooltip>
@@ -51,7 +62,7 @@ export default function Map({ buses = [], selectedId, routes = {} }) {
                    <p className="font-black text-[#002d72] uppercase italic text-sm">Bus #{busNumber}</p>
                    <p className="bg-[#ef7c00] text-white text-[9px] font-black px-2 py-0.5 rounded tracking-tighter">Route {routeNum}</p>
                 </div>
-                <p className="text-[10px] font-bold text-slate-500 uppercase leading-tight">
+                <p className="text-[10px] font-bold text-slate-500 uppercase leading-tight mb-3">
                     {fullRouteName.split(' - ')[1] || fullRouteName}
                 </p>
               </div>

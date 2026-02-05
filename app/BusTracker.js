@@ -63,8 +63,14 @@ export default function BusTracker() {
       if (sortBy === "route") {
         const idA = a.vehicle?.trip?.route_id || a.vehicle?.trip?.routeId;
         const idB = b.vehicle?.trip?.route_id || b.vehicle?.trip?.routeId;
-        const routeA = (routes && idA && routes[String(idA)]) ? routes[String(idA)] : "zzz";
-        const routeB = (routes && idB && routes[String(idB)]) ? routes[String(idB)] : "zzz";
+        
+        // --- ROUTE FIX: Ensure we compare strings ---
+        const cleanA = idA ? String(idA).trim() : "";
+        const cleanB = idB ? String(idB).trim() : "";
+        
+        const routeA = (routes && cleanA && routes[cleanA]) ? routes[cleanA] : "zzz";
+        const routeB = (routes && cleanB && routes[cleanB]) ? routes[cleanB] : "zzz";
+        
         return routeA.localeCompare(routeB);
       }
       return (a.vehicle?.vehicle?.label || "").localeCompare(b.vehicle?.vehicle?.label || "");
@@ -75,7 +81,7 @@ export default function BusTracker() {
 
   return (
     <div className="flex flex-col h-screen bg-white text-slate-900 overflow-hidden">
-      {/* SLENDER METRICS HEADER */}
+      {/* SLENDER HEADER */}
       <div className="flex-none flex items-center justify-between px-6 py-2 bg-[#002d72] text-white shadow-xl z-[2000] relative">
         <div className="flex gap-4">
           <button onClick={() => setFilterStatus("all")} className={`flex flex-col items-start px-3 py-0.5 rounded transition-all border ${filterStatus === 'all' ? 'bg-white/20 border-white' : 'border-transparent hover:bg-white/10'}`}>
@@ -113,15 +119,24 @@ export default function BusTracker() {
             {processedVehicles.map((v) => {
               const vehicle = v.vehicle;
               const busNum = vehicle?.vehicle?.label || vehicle?.vehicle?.id;
+              
+              // --- ROUTE FIX LOGIC ---
               const rId = vehicle?.trip?.route_id || vehicle?.trip?.routeId;
-              const routeInfo = (routes && rId && routes[String(rId)]) ? routes[String(rId)] : "Special";
+              const cleanId = rId ? String(rId).trim() : "";
+              
+              let routeInfo = "Special"; 
+              if (routes && cleanId && routes[cleanId]) {
+                  routeInfo = routes[cleanId];
+              } else if (cleanId) {
+                  routeInfo = `Route ${cleanId}`;
+              }
+
               const lastSeenMs = vehicle?.timestamp * 1000;
               const isStale = (Date.now() - lastSeenMs) > 300000;
 
               return (
                 <button key={v.id} onClick={() => setSelectedId(vehicle?.vehicle?.id)} className={`w-full p-3 text-left border-b border-slate-100 flex items-center justify-between group ${selectedId === vehicle?.vehicle?.id ? 'bg-blue-50 border-l-4 border-[#002d72]' : 'hover:bg-white border-l-4 border-transparent'}`}>
                   <div>
-                    {/* Bus: 1880 (Not bold) */}
                     <p className={`text-sm italic ${isStale ? 'text-slate-400' : 'text-slate-900'}`}>Bus: {busNum}</p>
                     <p className="text-[9px] font-bold text-[#ef7c00] uppercase truncate w-52 leading-none mt-1">{routeInfo.split(' - ')[1] || routeInfo}</p>
                   </div>

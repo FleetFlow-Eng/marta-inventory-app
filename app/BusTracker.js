@@ -6,6 +6,7 @@ export default function BusTracker() {
   const [vehicles, setVehicles] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedBus, setSelectedBus] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -14,14 +15,8 @@ export default function BusTracker() {
           fetch("/api/vehicles"),
           fetch("/api/routes")
         ]);
-
-        // Guard against failed network requests
-        if (!vegRes.ok || !routeRes.ok) throw new Error("Network response was not ok");
-
         const vehicleData = await vegRes.json();
         const routeData = await routeRes.json();
-
-        // Safely set data with fallback to empty arrays
         setVehicles(vehicleData?.entity || []);
         setRoutes(routeData || []);
       } catch (error) {
@@ -30,45 +25,39 @@ export default function BusTracker() {
         setLoading(false);
       }
     };
-
     fetchData();
     const interval = setInterval(fetchData, 10000); 
     return () => clearInterval(interval);
   }, []);
 
-  // Display a themed loading state for MARTA Ops
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full bg-slate-900">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-[#ef7c00] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">Updating Live Positions...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="h-full flex items-center justify-center bg-slate-900 text-blue-400 font-black italic">FETCHING LIVE FLEET...</div>;
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="px-6 py-3 bg-[#002d72] text-white flex justify-between items-center shadow-md">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          <h1 className="text-xs font-black uppercase tracking-tighter italic">Live Fleet Status</h1>
+    <div className="flex h-full bg-white overflow-hidden">
+      {/* SIDEBAR: List of active buses */}
+      <div className="w-64 bg-slate-50 border-r border-slate-200 flex flex-col">
+        <div className="p-4 bg-[#002d72] text-white">
+          <h2 className="text-[10px] font-black uppercase tracking-widest">Active Units ({vehicles.length})</h2>
         </div>
-        <div className="text-[10px] font-black uppercase tracking-widest opacity-80">
-          Units Transmitting: <span className="text-[#ef7c00] ml-1">{vehicles?.length || 0}</span>
+        <div className="flex-grow overflow-y-auto divide-y divide-slate-100">
+          {vehicles.map((v) => (
+            <button 
+              key={v.id}
+              onClick={() => setSelectedBus(v)}
+              className="w-full p-3 text-left hover:bg-white transition-colors group"
+            >
+              <div className="flex justify-between items-center">
+                <span className="font-black text-slate-700 text-sm">#{v.vehicle?.vehicle?.id}</span>
+                <span className="text-[9px] font-bold text-slate-400 group-hover:text-[#ef7c00]">VIEW →</span>
+              </div>
+            </button>
+          ))}
         </div>
       </div>
-      
+
+      {/* MAP AREA */}
       <div className="flex-grow relative">
-        {/* Only render Map if we have data to prevent the .find() crash */}
-        {vehicles?.length > 0 ? (
-          <Map vehicles={vehicles} routes={routes} />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-50 text-slate-400 text-xs font-bold uppercase">
-            Waiting for GPS Signal...
-          </div>
-        )}
+        <Map vehicles={vehicles} routes={routes} selectedBus={selectedBus} />
       </div>
     </div>
   );

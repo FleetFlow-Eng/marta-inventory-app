@@ -19,7 +19,6 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
   )
 });
 
-// --- COMPONENT: Read-Only Bus Details ---
 const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
     const [showHistory, setShowHistory] = useState(false);
     const historyLog: any[] = []; 
@@ -103,7 +102,6 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
     );
 };
 
-// --- COMPONENT: Data Entry Form ---
 const BusInputForm = () => {
     const [formData, setFormData] = useState({
         number: '',
@@ -247,7 +245,7 @@ export default function MartaInventory() {
 
   const holdStatuses = ['On Hold', 'Engine', 'Body Shop', 'Vendor', 'Brakes', 'Safety'];
 
-  // --- SAFETY-NET EXCEL PARSER ---
+  // --- REFINED EXCEL PARSER WITH "RED LINE" STOPPER ---
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -265,7 +263,7 @@ export default function MartaInventory() {
         const uploadQueue: any[] = [];
         const currentYear = new Date().getFullYear();
 
-        // STRICT MAPPING + SAFETY NETS
+        // VALID CATEGORIES
         const categoryMap: { [key: string]: string } = {
             'ENGINE': 'Engine',
             'VENDOR': 'Vendor',
@@ -274,10 +272,15 @@ export default function MartaInventory() {
             'CODE 1 BRAKES': 'Brakes',
             'NEW BRAKES': 'Brakes',
             'SERVICE CALLS': 'In Shop',
-            // Added TRIPPER with variations
             'TRIPPER': 'Active',
             'TRIPPERS': 'Active'
         };
+
+        // EXPLICIT IGNORE LIST (Stops accidental captures)
+        const ignoreHeaders = ['RETORQUES', 'SHOP REPORT', 'WEEKEND LIST', 'SAFETY 1ST', 'SAFETY'];
+
+        // THE "RED LINE" STOP WORDS (Stops reading the column entirely)
+        const stopWords = ['TOTAL', 'STEAM CLEAN', 'MAJOR CLEAN', 'HYAC INSPECTION', 'DAY SHIFT'];
 
         const formatOOSDate = (raw: string) => {
             if (!raw) return '';
@@ -292,20 +295,38 @@ export default function MartaInventory() {
 
         for (let col = 1; col <= 20; col++) {
             let currentStatus = '';
-            worksheet?.getColumn(col).eachCell((cell) => {
-                // TRIM() and TOUPPERCASE() for whitespace protection
+            
+            // Iterate cells in column
+            worksheet?.getColumn(col).eachCell((cell, rowNumber) => {
+                // HARD STOP: If we hit the "Red Line" area (Total, Steam Clean, or Row > 40)
+                if (rowNumber > 40) return; // Explicit row limit based on image
+
                 const val = cell.value ? cell.value.toString().trim().toUpperCase() : '';
                 
-                // Header detection
+                // CHECK FOR STOP WORDS (The "Red Line" Logic)
+                if (stopWords.some(word => val.includes(word))) {
+                    currentStatus = ''; // Stop capturing for this column
+                    return;
+                }
+
+                // HEADER DETECTION
                 if (categoryMap[val]) {
                     currentStatus = categoryMap[val];
                     return;
-                } else if (val.length > 3 && !/^\d{4}/.test(val)) {
-                    // Reset if we hit a text cell that isn't a known category
+                } 
+                
+                // IGNORE LIST (Retorques, etc.)
+                if (ignoreHeaders.some(header => val.includes(header))) {
+                    currentStatus = '';
+                    return;
+                }
+                
+                // If text is present but not a bus number and not a known header, reset status
+                if (val.length > 3 && !/^\d{4}/.test(val)) {
                     currentStatus = '';
                 }
 
-                // Process rows only if inside a VALID category and starts with 4-digit bus number
+                // PROCESS DATA ROW
                 if (currentStatus && /^\d{4}/.test(val)) {
                     const busNumber = val.substring(0, 4);
                     const remainingText = val.substring(4).trim();
@@ -340,7 +361,7 @@ export default function MartaInventory() {
         }
 
         if (uploadQueue.length === 0) {
-            alert("No recognized bus data found. Ensure headers like ENGINE or TRIPPER are present.");
+            alert("No recognized bus data found.");
             return;
         }
 
@@ -351,7 +372,7 @@ export default function MartaInventory() {
         });
         await batch.commit();
 
-        alert(`Success! Updated ${uploadQueue.length} buses from authorized categories.`);
+        alert(`Success! Updated ${uploadQueue.length} buses.`);
         
       } catch (err) {
         console.error("Parsing Error:", err);
@@ -523,7 +544,7 @@ export default function MartaInventory() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               {[
                 { label: 'Total Fleet', val: buses.length, color: 'text-slate-900' },
-                // FIX: "Ready" now explicitly adds Active + In Shop counts
+                // FIX: Ready logic now includes Active + In Shop
                 { label: 'Ready', val: buses.filter(b => b.status === 'Active' || b.status === 'In Shop').length, color: 'text-green-600' },
                 { label: 'On Hold', val: buses.filter(b => holdStatuses.includes(b.status)).length, color: 'text-red-600' },
                 { label: 'In Shop', val: buses.filter(b => b.status === 'In Shop').length, color: 'text-[#ef7c00]' }

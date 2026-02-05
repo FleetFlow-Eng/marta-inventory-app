@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebaseConfig'; 
-import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -19,7 +19,7 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
   )
 });
 
-// --- NEW COMPONENT: Dedicated Data Entry Form ---
+// --- COMPONENT: Data Entry Form (Only place to edit) ---
 const BusInputForm = () => {
     const [formData, setFormData] = useState({
         number: '',
@@ -41,13 +41,14 @@ const BusInputForm = () => {
         if (!formData.number) return;
 
         try {
+            // Merges data: Updates existing bus or creates new one
             await setDoc(doc(db, "buses", formData.number), {
                 ...formData,
                 timestamp: serverTimestamp()
             }, { merge: true });
             
             alert(`Bus #${formData.number} Record Saved Successfully!`);
-            // Reset form but keep location for faster entry if needed
+            // Reset main fields but keep location for faster batch entry
             setFormData(prev => ({ ...prev, number: '', status: 'Active', notes: '' })); 
         } catch (err) {
             console.error(err);
@@ -118,102 +119,11 @@ const BusInputForm = () => {
     );
 };
 
-// Reusable Edit Form Component (Popup)
-const EditBusForm = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
-    return (
-        <div className="bg-white p-6 rounded-xl shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
-                <h3 className="text-2xl font-black text-[#002d72] italic uppercase">Bus #{bus.number}</h3>
-                <button onClick={onClose} className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-full text-slate-500 font-bold transition-colors">✕</button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                    <div>
-                        <label className="text-[9px] font-black uppercase text-slate-400">Current Status</label>
-                        <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold mt-1 outline-none focus:border-[#002d72] focus:bg-white transition-all" 
-                            value={bus.status}
-                            onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { status: e.target.value, timestamp: serverTimestamp() }, { merge: true })}>
-                            <option value="Active">Ready for Service</option>
-                            <option value="On Hold">Maintenance Hold</option>
-                            <option value="In Shop">In Shop</option>
-                            <option value="Engine">Engine</option>
-                            <option value="Body Shop">Body Shop</option>
-                            <option value="Vendor">Vendor</option>
-                            <option value="Brakes">Brakes</option>
-                            <option value="Safety">Safety</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-[9px] font-black uppercase text-slate-400">Location</label>
-                        <input type="text" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold mt-1 outline-none focus:border-[#002d72] focus:bg-white transition-all" 
-                            value={bus.location || ''} placeholder="e.g. Hamilton"
-                            onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { location: e.target.value }, { merge: true })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] font-black uppercase text-slate-400">OOS Start Date</label>
-                        <input type="date" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold mt-1 outline-none focus:border-[#002d72] focus:bg-white transition-all" 
-                            value={bus.oosStartDate || ''}
-                            onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { oosStartDate: e.target.value }, { merge: true })} />
-                    </div>
-                </div>
-                <div className="flex flex-col space-y-4">
-                    <div>
-                        <label className="text-[9px] font-black uppercase text-slate-400 mb-1">Fault Details / Notes</label>
-                        <textarea className="w-full p-4 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-[#002d72] focus:bg-white transition-all h-28 resize-none" 
-                            placeholder="Enter technical details here..." value={bus.notes || ''}
-                            onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { notes: e.target.value }, { merge: true })} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-[9px] font-black uppercase text-slate-400">Exp Return</label>
-                            <input type="date" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold mt-1 outline-none focus:border-[#002d72] focus:bg-white transition-all" 
-                                value={bus.expectedReturnDate || ''}
-                                onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { expectedReturnDate: e.target.value }, { merge: true })} />
-                        </div>
-                        <div>
-                            <label className="text-[9px] font-black uppercase text-slate-400">Act Return</label>
-                            <input type="date" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold mt-1 outline-none focus:border-[#002d72] focus:bg-white transition-all" 
-                                value={bus.actualReturnDate || ''}
-                                onChange={async (e) => await setDoc(doc(db, "buses", bus.docId), { actualReturnDate: e.target.value }, { merge: true })} />
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div className="flex justify-between items-center mt-6 pt-6 border-t border-slate-100">
-                <button 
-                    onClick={async () => {
-                        if(confirm('Clear data for this unit?')) {
-                            await updateDoc(doc(db, "buses", bus.docId), {
-                                notes: '', location: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: ''
-                            });
-                        }
-                    }}
-                    className="px-4 py-2 text-red-500 hover:bg-red-50 rounded-lg text-[10px] font-black uppercase transition-colors"
-                >
-                    Clear Data
-                </button>
-                <button 
-                    onClick={onClose} 
-                    className="px-8 py-3 bg-[#002d72] hover:bg-[#001a3d] text-white rounded-lg text-xs font-black uppercase transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                >
-                    Save & Close
-                </button>
-            </div>
-        </div>
-    );
-};
-
 export default function MartaInventory() {
   const [user, setUser] = useState<any>(null);
-  
-  // ADDED 'input' to the view state
   const [view, setView] = useState<'inventory' | 'tracker' | 'input'>('inventory');
-  
   const [inventoryMode, setInventoryMode] = useState<'list' | 'grid'>('grid');
   const [buses, setBuses] = useState<any[]>([]);
-  const [expandedBus, setExpandedBus] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -270,6 +180,7 @@ export default function MartaInventory() {
               location: row.getCell(4).value || '',
               notes: row.getCell(5).value || '',
               expectedReturnDate: row.getCell(6).value || '',
+              actReturnDate: row.getCell(7).value || '',
               oosStartDate: row.getCell(8).value || ''
             });
           }
@@ -281,7 +192,7 @@ export default function MartaInventory() {
         alert(`Successfully synced ${uploadQueue.length} units from Excel.`);
       } catch (err) {
         console.error("Upload Error:", err);
-        alert("Failed to process Excel file. Ensure it matches the export format.");
+        alert("Failed to process Excel file.");
       }
     };
   };
@@ -383,33 +294,20 @@ export default function MartaInventory() {
       return <span className="ml-2 text-lg font-black text-[#ef7c00]">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
   };
 
-  const expandedBusObj = expandedBus ? buses.find(b => b.docId === expandedBus) : null;
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-[#ef7c00] selection:text-white relative">
-      
-      {inventoryMode === 'grid' && expandedBus && expandedBusObj && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-                <EditBusForm bus={expandedBusObj} onClose={() => setExpandedBus(null)} />
-            </div>
-        </div>
-      )}
-
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-3">
             <div className="w-2 h-6 bg-[#002d72] rounded-full"></div>
             <span className="font-black text-lg italic uppercase tracking-tighter text-[#002d72]">Fleet Manager</span>
         </div>
         <div className="flex gap-6 items-center">
-            {/* NAVIGATION TABS */}
           <button onClick={() => setView('inventory')} className={`text-[10px] font-black uppercase transition-all tracking-widest border-b-2 pb-1 ${view === 'inventory' ? 'border-[#ef7c00] text-[#002d72]' : 'border-transparent text-slate-400 hover:text-[#002d72]'}`}>Inventory</button>
           <button onClick={() => setView('input')} className={`text-[10px] font-black uppercase transition-all tracking-widest border-b-2 pb-1 ${view === 'input' ? 'border-[#ef7c00] text-[#002d72]' : 'border-transparent text-slate-400 hover:text-[#002d72]'}`}>Data Entry</button>
           <button onClick={() => setView('tracker')} className={`text-[10px] font-black uppercase transition-all tracking-widest border-b-2 pb-1 ${view === 'tracker' ? 'border-[#ef7c00] text-[#002d72]' : 'border-transparent text-slate-400 hover:text-[#002d72]'}`}>Route Viewer</button>
           
           <div className="h-4 w-[1px] bg-slate-200"></div>
           
-          {/* RESTORED: Export & Upload Controls */}
           <div className="flex gap-4">
               <label className="text-green-600 hover:text-green-800 text-[10px] font-black uppercase transition-all tracking-widest cursor-pointer">
                 Upload Excel
@@ -469,7 +367,7 @@ export default function MartaInventory() {
                             <div onClick={() => requestSort('expectedReturnDate')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Exp Return {getSortIcon('expectedReturnDate')}</div>
                             <div onClick={() => requestSort('actualReturnDate')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Act Return {getSortIcon('actualReturnDate')}</div>
                             <div onClick={() => requestSort('daysOOS')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Days OOS {getSortIcon('daysOOS')}</div>
-                            <div className="col-span-1 text-right">Action</div>
+                            {/* ACTION COLUMN REMOVED FOR READ-ONLY */}
                         </div>
 
                         <div className="divide-y divide-slate-100">
@@ -479,7 +377,6 @@ export default function MartaInventory() {
                                 sortedBuses.map((bus) => {
                                     const specs = getBusSpecs(bus.number);
                                     const isDown = bus.status !== 'Active';
-                                    const isExpanded = expandedBus === bus.docId;
                                     const days = calculateDaysOOS(bus.oosStartDate, new Date().toISOString().split('T')[0]);
                                     const isHoldGroup = holdStatuses.includes(bus.status);
                                     const rowClass = bus.status === 'Active' ? 'bg-white hover:bg-slate-50 border-l-4 border-l-green-500' :
@@ -492,8 +389,8 @@ export default function MartaInventory() {
                                                             'bg-orange-100 text-orange-700 border-orange-200';
 
                                     return (
-                                        <div key={bus.docId} className={`group transition-all duration-200 ${rowClass}`}>
-                                            <div onClick={() => setExpandedBus(isExpanded ? null : bus.docId)} className="grid grid-cols-10 gap-4 p-5 items-center cursor-pointer">
+                                        <div key={bus.docId} className={`group ${rowClass}`}>
+                                            <div className="grid grid-cols-10 gap-4 p-5 items-center">
                                                 <div className={`col-span-1 text-lg font-black ${statusTextColor}`}>#{bus.number}</div>
                                                 <div className="col-span-1"><span className="bg-white/50 border border-black/5 text-slate-500 text-[9px] font-bold px-2 py-1 rounded-md">{specs.length}</span></div>
                                                 <div className="col-span-1"><span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full border ${statusBadgeClass}`}>{bus.status}</span></div>
@@ -502,13 +399,7 @@ export default function MartaInventory() {
                                                 <div className="col-span-1 text-xs font-bold text-slate-700">{bus.expectedReturnDate || '--'}</div>
                                                 <div className="col-span-1 text-xs font-bold text-slate-700">{bus.actualReturnDate || '--'}</div>
                                                 <div className="col-span-1 text-xs font-bold text-slate-600">{isDown ? `${days} days` : '-'}</div>
-                                                <div className="col-span-1 text-right"><span className="text-[#002d72] font-black text-[10px] uppercase opacity-50 group-hover:opacity-100 transition-opacity">{isExpanded ? 'Close' : 'Edit'}</span></div>
                                             </div>
-                                            {isExpanded && (
-                                                <div className="bg-white/50 border-t border-black/5 p-6 animate-in slide-in-from-top-2">
-                                                    <EditBusForm bus={bus} onClose={() => setExpandedBus(null)} />
-                                                </div>
-                                            )}
                                         </div>
                                     );
                                 })
@@ -524,7 +415,7 @@ export default function MartaInventory() {
                                 else if (bus.status !== 'Active') colors = "bg-orange-50 border-orange-200 text-orange-800 hover:border-orange-400";
 
                                 return (
-                                    <div key={bus.docId} onClick={() => setExpandedBus(bus.docId)} className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105 shadow-sm ${colors}`}>
+                                    <div key={bus.docId} className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center shadow-sm ${colors}`}>
                                         <span className="text-xs font-black italic tracking-tighter">#{bus.number}</span>
                                         {bus.status !== 'Active' && <span className="text-[7px] font-bold uppercase opacity-60 leading-none mt-0.5">{bus.status}</span>}
                                     </div>

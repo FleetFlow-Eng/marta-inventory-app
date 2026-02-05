@@ -4,9 +4,9 @@ import Map from "./Map";
 
 export default function BusTracker() {
   const [vehicles, setVehicles] = useState([]);
-  const [routes, setRoutes] = useState([]);
+  const [routes, setRoutes] = useState({}); // FIXED: Initialize as {} for dictionary
   const [loading, setLoading] = useState(true);
-  const [selectedBus, setSelectedBus] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -15,11 +15,14 @@ export default function BusTracker() {
           fetch("/api/vehicles"),
           fetch("/api/routes")
         ]);
+        
         const vehicleData = await vegRes.json();
         const routeData = await routeRes.json();
         
+        // MARTA realtime uses 'entity' for the bus list
         setVehicles(vehicleData?.entity || []);
-        setRoutes(routeData || []);
+        // Your new route.js returns the routes.json dictionary
+        setRoutes(routeData || {}); 
       } catch (error) {
         console.error("Error loading MARTA data:", error);
       } finally {
@@ -34,9 +37,7 @@ export default function BusTracker() {
 
   if (loading) return (
     <div className="h-full flex items-center justify-center bg-slate-900">
-      <p className="text-[#ef7c00] font-black italic animate-pulse uppercase tracking-widest">
-        Syncing MARTA Fleet...
-      </p>
+      <p className="text-[#ef7c00] font-black italic animate-pulse">SYNCING MARTA FLEET...</p>
     </div>
   );
 
@@ -49,27 +50,22 @@ export default function BusTracker() {
         </div>
         <div className="flex-grow overflow-y-auto divide-y divide-slate-100">
           {vehicles.map((v) => {
-            // DECODING: Use label for the proper bus number
             const busNum = v.vehicle?.vehicle?.label || v.vehicle?.vehicle?.id;
             return (
               <button 
                 key={v.id}
-                onClick={() => setSelectedBus(v)}
-                className={`w-full p-3 text-left hover:bg-white transition-colors group ${selectedBus?.id === v.id ? 'bg-blue-50' : ''}`}
+                onClick={() => setSelectedId(v.vehicle?.vehicle?.id)}
+                className={`w-full p-3 text-left hover:bg-white transition-colors ${selectedId === v.vehicle?.vehicle?.id ? 'bg-blue-100' : ''}`}
               >
-                <div className="flex justify-between items-center">
-                  <span className="font-black text-slate-700 text-sm italic">#{busNum}</span>
-                  <span className="text-[9px] font-bold text-slate-400 group-hover:text-[#ef7c00]">NAVIGATE →</span>
-                </div>
+                <span className="font-black text-slate-700 text-sm italic">#{busNum}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* MAP */}
       <div className="flex-grow relative">
-        <Map vehicles={vehicles} routes={routes} selectedBus={selectedBus} />
+        <Map buses={vehicles} selectedId={selectedId} routes={routes} />
       </div>
     </div>
   );

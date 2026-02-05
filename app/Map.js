@@ -42,10 +42,11 @@ function MapController({ selectedBus }) {
   return null;
 }
 
-// ADDED 'routes' prop here to receive your routes.json data
-export default function Map({ buses, selectedId, pinnedIds = [], routes = {} }) {
+export default function Map({ buses = [], selectedId, pinnedIds = [], routes = {} }) {
   const position = [33.7490, -84.3880];
-  const selectedBus = buses.find(b => b.vehicle?.vehicle?.id === selectedId);
+  
+  // SAFETY: Added ?. to prevent the "find of undefined" crash
+  const selectedBus = buses?.find?.(b => b.vehicle?.vehicle?.id === selectedId);
   
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -61,29 +62,30 @@ export default function Map({ buses, selectedId, pinnedIds = [], routes = {} }) 
       />
       <MapController selectedBus={selectedBus} />
       
-      {buses.map((bus) => {
+      {/* SAFETY: Ensure buses is an array before mapping */}
+      {Array.isArray(buses) && buses.map((bus) => {
         const vehicle = bus.vehicle?.vehicle;
         const id = vehicle?.id;
         if (!id) return null;
 
         // --- PROPER DECODING ---
-        // 1. Bus Number (Uses Label like #2316)
         const busNumber = vehicle?.label || id;
-        
-        // 2. Route Number (Look up in your routes.json dictionary)
         const rawRouteId = bus.vehicle?.trip?.route_id;
+        
+        // Use your routes.json dictionary lookup
         const properRouteNumber = routes[rawRouteId] || "??";
 
         const isSelected = id === selectedId;
         const isPinned = pinnedIds.includes(id); 
-        const lat = bus.vehicle.position.latitude;
-        const lon = bus.vehicle.position.longitude;
-        const miles = bus.distanceToGarage ? bus.distanceToGarage.toFixed(1) : "?";
+        const lat = bus.vehicle?.position?.latitude;
+        const lon = bus.vehicle?.position?.longitude;
         
+        if (!lat || !lon) return null;
+
+        const miles = bus.distanceToGarage ? bus.distanceToGarage.toFixed(1) : "?";
         const trail = bus.trail && bus.trail.length > 0 ? bus.trail : [[lat, lon]];
 
         // --- GHOST LOGIC ---
-        // MARTA timestamp is in seconds, JavaScript needs milliseconds
         const lastSeen = bus.vehicle?.timestamp ? bus.vehicle.timestamp * 1000 : Date.now();
         const isStale = (Date.now() - lastSeen) > 300000;
         const timeString = new Date(lastSeen).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -112,7 +114,6 @@ export default function Map({ buses, selectedId, pinnedIds = [], routes = {} }) 
                 opacity={isSelected ? 1.0 : (isStale && !isPinned ? 0.6 : 0.9)}
                 zIndexOffset={isPinned ? 1000 : 0} 
             >
-                {/* TOOLTIP: Now shows proper Unit and Route on hover */}
                 <Tooltip direction="top" offset={[0, -40]}>
                     <span className="font-black text-[#002d72]">#{busNumber} | RT {properRouteNumber}</span>
                 </Tooltip>
@@ -141,7 +142,7 @@ export default function Map({ buses, selectedId, pinnedIds = [], routes = {} }) 
 
                         <div style={{ marginTop: "10px", borderTop: "1px solid #eee", paddingTop: "8px" }}>
                             <a 
-                            href={`https://www.google.com/maps/search/?api=1&query=${lat},${lon}`}
+                            href={`https://www.google.com/maps?q=${lat},${lon}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{

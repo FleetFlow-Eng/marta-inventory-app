@@ -245,136 +245,6 @@ export default function MartaInventory() {
 
   const holdStatuses = ['On Hold', 'Engine', 'Body Shop', 'Vendor', 'Brakes', 'Safety'];
 
-  // --- REFINED EXCEL PARSER ---
-  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.readAsArrayBuffer(file);
-    
-    reader.onload = async () => {
-      try {
-        const buffer = reader.result as ArrayBuffer;
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(buffer);
-        const worksheet = workbook.getWorksheet(1); 
-
-        const uploadQueue: any[] = [];
-        const currentYear = new Date().getFullYear();
-
-        // 1. UPDATED MAPPING: Added Engineering & Brakes catch-all
-        const categoryMap: { [key: string]: string } = {
-            'ENGINE': 'Engine',
-            'ENGINEERING': 'Engine', // Maps Engineering -> Engine status
-            'VENDOR': 'Vendor',
-            'HOLD': 'On Hold',
-            'BODY SHOP': 'Body Shop',
-            'CODE 1 BRAKES': 'Brakes',
-            'NEW BRAKES': 'Brakes',
-            'BRAKES': 'Brakes',      // Catch-all for simple 'Brakes' header
-            'SERVICE CALLS': 'In Shop',
-            'TRIPPER': 'Active',
-            'TRIPPERS': 'Active'
-        };
-
-        const stopWords = ['TOTAL', 'STEAM CLEAN', 'MAJOR CLEAN', 'HYAC INSPECTION', 'DAY SHIFT'];
-        const ignoreHeaders = ['RETORQUES', 'SHOP REPORT', 'WEEKEND LIST', 'SAFETY 1ST', 'SAFETY'];
-
-        const formatOOSDate = (raw: string) => {
-            if (!raw) return '';
-            const match = raw.match(/(\d{1,2})\.(\d{1,2})/);
-            if (match) {
-                const month = match[1].padStart(2, '0');
-                const day = match[2].padStart(2, '0');
-                return `${currentYear}-${month}-${day}`;
-            }
-            return '';
-        };
-
-        for (let col = 1; col <= 20; col++) {
-            let currentStatus = '';
-            
-            worksheet?.getColumn(col).eachCell((cell, rowNumber) => {
-                const val = cell.value ? cell.value.toString().trim().toUpperCase() : '';
-                
-                // HARD STOP: Red Line / Row Limit
-                if (rowNumber > 40 || stopWords.some(word => val.includes(word))) {
-                    if (stopWords.some(word => val.includes(word))) currentStatus = ''; 
-                    return;
-                }
-
-                // PRIORITY 1: IS THIS A BUS? (Capture it!)
-                if (/^\d{4}/.test(val)) {
-                    if (currentStatus) {
-                        const busNumber = val.substring(0, 4);
-                        const remainingText = val.substring(4).trim();
-                        let oosDate = '';
-                        let notes = remainingText;
-
-                        const dateMatch = remainingText.match(/(\d{1,2}\.\d{1,2})/);
-                        if (dateMatch) {
-                            oosDate = formatOOSDate(dateMatch[0]);
-                            notes = notes.replace(dateMatch[0], '').trim();
-                        }
-
-                        notes = notes.replace(/\([A-Z]\)/g, '').trim();
-                        
-                        // Safety Override
-                        let finalStatus = currentStatus;
-                        if (remainingText.toUpperCase().includes('SAFETY HOLD')) {
-                            finalStatus = 'Safety';
-                        }
-
-                        if (!notes || notes.length < 2) notes = finalStatus; 
-
-                        uploadQueue.push({
-                            number: busNumber,
-                            status: finalStatus,
-                            notes: notes,
-                            oosStartDate: oosDate,
-                            timestamp: serverTimestamp()
-                        });
-                    }
-                    return;
-                }
-
-                // PRIORITY 2: IS THIS A HEADER? (Switch Status)
-                if (categoryMap[val]) {
-                    currentStatus = categoryMap[val];
-                    return;
-                }
-
-                // PRIORITY 3: IS THIS TRASH? (Kill Status)
-                // We check this LAST so it doesn't kill "SAFETY HOLD" bus notes
-                if (ignoreHeaders.some(header => val.includes(header)) || val.length > 3) {
-                    currentStatus = '';
-                    return;
-                }
-            });
-        }
-
-        if (uploadQueue.length === 0) {
-            alert("No recognized bus data found.");
-            return;
-        }
-
-        const batch = writeBatch(db);
-        uploadQueue.forEach((data) => {
-            const ref = doc(db, "buses", data.number);
-            batch.set(ref, data, { merge: true });
-        });
-        await batch.commit();
-
-        alert(`Success! Updated ${uploadQueue.length} buses.`);
-        
-      } catch (err) {
-        console.error("Parsing Error:", err);
-        alert("Failed to parse file.");
-      }
-    };
-  };
-
   const getBusSpecs = (num: string) => {
     const n = parseInt(num);
     const thirtyFt = [1951, 1958, 1959];
@@ -517,10 +387,6 @@ export default function MartaInventory() {
           <div className="h-4 w-[1px] bg-slate-200"></div>
           
           <div className="flex gap-4">
-              <label className="text-green-600 hover:text-green-800 text-[10px] font-black uppercase transition-all tracking-widest cursor-pointer">
-                Upload Report
-                <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleExcelUpload} />
-              </label>
               <button onClick={exportToExcel} className="text-[#002d72] hover:text-[#ef7c00] text-[10px] font-black uppercase transition-all tracking-widest">Export Excel</button>
           </div>
           
@@ -538,7 +404,6 @@ export default function MartaInventory() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               {[
                 { label: 'Total Fleet', val: buses.length, color: 'text-slate-900' },
-                // FIX: Ready logic now includes Active + In Shop
                 { label: 'Ready', val: buses.filter(b => b.status === 'Active' || b.status === 'In Shop').length, color: 'text-green-600' },
                 { label: 'On Hold', val: buses.filter(b => holdStatuses.includes(b.status)).length, color: 'text-red-600' },
                 { label: 'In Shop', val: buses.filter(b => b.status === 'In Shop').length, color: 'text-[#ef7c00]' }

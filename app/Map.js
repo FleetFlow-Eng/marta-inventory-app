@@ -36,12 +36,12 @@ export default function Map({ buses = [], selectedId, routes = {} }) {
         const fullRouteName = (routes && rId && routes[String(rId)]) ? routes[String(rId)] : "Special";
         const routeNum = fullRouteName.split(' - ')[0];
 
-        const lastSeenMs = vData?.timestamp * 1000;
+        const lastSeenMs = vData.timestamp * 1000;
         const isStale = (Date.now() - lastSeenMs) > 300000;
 
         return (
           <Marker key={id} position={[vData.position.latitude, vData.position.longitude]} icon={isStale ? greyIcon : blueIcon}>
-            {/* UPDATED: Displays Route instead of RT */}
+            {/* Route instead of RT */}
             <Tooltip direction="top" offset={[0, -40]} opacity={1}>
               <span className="font-black text-[10px] text-[#002d72]">Bus #{busNumber} | Route {routeNum}</span>
             </Tooltip>
@@ -51,7 +51,7 @@ export default function Map({ buses = [], selectedId, routes = {} }) {
                    <p className="font-black text-[#002d72] uppercase italic text-sm">Bus #{busNumber}</p>
                    <p className="bg-[#ef7c00] text-white text-[9px] font-black px-2 py-0.5 rounded tracking-tighter">Route {routeNum}</p>
                 </div>
-                <p className="text-[10px] font-bold text-slate-500 uppercase leading-tight mb-3">
+                <p className="text-[10px] font-bold text-slate-500 uppercase leading-tight">
                     {fullRouteName.split(' - ')[1] || fullRouteName}
                 </p>
               </div>

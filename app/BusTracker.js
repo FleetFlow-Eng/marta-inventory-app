@@ -121,7 +121,7 @@ export default function BusTracker() {
               return (
                 <button key={v.id} onClick={() => setSelectedId(vehicle?.vehicle?.id)} className={`w-full p-3 text-left border-b border-slate-100 flex items-center justify-between group ${selectedId === vehicle?.vehicle?.id ? 'bg-blue-50 border-l-4 border-[#002d72]' : 'hover:bg-white border-l-4 border-transparent'}`}>
                   <div>
-                    {/* UPDATED FORMAT: Bus: 1880 (Not bold) */}
+                    {/* Bus: 1880 (Not bold) */}
                     <p className={`text-sm italic ${isStale ? 'text-slate-400' : 'text-slate-900'}`}>Bus: {busNum}</p>
                     <p className="text-[9px] font-bold text-[#ef7c00] uppercase truncate w-52 leading-none mt-1">{routeInfo.split(' - ')[1] || routeInfo}</p>
                   </div>

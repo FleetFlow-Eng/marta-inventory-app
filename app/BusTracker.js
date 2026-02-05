@@ -42,7 +42,7 @@ export default function BusTracker() {
   const stats = useMemo(() => {
     const total = vehicles.length;
     const active = vehicles.filter(v => (Date.now() - (v.vehicle?.timestamp * 1000)) < 300000).length;
-    return { total, active, hold: total - active };
+    return { total, active, ghost: total - active }; // Stats for the Ghost count
   }, [vehicles]);
 
   const processedVehicles = useMemo(() => {
@@ -63,14 +63,10 @@ export default function BusTracker() {
       if (sortBy === "route") {
         const idA = a.vehicle?.trip?.route_id || a.vehicle?.trip?.routeId;
         const idB = b.vehicle?.trip?.route_id || b.vehicle?.trip?.routeId;
-        
-        // --- ROUTE FIX: Ensure we compare strings ---
         const cleanA = idA ? String(idA).trim() : "";
         const cleanB = idB ? String(idB).trim() : "";
-        
         const routeA = (routes && cleanA && routes[cleanA]) ? routes[cleanA] : "zzz";
         const routeB = (routes && cleanB && routes[cleanB]) ? routes[cleanB] : "zzz";
-        
         return routeA.localeCompare(routeB);
       }
       return (a.vehicle?.vehicle?.label || "").localeCompare(b.vehicle?.vehicle?.label || "");
@@ -81,7 +77,7 @@ export default function BusTracker() {
 
   return (
     <div className="flex flex-col h-screen bg-white text-slate-900 overflow-hidden">
-      {/* SLENDER HEADER */}
+      {/* SLENDER HEADER - UPDATED LABEL TO GHOST BUS */}
       <div className="flex-none flex items-center justify-between px-6 py-2 bg-[#002d72] text-white shadow-xl z-[2000] relative">
         <div className="flex gap-4">
           <button onClick={() => setFilterStatus("all")} className={`flex flex-col items-start px-3 py-0.5 rounded transition-all border ${filterStatus === 'all' ? 'bg-white/20 border-white' : 'border-transparent hover:bg-white/10'}`}>
@@ -92,9 +88,11 @@ export default function BusTracker() {
             <p className="text-[8px] font-bold opacity-70 uppercase text-green-400">Live Active</p>
             <p className="text-lg font-black text-green-400">{stats.active}</p>
           </button>
+          
+          {/* Label changed from 'ON HOLD' to 'GHOST BUS' */}
           <button onClick={() => setFilterStatus("hold")} className={`flex flex-col items-start px-3 py-0.5 rounded transition-all border ${filterStatus === 'hold' ? 'bg-orange-900/40 border-[#ef7c00]' : 'border-transparent hover:bg-white/10'}`}>
-            <p className="text-[8px] font-bold opacity-70 uppercase text-[#ef7c00]">On Hold</p>
-            <p className="text-lg font-black text-[#ef7c00]">{stats.hold}</p>
+            <p className="text-[8px] font-bold opacity-70 uppercase text-[#ef7c00]">Ghost Bus</p>
+            <p className="text-lg font-black text-[#ef7c00]">{stats.ghost}</p>
           </button>
         </div>
         <div className="text-right">
@@ -119,18 +117,14 @@ export default function BusTracker() {
             {processedVehicles.map((v) => {
               const vehicle = v.vehicle;
               const busNum = vehicle?.vehicle?.label || vehicle?.vehicle?.id;
-              
-              // --- ROUTE FIX LOGIC ---
               const rId = vehicle?.trip?.route_id || vehicle?.trip?.routeId;
               const cleanId = rId ? String(rId).trim() : "";
-              
               let routeInfo = "Special"; 
               if (routes && cleanId && routes[cleanId]) {
                   routeInfo = routes[cleanId];
               } else if (cleanId) {
                   routeInfo = `Route ${cleanId}`;
               }
-
               const lastSeenMs = vehicle?.timestamp * 1000;
               const isStale = (Date.now() - lastSeenMs) > 300000;
 

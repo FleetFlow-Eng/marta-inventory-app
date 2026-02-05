@@ -39,12 +39,14 @@ export default function BusTracker() {
     return () => clearInterval(interval);
   }, []);
 
+  // Metrics Logic
   const stats = useMemo(() => {
     const total = vehicles.length;
     const active = vehicles.filter(v => (Date.now() - (v.vehicle?.timestamp * 1000)) < 300000).length;
     return { total, active, hold: total - active };
   }, [vehicles]);
 
+  // Search & Sorting Logic
   const processedVehicles = useMemo(() => {
     let filtered = vehicles.filter(v => {
       const busNum = (v.vehicle?.vehicle?.label || v.vehicle?.vehicle?.id || "").toLowerCase();
@@ -53,11 +55,12 @@ export default function BusTracker() {
 
     return filtered.sort((a, b) => {
       if (sortBy === "route") {
-        const idA = a.vehicle?.trip?.route_id || a.vehicle?.trip?.routeId || "";
-        const idB = b.vehicle?.trip?.route_id || b.vehicle?.trip?.routeId || "";
-        const nameA = routes[String(idA)] || "999";
-        const nameB = routes[String(idB)] || "999";
-        return nameA.localeCompare(nameB);
+        const idA = a.vehicle?.trip?.route_id || a.vehicle?.trip?.routeId;
+        const idB = b.vehicle?.trip?.route_id || b.vehicle?.trip?.routeId;
+        // Use clean strings for comparison
+        const routeA = idA ? String(idA).trim() : "999";
+        const routeB = idB ? String(idB).trim() : "999";
+        return routeA.localeCompare(routeB);
       }
       return (a.vehicle?.vehicle?.label || "").localeCompare(b.vehicle?.vehicle?.label || "");
     });
@@ -67,7 +70,7 @@ export default function BusTracker() {
 
   return (
     <div className="flex flex-col h-screen bg-white text-slate-900">
-      {/* PROFESSIONAL METRICS HEADER */}
+      {/* METRICS HEADER */}
       <div className="flex items-center justify-between px-6 py-4 bg-[#002d72] text-white shadow-xl z-10">
         <div className="flex gap-10">
           <div><p className="text-[9px] font-bold opacity-50 uppercase tracking-widest">Total Fleet</p><p className="text-xl font-black">{stats.total}</p></div>
@@ -78,7 +81,7 @@ export default function BusTracker() {
         <div className="flex items-center gap-3">
           <input 
             type="text" 
-            placeholder="Search Unit #..."
+            placeholder="Search Bus #..."
             className="bg-white/10 border border-white/20 rounded px-3 py-1.5 text-xs font-bold outline-none placeholder:text-white/40 focus:bg-white/20 transition-all w-40"
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -86,20 +89,35 @@ export default function BusTracker() {
             onChange={(e) => setSortBy(e.target.value)}
             className="bg-[#002d72] text-[10px] font-black uppercase p-2 rounded border border-white/30 outline-none cursor-pointer"
           >
-            <option value="unit">Sort: Unit #</option>
+            <option value="unit">Sort: Bus #</option>
             <option value="route">Sort: Route</option>
           </select>
         </div>
       </div>
 
       <div className="flex flex-grow overflow-hidden">
+        {/* SIDEBAR */}
         <div className="w-80 bg-slate-50 border-r border-slate-200 flex flex-col shadow-inner">
           <div className="flex-grow overflow-y-auto">
             {processedVehicles.map((v) => {
               const vehicle = v.vehicle;
               const busNum = vehicle?.vehicle?.label || vehicle?.vehicle?.id;
+              
+              // --- SIDEBAR ROUTE LOGIC ---
               const rId = vehicle?.trip?.route_id || vehicle?.trip?.routeId;
-              const routeInfo = (rId && routes[String(rId)]) ? routes[String(rId)] : "No Route Data";
+              const cleanId = rId ? String(rId).trim() : "";
+              
+              // Lookup Name OR Fallback to "Route [ID]"
+              let displayRoute = "Special / Yard Move";
+              if (routes && cleanId && routes[cleanId]) {
+                 // Use the dictionary name (e.g. "191 - Riverdale")
+                 const name = routes[cleanId];
+                 displayRoute = name.split(' - ')[1] || name; 
+              } else if (cleanId) {
+                 // Fallback: "Route 26862" instead of "ID: 26862"
+                 displayRoute = `Route ${cleanId}`;
+              }
+
               const lastSeenMs = vehicle?.timestamp * 1000;
               const isStale = (Date.now() - lastSeenMs) > 300000;
 
@@ -110,8 +128,8 @@ export default function BusTracker() {
                   className={`w-full p-4 text-left border-b border-slate-100 transition-all flex items-center justify-between group ${selectedId === vehicle?.vehicle?.id ? 'bg-blue-100 border-l-8 border-[#002d72]' : 'hover:bg-white border-l-8 border-transparent'}`}
                 >
                   <div>
-                    <p className={`font-black text-sm italic tracking-tighter ${isStale ? 'text-slate-400' : 'text-slate-900'}`}>UNIT #{busNum}</p>
-                    <p className="text-[10px] font-bold text-[#ef7c00] uppercase truncate w-52 leading-none mt-1">{routeInfo.split(' - ')[1] || routeInfo}</p>
+                    <p className={`font-black text-sm italic tracking-tighter ${isStale ? 'text-slate-400' : 'text-slate-900'}`}>BUS #{busNum}</p>
+                    <p className="text-[10px] font-bold text-[#ef7c00] uppercase truncate w-52 leading-none mt-1">{displayRoute}</p>
                   </div>
                   <div className={`text-[9px] font-black px-2 py-1 rounded ${isStale ? 'bg-slate-200 text-slate-500' : 'bg-green-100 text-green-700 animate-pulse'}`}>
                     {isStale ? 'OFFLINE' : 'LIVE'}

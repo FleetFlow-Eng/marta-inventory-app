@@ -265,7 +265,7 @@ export default function MartaInventory() {
         const uploadQueue: any[] = [];
         const currentYear = new Date().getFullYear();
 
-        // 1. STRICT MAPPING (Ignores "SAFETY 1ST" and unrecognized cols)
+        // 1. STRICT MAPPING
         const categoryMap: { [key: string]: string } = {
             'ENGINE': 'Engine',
             'VENDOR': 'Vendor',
@@ -273,9 +273,8 @@ export default function MartaInventory() {
             'BODY SHOP': 'Body Shop',
             'CODE 1 BRAKES': 'Brakes',
             'NEW BRAKES': 'Brakes',
-            // Note: 'SAFETY 1ST' is removed so it will be ignored
-            // 'SAFETY': 'Safety', // Removed based on request to ignore vague safety headers
-            'SERVICE CALLS': 'In Shop'
+            'SERVICE CALLS': 'In Shop',
+            'TRIPPER': 'Active' // Added Tripper as requested
         };
 
         const formatOOSDate = (raw: string) => {
@@ -291,7 +290,7 @@ export default function MartaInventory() {
 
         for (let col = 1; col <= 20; col++) {
             let currentStatus = '';
-            worksheet?.getColumn(col).eachCell((cell, rowNumber) => {
+            worksheet?.getColumn(col).eachCell((cell) => {
                 const val = cell.value ? cell.value.toString().trim().toUpperCase() : '';
                 
                 // Header detection
@@ -299,10 +298,11 @@ export default function MartaInventory() {
                     currentStatus = categoryMap[val];
                     return;
                 } else if (val.length > 3 && !/^\d{4}/.test(val)) {
-                    // Reset if we hit a header NOT in our map (like SAFETY 1ST or RETORQUES)
+                    // Reset if we hit a text cell that isn't a known category
                     currentStatus = '';
                 }
 
+                // Process rows only if inside a VALID category and starts with 4-digit bus number
                 if (currentStatus && /^\d{4}/.test(val)) {
                     const busNumber = val.substring(0, 4);
                     const remainingText = val.substring(4).trim();
@@ -317,7 +317,7 @@ export default function MartaInventory() {
 
                     notes = notes.replace(/\([A-Z]\)/g, '').trim();
                     
-                    // 2. SAFETY HOLD CHECK: If text contains "SAFETY HOLD", override status
+                    // 2. SAFETY HOLD DETECTION
                     let finalStatus = currentStatus;
                     if (remainingText.toUpperCase().includes('SAFETY HOLD')) {
                         finalStatus = 'Safety';
@@ -337,7 +337,7 @@ export default function MartaInventory() {
         }
 
         if (uploadQueue.length === 0) {
-            alert("No recognized bus data found. Check your column headers.");
+            alert("No recognized bus data found. Ensure categories like ENGINE or TRIPPER are present.");
             return;
         }
 
@@ -348,7 +348,7 @@ export default function MartaInventory() {
         });
         await batch.commit();
 
-        alert(`Success! Updated ${uploadQueue.length} buses from authorized categories.`);
+        alert(`Successfully updated ${uploadQueue.length} buses.`);
         
       } catch (err) {
         console.error("Parsing Error:", err);
@@ -453,7 +453,7 @@ export default function MartaInventory() {
     const matchesSearch = b.number.includes(searchTerm);
     if (!matchesSearch) return false;
     if (activeFilter === 'Total Fleet') return true;
-    if (activeFilter === 'Ready') return b.status === 'Active';
+    if (activeFilter === 'Ready') return b.status === 'Active' || b.status === 'In Shop';
     if (activeFilter === 'On Hold') return holdStatuses.includes(b.status);
     if (activeFilter === 'In Shop') return b.status === 'In Shop';
     return true;
@@ -479,7 +479,6 @@ export default function MartaInventory() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-[#ef7c00] selection:text-white relative">
       
-      {/* DISPLAY MODAL (Read Only) */}
       {inventoryMode === 'grid' && selectedBusDetail && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
             <BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} />
@@ -520,7 +519,7 @@ export default function MartaInventory() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               {[
                 { label: 'Total Fleet', val: buses.length, color: 'text-slate-900' },
-                // FIX: "Ready" now explicitly adds Active + In Shop counts
+                // FIX: "Ready" count logic
                 { label: 'Ready', val: buses.filter(b => b.status === 'Active' || b.status === 'In Shop').length, color: 'text-green-600' },
                 { label: 'On Hold', val: buses.filter(b => holdStatuses.includes(b.status)).length, color: 'text-red-600' },
                 { label: 'In Shop', val: buses.filter(b => b.status === 'In Shop').length, color: 'text-[#ef7c00]' }

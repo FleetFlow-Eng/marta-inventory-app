@@ -1,7 +1,8 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebaseConfig'; 
-import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc, writeBatch, getDocs } from "firebase/firestore";
+// Added deleteDoc to imports
+import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc, deleteDoc, writeBatch, getDocs } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -19,9 +20,52 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
   )
 });
 
+// --- COMPONENT: Bus Details with EDIT & DELETE ---
 const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
+    const [isEditing, setIsEditing] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
+    
+    const [editData, setEditData] = useState({
+        status: bus.status || 'Active',
+        location: bus.location || '',
+        notes: bus.notes || '',
+        oosStartDate: bus.oosStartDate || '',
+        expectedReturnDate: bus.expectedReturnDate || '',
+        actualReturnDate: bus.actualReturnDate || ''
+    });
+
     const historyLog: any[] = []; 
+
+    const handleChange = (e: any) => {
+        const { name, value } = e.target;
+        setEditData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleSave = async () => {
+        try {
+            await setDoc(doc(db, "buses", bus.number), {
+                ...editData,
+                timestamp: serverTimestamp()
+            }, { merge: true });
+            setIsEditing(false);
+        } catch (err) {
+            console.error("Error updating bus:", err);
+            alert("Failed to save changes.");
+        }
+    };
+
+    // --- NEW DELETE FUNCTION ---
+    const handleDelete = async () => {
+        if (confirm(`⚠️ ARE YOU SURE you want to delete Bus #${bus.number}?\n\nThis action cannot be undone.`)) {
+            try {
+                await deleteDoc(doc(db, "buses", bus.number));
+                onClose(); // Close modal after delete
+            } catch (err) {
+                console.error("Error deleting bus:", err);
+                alert("Failed to delete bus.");
+            }
+        }
+    };
 
     if (showHistory) {
         return (
@@ -47,6 +91,63 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
                             </div>
                         ))
                     )}
+                </div>
+            </div>
+        );
+    }
+
+    if (isEditing) {
+        return (
+            <div className="bg-white p-8 rounded-xl shadow-2xl border border-slate-200 w-full max-w-2xl animate-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+                    <h3 className="text-2xl font-black text-[#002d72] italic uppercase">Editing Bus #{bus.number}</h3>
+                    <button onClick={() => setIsEditing(false)} className="text-xs font-bold text-slate-400 hover:text-red-500 uppercase">Cancel</button>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Status</label>
+                            <select name="status" className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-lg font-bold outline-none focus:border-[#002d72]" value={editData.status} onChange={handleChange}>
+                                <option value="Active">Ready for Service</option>
+                                <option value="On Hold">Maintenance Hold</option>
+                                <option value="In Shop">In Shop</option>
+                                <option value="Engine">Engine</option>
+                                <option value="Body Shop">Body Shop</option>
+                                <option value="Vendor">Vendor</option>
+                                <option value="Brakes">Brakes</option>
+                                <option value="Safety">Safety</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Location</label>
+                            <input name="location" type="text" className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-lg font-bold outline-none focus:border-[#002d72]" value={editData.location} onChange={handleChange} />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Fault Details</label>
+                        <textarea name="notes" className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-lg font-medium outline-none focus:border-[#002d72] h-24 resize-none" value={editData.notes} onChange={handleChange} />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">OOS Date</label>
+                            <input name="oosStartDate" type="date" className="w-full p-2 bg-slate-50 border-2 border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-[#002d72]" value={editData.oosStartDate} onChange={handleChange} />
+                        </div>
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Exp Return</label>
+                            <input name="expectedReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-[#002d72]" value={editData.expectedReturnDate} onChange={handleChange} />
+                        </div>
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Act Return</label>
+                            <input name="actualReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-[#002d72]" value={editData.actualReturnDate} onChange={handleChange} />
+                        </div>
+                    </div>
+
+                    <button onClick={handleSave} className="w-full py-3 bg-[#002d72] hover:bg-[#ef7c00] text-white rounded-xl font-black uppercase tracking-widest shadow-lg mt-4 transition-all">
+                        Save Changes
+                    </button>
                 </div>
             </div>
         );
@@ -94,9 +195,18 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
                 <button onClick={() => setShowHistory(true)} className="flex items-center gap-2 px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-black uppercase transition-all">
                     <span>📜</span> View History
                 </button>
-                <button onClick={onClose} className="px-8 py-3 bg-[#002d72] hover:bg-[#001a3d] text-white rounded-lg text-xs font-black uppercase transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5">
-                    Close Profile
-                </button>
+                <div className="flex gap-3">
+                    {/* NEW DELETE BUTTON */}
+                    <button onClick={handleDelete} className="px-6 py-3 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-xs font-black uppercase transition-all">
+                        Delete
+                    </button>
+                    <button onClick={() => setIsEditing(true)} className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-[#002d72] rounded-lg text-xs font-black uppercase transition-all">
+                        Edit
+                    </button>
+                    <button onClick={onClose} className="px-6 py-3 bg-[#002d72] hover:bg-[#001a3d] text-white rounded-lg text-xs font-black uppercase transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5">
+                        Close
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -367,7 +477,7 @@ export default function MartaInventory() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-[#ef7c00] selection:text-white relative">
       
-      {/* DISPLAY MODAL (Read Only) */}
+      {/* DISPLAY MODAL (Read Only with Edit & Delete) */}
       {inventoryMode === 'grid' && selectedBusDetail && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
             <BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} />

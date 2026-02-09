@@ -99,7 +99,7 @@ const StatusCharts = ({ buses }: { buses: any[] }) => {
     );
 };
 
-// --- COMPONENT: ANALYTICS TAB ---
+// --- COMPONENT: ANALYTICS DASHBOARD ---
 const AnalyticsDashboard = ({ buses }: { buses: any[] }) => {
     const [shopQueens, setShopQueens] = useState<{number: string, count: number}[]>([]);
     
@@ -136,7 +136,7 @@ const AnalyticsDashboard = ({ buses }: { buses: any[] }) => {
                 </div>
             </div>
             <div className="bg-white p-8 rounded-2xl shadow-lg border border-slate-200">
-                <h3 className="text-xl font-black text-[#002d72] uppercase mb-6 flex items-center gap-2"> Top "Shop Buses" (High Activity)</h3>
+                <h3 className="text-xl font-black text-[#002d72] uppercase mb-6 flex items-center gap-2"><span>👑</span> Top "Shop Queens" (High Activity)</h3>
                 <div className="space-y-4">
                     {shopQueens.map((queen, i) => (
                         <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
@@ -155,7 +155,7 @@ const AnalyticsDashboard = ({ buses }: { buses: any[] }) => {
     );
 };
 
-// --- COMPONENT: SHIFT HANDOVER TAB ---
+// --- COMPONENT: SHIFT HANDOVER ---
 const ShiftHandover = ({ buses }: { buses: any[] }) => {
     const [report, setReport] = useState<any[]>([]);
 
@@ -238,10 +238,16 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
             let changes = [];
             if (oldData.status !== editData.status) changes.push(`STATUS: ${oldData.status} ➝ ${editData.status}`);
             if (oldData.location !== editData.location) changes.push(`LOC: ${oldData.location} ➝ ${editData.location}`);
-            if (oldData.notes !== editData.notes) changes.push(`NOTES UPDATED`);
-            
+            if (oldData.notes !== editData.notes) changes.push(`NOTES CHANGED:\nFROM: "${oldData.notes || ''}"\nTO: "${editData.notes}"`);
+            if (oldData.oosStartDate !== editData.oosStartDate) changes.push(`OOS DATE: ${oldData.oosStartDate || 'N/A'} ➝ ${editData.oosStartDate}`);
+            if (oldData.expectedReturnDate !== editData.expectedReturnDate) changes.push(`EXP: ${oldData.expectedReturnDate || 'N/A'} ➝ ${editData.expectedReturnDate}`);
+            if (oldData.actualReturnDate !== editData.actualReturnDate) changes.push(`ACT: ${oldData.actualReturnDate || 'N/A'} ➝ ${editData.actualReturnDate}`);
+
             await setDoc(busRef, { ...editData, timestamp: serverTimestamp() }, { merge: true });
-            if (changes.length > 0) await logHistory(bus.number, "EDIT", changes.join('\n'), auth.currentUser?.email || 'Unknown');
+            
+            if (changes.length > 0) {
+                await logHistory(bus.number, "EDIT", changes.join('\n\n'), auth.currentUser?.email || 'Unknown');
+            }
             setIsEditing(false);
         } catch (err) { alert("Save failed"); }
     };
@@ -264,7 +270,7 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
                         <div key={log.id} className="group relative p-3 bg-slate-50 rounded-lg border border-slate-100">
                             <button onClick={() => deleteLog(log.id)} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity">✕</button>
                             <div className="flex justify-between text-[8px] font-black uppercase text-slate-400 mb-1"><span className={log.action === 'RESET' ? 'text-red-500' : 'text-blue-500'}>{log.action}</span><span>{formatTime(log.timestamp)}</span></div>
-                            <p className="text-xs font-bold text-slate-700 leading-snug whitespace-pre-line">{log.details}</p>
+                            <p className="text-xs font-bold text-slate-700 leading-snug whitespace-pre-wrap">{log.details}</p>
                             <p className="text-[8px] text-slate-400 italic mt-1 text-right">{log.user}</p>
                         </div>
                     ))}
@@ -278,7 +284,7 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
             <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95">
                 <h3 className="text-2xl font-black text-[#002d72] mb-6 uppercase italic tracking-tighter">Edit Bus #{bus.number}</h3>
                 <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400">Status</label><select name="status" className="w-full p-3 bg-slate-50 border-2 rounded-lg font-bold" value={editData.status} onChange={handleChange}><option value="Active">Ready for Service</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select></div>
+                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400">Status</label><select name="status" className="w-full p-3 bg-slate-50 border-2 rounded-lg font-bold" value={editData.status} onChange={handleChange}><option value="Active">Ready for Service</option><option value="On Hold">Maintenance Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select></div>
                     <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400">Location</label><input name="location" type="text" className="w-full p-3 bg-slate-50 border-2 rounded-lg font-bold" value={editData.location} onChange={handleChange} /></div>
                 </div>
                 <div className="space-y-1 mb-6"><label className="text-[9px] font-black uppercase text-slate-400">Fault Details</label><textarea name="notes" className="w-full p-3 bg-slate-50 border-2 rounded-lg h-24" value={editData.notes} onChange={handleChange} /></div>
@@ -302,6 +308,14 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
                 <button onClick={onClose} className="text-slate-400 text-2xl font-bold hover:text-slate-600">✕</button>
             </div>
             <div className="bg-slate-50 p-4 rounded-xl mb-6"><p className="text-[10px] font-black uppercase text-slate-400 mb-2">Fault Details</p><p className="text-lg font-medium text-slate-800">{bus.notes || "No active faults."}</p></div>
+            
+            {/* --- RESTORED DATES IN READ-ONLY VIEW --- */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+                <div><p className="text-[9px] font-black uppercase text-slate-400">OOS Date</p><p className="text-xl font-black text-[#002d72]">{bus.oosStartDate || '--'}</p></div>
+                <div><p className="text-[9px] font-black uppercase text-slate-400">Exp Return</p><p className="text-xl font-black text-[#ef7c00]">{bus.expectedReturnDate || '--'}</p></div>
+                <div><p className="text-[9px] font-black uppercase text-slate-400">Act Return</p><p className="text-xl font-black text-green-600">{bus.actualReturnDate || '--'}</p></div>
+            </div>
+
             <div className="flex justify-between pt-6 border-t">
                 <button onClick={() => setShowHistory(true)} className="px-5 py-3 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-200">📜 History</button>
                 <div className="flex gap-3">
@@ -318,15 +332,45 @@ const BusInputForm = () => {
     const [formData, setFormData] = useState({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
     const handleChange = (e: any) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
+    // --- RESTORED FORENSIC LOGGING FOR DATA ENTRY ---
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const busRef = doc(db, "buses", formData.number);
         const busSnap = await getDoc(busRef);
         if (!busSnap.exists()) return alert("⛔ ACCESS DENIED: Bus not in registry.");
+        
+        const oldData = busSnap.data();
+        let changes = [];
+        if (oldData.status !== formData.status) changes.push(`STATUS: ${oldData.status || 'Active'} ➝ ${formData.status}`);
+        if (oldData.location !== formData.location) changes.push(`LOC: ${oldData.location || 'Blank'} ➝ ${formData.location}`);
+        if (oldData.notes !== formData.notes) changes.push(`📝 NOTES CHANGED:\nFROM: "${oldData.notes || ''}"\nTO: "${formData.notes}"`);
+        if (oldData.oosStartDate !== formData.oosStartDate) changes.push(`OOS: ${oldData.oosStartDate || 'N/A'} ➝ ${formData.oosStartDate}`);
+        if (oldData.expectedReturnDate !== formData.expectedReturnDate) changes.push(`EXP: ${oldData.expectedReturnDate || 'N/A'} ➝ ${formData.expectedReturnDate}`);
+        if (oldData.actualReturnDate !== formData.actualReturnDate) changes.push(`ACT: ${oldData.actualReturnDate || 'N/A'} ➝ ${formData.actualReturnDate}`);
+
         await setDoc(busRef, { ...formData, timestamp: serverTimestamp() }, { merge: true });
-        await logHistory(formData.number, "UPDATE", `Manual update via Data Entry. Status: ${formData.status}`, auth.currentUser?.email || 'Unknown');
+        
+        if (changes.length > 0) {
+            await logHistory(formData.number, "UPDATE", changes.join('\n\n'), auth.currentUser?.email || 'Unknown');
+        } else {
+            await logHistory(formData.number, "UPDATE", "Routine Update via Data Entry", auth.currentUser?.email || 'Unknown');
+        }
+
         alert("Unit Updated!");
         setFormData({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
+    };
+
+    const handleGlobalReset = async () => {
+        if (!confirm("⚠️ DANGER: This will set EVERY bus in the fleet to 'Active' status and clear all fault notes.\n\nAre you absolutely sure?")) return;
+        try {
+            const querySnapshot = await getDocs(collection(db, "buses"));
+            const batch = writeBatch(db);
+            querySnapshot.docs.forEach((document) => {
+                batch.update(doc(db, "buses", document.id), { status: 'Active', notes: '', location: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
+            });
+            await batch.commit();
+            alert("✅ Fleet Reset Complete. All buses are now Active.");
+        } catch (err) { console.error("Batch reset failed:", err); alert("Failed to reset fleet."); }
     };
 
     return (
@@ -340,14 +384,24 @@ const BusInputForm = () => {
                     </div>
                     <input type="text" placeholder="Location" className="w-full p-4 bg-slate-50 border-2 rounded-xl" value={formData.location} onChange={handleChange} name="location" />
                     <textarea placeholder="Maintenance Notes" className="w-full p-4 bg-slate-50 border-2 rounded-xl h-24" value={formData.notes} onChange={handleChange} name="notes" />
+                    
+                    {/* --- RESTORED DATE INPUTS --- */}
+                    <div className="grid grid-cols-3 gap-4">
+                        <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">OOS Date</label><input name="oosStartDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={formData.oosStartDate} onChange={handleChange} /></div>
+                        <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Exp Return</label><input name="expectedReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={formData.expectedReturnDate} onChange={handleChange} /></div>
+                        <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Act Return</label><input name="actualReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={formData.actualReturnDate} onChange={handleChange} /></div>
+                    </div>
+
                     <button className="w-full py-4 bg-[#002d72] hover:bg-[#ef7c00] text-white rounded-xl font-black uppercase tracking-widest transition-all shadow-lg">Update Record</button>
                 </form>
+                <div className="mt-12 pt-8 border-t border-slate-100 text-center">
+                    <button onClick={handleGlobalReset} className="text-red-500 hover:text-red-700 hover:bg-red-50 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">⚠️ Reset Entire Fleet to Ready</button>
+                </div>
             </div>
         </div>
     );
 };
 
-// --- MAIN PAGE COMPONENT (The Missing Piece) ---
 export default function MartaInventory() {
   const [user, setUser] = useState<any>(null);
   const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover'>('inventory');

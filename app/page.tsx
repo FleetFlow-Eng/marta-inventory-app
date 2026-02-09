@@ -102,25 +102,65 @@ const StatusCharts = ({ buses }: { buses: any[] }) => {
 // --- COMPONENT: ANALYTICS DASHBOARD ---
 const AnalyticsDashboard = ({ buses }: { buses: any[] }) => {
     const [shopQueens, setShopQueens] = useState<{number: string, count: number}[]>([]);
+    const [isResetting, setIsResetting] = useState(false);
     
+    // Function to calculate rankings
+    const fetchRankings = async () => {
+        const rankings: {number: string, count: number}[] = [];
+        const sampleBuses = buses.slice(0, 50); 
+        for (const bus of sampleBuses) {
+            const hSnap = await getDocs(query(collection(db, "buses", bus.number, "history"), limit(20)));
+            if (hSnap.size > 0) rankings.push({ number: bus.number, count: hSnap.size });
+        }
+        setShopQueens(rankings.sort((a,b) => b.count - a.count).slice(0, 5));
+    };
+
     useEffect(() => {
-        const fetchRankings = async () => {
-            const rankings: {number: string, count: number}[] = [];
-            const sampleBuses = buses.slice(0, 50); 
-            for (const bus of sampleBuses) {
-                const hSnap = await getDocs(query(collection(db, "buses", bus.number, "history"), limit(20)));
-                if (hSnap.size > 0) rankings.push({ number: bus.number, count: hSnap.size });
-            }
-            setShopQueens(rankings.sort((a,b) => b.count - a.count).slice(0, 5));
-        };
         if(buses.length > 0) fetchRankings();
     }, [buses]);
+
+    const handleResetMetrics = async () => {
+        if(!confirm("⚠️ WARNING: This will WIPE ALL HISTORY logs for the entire fleet.\n\n• 'Shop Queen' counts will reset to 0.\n• '7-Day Trend' will flatten.\n• Shift Handover reports will be cleared.\n\nAre you sure you want to delete all historical data?")) return;
+        
+        setIsResetting(true);
+        try {
+            let deletedCount = 0;
+            // Iterate through buses and delete their history subcollections
+            for (const bus of buses) {
+                const hSnap = await getDocs(collection(db, "buses", bus.number, "history"));
+                if (!hSnap.empty) {
+                    const batch = writeBatch(db);
+                    hSnap.docs.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                    deletedCount += hSnap.size;
+                }
+            }
+            alert(`Analytics Reset Complete. Cleared ${deletedCount} records.`);
+            setShopQueens([]); // Clear local state immediately
+        } catch (err) {
+            console.error("Reset failed", err);
+            alert("Failed to reset some records. Check console.");
+        }
+        setIsResetting(false);
+    };
 
     const avgOOS = buses.reduce((acc, b) => acc + (b.status !== 'Active' ? 1 : 0), 0);
 
     return (
         <div className="p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-black text-[#002d72] italic uppercase">Fleet Analytics</h2>
+                <button 
+                    onClick={handleResetMetrics} 
+                    disabled={isResetting}
+                    className="px-4 py-2 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                >
+                    {isResetting ? "Resetting..." : "⚠️ Reset Metrics"}
+                </button>
+            </div>
+
             <StatusCharts buses={buses} />
+            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fleet Availability</p>
@@ -135,8 +175,9 @@ const AnalyticsDashboard = ({ buses }: { buses: any[] }) => {
                     <p className="text-4xl font-black text-slate-700 italic">{shopQueens[0]?.number || '---'}</p>
                 </div>
             </div>
+            
             <div className="bg-white p-8 rounded-2xl shadow-lg border border-slate-200">
-                <h3 className="text-xl font-black text-[#002d72] uppercase mb-6 flex items-center gap-2"><span>👑</span> Top "Shop Queens" (High Activity)</h3>
+                <h3 className="text-xl font-black text-[#002d72] uppercase mb-6 flex items-center gap-2"> Top "Shop Buses" (High Activity)</h3>
                 <div className="space-y-4">
                     {shopQueens.map((queen, i) => (
                         <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
@@ -149,6 +190,7 @@ const AnalyticsDashboard = ({ buses }: { buses: any[] }) => {
                             </div>
                         </div>
                     ))}
+                    {shopQueens.length === 0 && <p className="text-center text-slate-400 italic text-sm">No significant repair history found.</p>}
                 </div>
             </div>
         </div>
@@ -309,7 +351,6 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
             </div>
             <div className="bg-slate-50 p-4 rounded-xl mb-6"><p className="text-[10px] font-black uppercase text-slate-400 mb-2">Fault Details</p><p className="text-lg font-medium text-slate-800">{bus.notes || "No active faults."}</p></div>
             
-            {/* --- RESTORED DATES IN READ-ONLY VIEW --- */}
             <div className="grid grid-cols-3 gap-4 mb-6">
                 <div><p className="text-[9px] font-black uppercase text-slate-400">OOS Date</p><p className="text-xl font-black text-[#002d72]">{bus.oosStartDate || '--'}</p></div>
                 <div><p className="text-[9px] font-black uppercase text-slate-400">Exp Return</p><p className="text-xl font-black text-[#ef7c00]">{bus.expectedReturnDate || '--'}</p></div>
@@ -332,7 +373,6 @@ const BusInputForm = () => {
     const [formData, setFormData] = useState({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
     const handleChange = (e: any) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
-    // --- RESTORED FORENSIC LOGGING FOR DATA ENTRY ---
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const busRef = doc(db, "buses", formData.number);
@@ -385,7 +425,6 @@ const BusInputForm = () => {
                     <input type="text" placeholder="Location" className="w-full p-4 bg-slate-50 border-2 rounded-xl" value={formData.location} onChange={handleChange} name="location" />
                     <textarea placeholder="Maintenance Notes" className="w-full p-4 bg-slate-50 border-2 rounded-xl h-24" value={formData.notes} onChange={handleChange} name="notes" />
                     
-                    {/* --- RESTORED DATE INPUTS --- */}
                     <div className="grid grid-cols-3 gap-4">
                         <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">OOS Date</label><input name="oosStartDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={formData.oosStartDate} onChange={handleChange} /></div>
                         <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Exp Return</label><input name="expectedReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={formData.expectedReturnDate} onChange={handleChange} /></div>

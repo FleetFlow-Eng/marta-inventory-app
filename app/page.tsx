@@ -19,27 +19,21 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
   )
 });
 
-// --- HELPER: LOG HISTORY TO FIREBASE ---
-const logHistory = async (busNumber: string, action: string, details: string, userEmail: string) => {
-    if (!busNumber) return;
-    try {
-        await addDoc(collection(db, "buses", busNumber, "history"), {
-            action,
-            details,
-            user: userEmail,
-            timestamp: serverTimestamp()
-        });
-    } catch (err) {
-        console.error("Failed to log history", err);
-    }
+// --- HELPER: FORMAT TIMESTAMP SAFELY ---
+const formatTime = (timestamp: any) => {
+    if (!timestamp) return 'Just now';
+    // Handle Firestore Timestamp vs JS Date
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 };
 
-// --- COMPONENT: Bus Details with ROBUST LOGGING ---
+// --- COMPONENT: Bus Details (Revamped Audit System) ---
 const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
-    const [historyLogs, setHistoryLogs] = useState<any[]>([]); 
+    const [historyLogs, setHistoryLogs] = useState<any[]>([]);
     
+    // Local state for editing
     const [editData, setEditData] = useState({
         status: bus.status || 'Active',
         location: bus.location || '',
@@ -49,11 +43,19 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
         actualReturnDate: bus.actualReturnDate || ''
     });
 
+    // 1. LIVE HISTORY LISTENER
     useEffect(() => {
         if (showHistory) {
-            const q = query(collection(db, "buses", bus.number, "history"), orderBy("timestamp", "desc"));
+            // Reference the specific bus's history sub-collection
+            const historyRef = collection(db, "buses", bus.number, "history");
+            const q = query(historyRef, orderBy("timestamp", "desc"));
+            
             const unsubscribe = onSnapshot(q, (snapshot) => {
-                setHistoryLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                const logs = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                setHistoryLogs(logs);
             });
             return () => unsubscribe();
         }
@@ -64,43 +66,49 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
         setEditData(prev => ({ ...prev, [name]: value }));
     };
 
-    // --- UPDATED SAVE FUNCTION ---
+    // 2. ROBUST SAVE & LOG FUNCTION
     const handleSave = async () => {
         try {
-            // 1. Fetch FRESH data from DB to ensure accurate comparison
             const busRef = doc(db, "buses", bus.number);
-            const busSnap = await getDoc(busRef);
-            const currentDbData = busSnap.exists() ? busSnap.data() : {};
+            
+            // A. Fetch the "Before" state directly from DB to be 100% sure
+            const currentSnap = await getDoc(busRef);
+            const oldData = currentSnap.exists() ? currentSnap.data() : {};
 
-            // 2. Calculate Changes
-            const changes = [];
-            if (currentDbData.status !== editData.status) changes.push(`Status: ${currentDbData.status || 'Active'} -> ${editData.status}`);
-            if (currentDbData.location !== editData.location) changes.push(`Loc: ${currentDbData.location || 'Blank'} -> ${editData.location}`);
-            if (currentDbData.notes !== editData.notes) changes.push(`Notes Updated`);
-            if (currentDbData.oosStartDate !== editData.oosStartDate) changes.push(`OOS: ${currentDbData.oosStartDate || 'None'} -> ${editData.oosStartDate}`);
-            if (currentDbData.expectedReturnDate !== editData.expectedReturnDate) changes.push(`Exp: ${currentDbData.expectedReturnDate || 'None'} -> ${editData.expectedReturnDate}`);
-            if (currentDbData.actualReturnDate !== editData.actualReturnDate) changes.push(`Act: ${currentDbData.actualReturnDate || 'None'} -> ${editData.actualReturnDate}`);
+            // B. Build the Change Log String
+            let changeDetails = [];
+            if (oldData.status !== editData.status) changeDetails.push(`Status: ${oldData.status} ➝ ${editData.status}`);
+            if (oldData.location !== editData.location) changeDetails.push(`Loc: ${oldData.location} ➝ ${editData.location}`);
+            if (oldData.notes !== editData.notes) changeDetails.push(`Notes Edited`);
+            if (oldData.oosStartDate !== editData.oosStartDate) changeDetails.push(`OOS Date Changed`);
+            
+            // Default message if nothing obvious changed but save was clicked
+            const logMessage = changeDetails.length > 0 ? changeDetails.join(', ') : "Routine Update";
 
-            const logMessage = changes.length > 0 ? changes.join(' | ') : "Routine Update (No specific changes detected)";
-
-            // 3. Update DB
+            // C. Save the Bus Data
             await setDoc(busRef, {
                 ...editData,
                 timestamp: serverTimestamp()
             }, { merge: true });
 
-            // 4. Log History
-            await logHistory(bus.number, "EDIT", logMessage, auth.currentUser?.email || 'Unknown');
+            // D. Write to History Sub-collection
+            await addDoc(collection(db, "buses", bus.number, "history"), {
+                action: "EDIT",
+                details: logMessage,
+                user: auth.currentUser?.email || "Unknown User",
+                timestamp: serverTimestamp()
+            });
             
             setIsEditing(false);
         } catch (err) {
-            console.error("Error updating bus:", err);
-            alert("Failed to save changes.");
+            console.error("Save failed:", err);
+            alert("Failed to save. Check console.");
         }
     };
 
+    // 3. CLEAR DATA FUNCTION
     const handleClearData = async () => {
-        if (confirm(`⚠️ Clear all maintenance data for Bus #${bus.number}?\n\nThis will reset it to 'Active' and remove notes. The bus will remain in the fleet list.`)) {
+        if (confirm(`⚠️ CLEAR DATA for Bus #${bus.number}?\n\nThis resets the bus to Active/Ready. It DOES NOT delete the bus from the fleet.`)) {
             try {
                 await setDoc(doc(db, "buses", bus.number), {
                     status: 'Active',
@@ -112,12 +120,18 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
                     timestamp: serverTimestamp()
                 }, { merge: true });
 
-                await logHistory(bus.number, "RESET", "Cleared all data. Unit reset to Active.", auth.currentUser?.email || 'Unknown');
+                // Log the Reset
+                await addDoc(collection(db, "buses", bus.number, "history"), {
+                    action: "RESET",
+                    details: "Cleared all maintenance data. Bus is Ready.",
+                    user: auth.currentUser?.email || "Unknown User",
+                    timestamp: serverTimestamp()
+                });
                 
                 setIsEditing(false);
                 onClose();
             } catch (err) {
-                console.error("Error clearing bus:", err);
+                console.error("Clear failed:", err);
                 alert("Failed to clear data.");
             }
         }
@@ -143,16 +157,16 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
                         historyLogs.map((log) => (
                             <div key={log.id} className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col gap-1">
                                 <div className="flex justify-between items-center">
-                                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-white ${log.action === 'RESET' ? 'bg-red-500' : 'bg-blue-500'}`}>
-                                        {log.action || 'UPDATE'}
+                                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-white ${log.action === 'RESET' ? 'bg-red-500' : log.action === 'EDIT' ? 'bg-blue-500' : 'bg-slate-400'}`}>
+                                        {log.action || 'LOG'}
                                     </span>
                                     <span className="text-[9px] font-bold text-slate-400">
-                                        {log.timestamp?.toDate().toLocaleDateString()} {log.timestamp?.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                        {formatTime(log.timestamp)}
                                     </span>
                                 </div>
-                                <p className="text-xs font-bold text-slate-700 mt-1 break-words">{log.details}</p>
+                                <p className="text-xs font-bold text-slate-700 mt-1 break-words leading-snug">{log.details}</p>
                                 <p className="text-[9px] text-slate-400 italic text-right border-t border-slate-100 pt-1 mt-1">
-                                    User: {log.user}
+                                    {log.user}
                                 </p>
                             </div>
                         ))
@@ -304,9 +318,8 @@ const BusInputForm = () => {
         try {
             const busRef = doc(db, "buses", formData.number);
             
-            // 1. GET OLD DATA
+            // STRICT VALIDATION: Check if bus exists
             const busSnap = await getDoc(busRef);
-            
             if (!busSnap.exists()) {
                 alert(`⛔ ACCESS DENIED: Bus #${formData.number} is not in the fleet registry.\n\nYou cannot create new buses here. Contact the administrator.`);
                 return;
@@ -314,25 +327,29 @@ const BusInputForm = () => {
 
             const oldData = busSnap.data();
 
-            // 2. CALCULATE CHANGES
-            const changes = [];
-            if (oldData.status !== formData.status) changes.push(`Status: ${oldData.status || 'Active'} -> ${formData.status}`);
-            if (oldData.location !== formData.location) changes.push(`Loc: ${oldData.location || 'Blank'} -> ${formData.location}`);
-            if (oldData.notes !== formData.notes) changes.push(`Notes Updated`);
-            if (oldData.oosStartDate !== formData.oosStartDate) changes.push(`OOS: ${oldData.oosStartDate || 'None'} -> ${formData.oosStartDate}`);
+            // Calculate Changes
+            let changeDetails = [];
+            if (oldData.status !== formData.status) changeDetails.push(`Status: ${oldData.status} ➝ ${formData.status}`);
+            if (oldData.location !== formData.location) changeDetails.push(`Loc: ${oldData.location} ➝ ${formData.location}`);
+            if (oldData.notes !== formData.notes) changeDetails.push(`Notes Updated`);
+            
+            const logMessage = changeDetails.length > 0 ? changeDetails.join(', ') : "Update from Data Entry";
 
-            const logMessage = changes.length > 0 ? changes.join(' | ') : "Update from Data Entry Terminal";
-
-            // 3. UPDATE DB
+            // Update DB
             await setDoc(busRef, {
                 ...formData,
                 timestamp: serverTimestamp()
             }, { merge: true });
             
-            // 4. LOG HISTORY
-            await logHistory(formData.number, "UPDATE", logMessage, auth.currentUser?.email || 'Unknown');
+            // Log History
+            await addDoc(collection(db, "buses", formData.number, "history"), {
+                action: "UPDATE",
+                details: logMessage,
+                user: auth.currentUser?.email || "Unknown User",
+                timestamp: serverTimestamp()
+            });
 
-            alert(`Bus #${formData.number} Record Updated Successfully!`);
+            alert(`Bus #${formData.number} Updated!`);
             setFormData(prev => ({ ...prev, number: '', status: 'Active', notes: '' })); 
         } catch (err) {
             console.error(err);

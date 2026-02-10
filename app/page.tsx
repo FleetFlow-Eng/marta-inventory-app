@@ -19,6 +19,24 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
   )
 });
 
+// --- COMPONENT: TOAST NOTIFICATION ---
+const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) => {
+    useEffect(() => {
+        const timer = setTimeout(onClose, 3000);
+        return () => clearTimeout(timer);
+    }, [onClose]);
+
+    return (
+        <div className={`fixed bottom-6 right-6 z-[3000] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-10 duration-300 border-l-8 ${type === 'success' ? 'bg-white border-green-500 text-slate-800' : 'bg-white border-red-500 text-slate-800'}`}>
+            <span className="text-2xl">{type === 'success' ? '✅' : '⛔'}</span>
+            <div>
+                <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{type === 'success' ? 'Success' : 'Error'}</p>
+                <p className="text-sm font-bold text-slate-800">{message}</p>
+            </div>
+        </div>
+    );
+};
+
 // --- HELPER: FORMAT TIMESTAMP ---
 const formatTime = (timestamp: any) => {
     if (!timestamp) return 'Just now';
@@ -62,8 +80,11 @@ const StatusCharts = ({ buses }: { buses: any[] }) => {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="text-[10px] font-black text-[#002d72] uppercase tracking-widest mb-6">Current Fleet Status</h3>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <h3 className="text-[10px] font-black text-[#002d72] uppercase tracking-widest mb-6 flex items-center gap-2">
+                    Current Fleet Status 
+                    <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span>
+                </h3>
                 <div className="flex items-end gap-3 h-40">
                     {Object.entries(statusCounts).map(([status, count]) => {
                         const height = (count / maxCount) * 100;
@@ -78,7 +99,7 @@ const StatusCharts = ({ buses }: { buses: any[] }) => {
                     })}
                 </div>
             </div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                 <h3 className="text-[10px] font-black text-[#002d72] uppercase tracking-widest mb-6">7-Day Failure Trend</h3>
                 <div className="flex items-end gap-2 h-40 border-l border-b border-slate-100 pl-2 pb-2">
                     {trendData.map((count, i) => {
@@ -100,22 +121,20 @@ const StatusCharts = ({ buses }: { buses: any[] }) => {
 };
 
 // --- COMPONENT: ANALYTICS DASHBOARD ---
-const AnalyticsDashboard = ({ buses }: { buses: any[] }) => {
+const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: (msg: string, type: 'success'|'error') => void }) => {
     const [shopQueens, setShopQueens] = useState<{number: string, count: number}[]>([]);
     const [isResetting, setIsResetting] = useState(false);
     
-    // Function to calculate rankings
-    const fetchRankings = async () => {
-        const rankings: {number: string, count: number}[] = [];
-        const sampleBuses = buses.slice(0, 50); 
-        for (const bus of sampleBuses) {
-            const hSnap = await getDocs(query(collection(db, "buses", bus.number, "history"), limit(20)));
-            if (hSnap.size > 0) rankings.push({ number: bus.number, count: hSnap.size });
-        }
-        setShopQueens(rankings.sort((a,b) => b.count - a.count).slice(0, 5));
-    };
-
     useEffect(() => {
+        const fetchRankings = async () => {
+            const rankings: {number: string, count: number}[] = [];
+            const sampleBuses = buses.slice(0, 50); 
+            for (const bus of sampleBuses) {
+                const hSnap = await getDocs(query(collection(db, "buses", bus.number, "history"), limit(20)));
+                if (hSnap.size > 0) rankings.push({ number: bus.number, count: hSnap.size });
+            }
+            setShopQueens(rankings.sort((a,b) => b.count - a.count).slice(0, 5));
+        };
         if(buses.length > 0) fetchRankings();
     }, [buses]);
 
@@ -125,7 +144,6 @@ const AnalyticsDashboard = ({ buses }: { buses: any[] }) => {
         setIsResetting(true);
         try {
             let deletedCount = 0;
-            // Iterate through buses and delete their history subcollections
             for (const bus of buses) {
                 const hSnap = await getDocs(collection(db, "buses", bus.number, "history"));
                 if (!hSnap.empty) {
@@ -135,11 +153,11 @@ const AnalyticsDashboard = ({ buses }: { buses: any[] }) => {
                     deletedCount += hSnap.size;
                 }
             }
-            alert(`Analytics Reset Complete. Cleared ${deletedCount} records.`);
-            setShopQueens([]); // Clear local state immediately
+            showToast(`Analytics Reset Complete. Cleared ${deletedCount} records.`, 'success');
+            setShopQueens([]); 
         } catch (err) {
             console.error("Reset failed", err);
-            alert("Failed to reset some records. Check console.");
+            showToast("Failed to reset records.", 'error');
         }
         setIsResetting(false);
     };
@@ -153,7 +171,7 @@ const AnalyticsDashboard = ({ buses }: { buses: any[] }) => {
                 <button 
                     onClick={handleResetMetrics} 
                     disabled={isResetting}
-                    className="px-4 py-2 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                    className="px-4 py-2 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 shadow-sm hover:shadow-md"
                 >
                     {isResetting ? "Resetting..." : "⚠️ Reset Metrics"}
                 </button>
@@ -177,10 +195,10 @@ const AnalyticsDashboard = ({ buses }: { buses: any[] }) => {
             </div>
             
             <div className="bg-white p-8 rounded-2xl shadow-lg border border-slate-200">
-                <h3 className="text-xl font-black text-[#002d72] uppercase mb-6 flex items-center gap-2"> Top "Shop Buses" (High Activity)</h3>
+                <h3 className="text-xl font-black text-[#002d72] uppercase mb-6 flex items-center gap-2"><span>👑</span> Top "Shop Buses" (High Activity)</h3>
                 <div className="space-y-4">
                     {shopQueens.map((queen, i) => (
-                        <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-slate-300 transition-all hover:scale-[1.01]">
                             <span className="text-lg font-black text-slate-700">Bus #{queen.number}</span>
                             <div className="flex items-center gap-4">
                                 <div className="h-2 w-32 bg-slate-200 rounded-full overflow-hidden">
@@ -190,7 +208,6 @@ const AnalyticsDashboard = ({ buses }: { buses: any[] }) => {
                             </div>
                         </div>
                     ))}
-                    {shopQueens.length === 0 && <p className="text-center text-slate-400 italic text-sm">No significant repair history found.</p>}
                 </div>
             </div>
         </div>
@@ -198,7 +215,7 @@ const AnalyticsDashboard = ({ buses }: { buses: any[] }) => {
 };
 
 // --- COMPONENT: SHIFT HANDOVER ---
-const ShiftHandover = ({ buses }: { buses: any[] }) => {
+const ShiftHandover = ({ buses, showToast }: { buses: any[], showToast: (msg: string, type: 'success'|'error') => void }) => {
     const [report, setReport] = useState<any[]>([]);
 
     useEffect(() => {
@@ -226,7 +243,7 @@ const ShiftHandover = ({ buses }: { buses: any[] }) => {
     const copyReport = () => {
         const text = report.map(r => `[Bus ${r.bus}] ${r.action}: ${r.details} (${r.user})`).join('\n');
         navigator.clipboard.writeText(`SHIFT HANDOVER REPORT - ${new Date().toLocaleDateString()}\n\n${text}`);
-        alert("Report copied to clipboard!");
+        showToast("Report copied to clipboard!", 'success');
     };
 
     return (
@@ -236,11 +253,11 @@ const ShiftHandover = ({ buses }: { buses: any[] }) => {
                     <h2 className="text-3xl font-black text-[#002d72] uppercase italic">Shift Handover</h2>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Activity in last 12 hours</p>
                 </div>
-                <button onClick={copyReport} className="px-6 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-[#ef7c00] transition-all">Copy Report</button>
+                <button onClick={copyReport} className="px-6 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-[#ef7c00] transition-all transform active:scale-95">Copy Report</button>
             </div>
             <div className="space-y-4">
                 {report.length === 0 ? <div className="p-12 text-center border-2 border-dashed border-slate-200 rounded-3xl text-slate-300 italic">No recent activity found.</div> : report.map((log, i) => (
-                    <div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex gap-6 items-center">
+                    <div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex gap-6 items-center hover:shadow-md transition-shadow">
                         <div className="w-16 h-16 bg-[#002d72]/5 rounded-xl flex items-center justify-center border border-[#002d72]/10"><span className="text-lg font-black text-[#002d72]">#{log.bus}</span></div>
                         <div className="flex-grow">
                             <div className="flex justify-between mb-1"><span className="text-[10px] font-black text-[#ef7c00] uppercase">{log.action}</span><span className="text-[10px] font-bold text-slate-400">{formatTime(log.timestamp)}</span></div>
@@ -255,7 +272,7 @@ const ShiftHandover = ({ buses }: { buses: any[] }) => {
 };
 
 // --- COMPONENT: BUS DETAIL POPUP ---
-const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
+const BusDetailView = ({ bus, onClose, showToast }: { bus: any; onClose: () => void; showToast: (msg: string, type: 'success'|'error') => void }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [historyLogs, setHistoryLogs] = useState<any[]>([]); 
@@ -290,8 +307,9 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
             if (changes.length > 0) {
                 await logHistory(bus.number, "EDIT", changes.join('\n\n'), auth.currentUser?.email || 'Unknown');
             }
+            showToast(`Bus #${bus.number} updated successfully`, 'success');
             setIsEditing(false);
-        } catch (err) { alert("Save failed"); }
+        } catch (err) { showToast("Save failed", 'error'); }
     };
 
     const deleteLog = async (id: string) => { if(confirm("Delete log?")) await deleteDoc(doc(db, "buses", bus.number, "history", id)); };
@@ -300,16 +318,17 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
         if (!confirm("Reset bus to Active?")) return;
         await setDoc(doc(db, "buses", bus.number), { status: 'Active', notes: '', location: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', timestamp: serverTimestamp() }, { merge: true });
         await logHistory(bus.number, "RESET", "Unit reset to Active/Ready.", auth.currentUser?.email || 'Unknown');
+        showToast("Bus reset to default", 'success');
         setIsEditing(false); onClose();
     };
 
     if (showHistory) {
         return (
             <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg h-[600px] flex flex-col animate-in zoom-in-95">
-                <div className="flex justify-between items-center mb-4 border-b pb-4"><h3 className="text-xl font-black text-[#002d72] uppercase">History: #{bus.number}</h3><button onClick={() => setShowHistory(false)} className="text-sm font-bold text-slate-400">Back</button></div>
+                <div className="flex justify-between items-center mb-4 border-b pb-4"><h3 className="text-xl font-black text-[#002d72] uppercase">History: #{bus.number}</h3><button onClick={() => setShowHistory(false)} className="text-sm font-bold text-slate-400 hover:text-[#002d72]">Back</button></div>
                 <div className="flex-grow overflow-y-auto space-y-3">
                     {historyLogs.map((log) => (
-                        <div key={log.id} className="group relative p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <div key={log.id} className="group relative p-3 bg-slate-50 rounded-lg border border-slate-100 hover:border-slate-300 transition-colors">
                             <button onClick={() => deleteLog(log.id)} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity">✕</button>
                             <div className="flex justify-between text-[8px] font-black uppercase text-slate-400 mb-1"><span className={log.action === 'RESET' ? 'text-red-500' : 'text-blue-500'}>{log.action}</span><span>{formatTime(log.timestamp)}</span></div>
                             <p className="text-xs font-bold text-slate-700 leading-snug whitespace-pre-wrap">{log.details}</p>
@@ -326,14 +345,14 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
             <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95">
                 <h3 className="text-2xl font-black text-[#002d72] mb-6 uppercase italic tracking-tighter">Edit Bus #{bus.number}</h3>
                 <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400">Status</label><select name="status" className="w-full p-3 bg-slate-50 border-2 rounded-lg font-bold" value={editData.status} onChange={handleChange}><option value="Active">Ready for Service</option><option value="On Hold">Maintenance Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select></div>
-                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400">Location</label><input name="location" type="text" className="w-full p-3 bg-slate-50 border-2 rounded-lg font-bold" value={editData.location} onChange={handleChange} /></div>
+                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400">Status</label><select name="status" className="w-full p-3 bg-slate-50 border-2 rounded-lg font-bold outline-none focus:border-[#002d72] transition-colors" value={editData.status} onChange={handleChange}><option value="Active">Ready for Service</option><option value="On Hold">Maintenance Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select></div>
+                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400">Location</label><input name="location" type="text" className="w-full p-3 bg-slate-50 border-2 rounded-lg font-bold outline-none focus:border-[#002d72] transition-colors" value={editData.location} onChange={handleChange} /></div>
                 </div>
-                <div className="space-y-1 mb-6"><label className="text-[9px] font-black uppercase text-slate-400">Fault Details</label><textarea name="notes" className="w-full p-3 bg-slate-50 border-2 rounded-lg h-24" value={editData.notes} onChange={handleChange} /></div>
+                <div className="space-y-1 mb-6"><label className="text-[9px] font-black uppercase text-slate-400">Fault Details</label><textarea name="notes" className="w-full p-3 bg-slate-50 border-2 rounded-lg h-24 outline-none focus:border-[#002d72] transition-colors" value={editData.notes} onChange={handleChange} /></div>
                 <div className="grid grid-cols-3 gap-4 mb-6">
-                    <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">OOS Date</label><input name="oosStartDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={editData.oosStartDate} onChange={handleChange} /></div>
-                    <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Exp Return</label><input name="expectedReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={editData.expectedReturnDate} onChange={handleChange} /></div>
-                    <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Act Return</label><input name="actualReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={editData.actualReturnDate} onChange={handleChange} /></div>
+                    <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">OOS Date</label><input name="oosStartDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold outline-none focus:border-[#002d72]" value={editData.oosStartDate} onChange={handleChange} /></div>
+                    <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Exp Return</label><input name="expectedReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold outline-none focus:border-[#002d72]" value={editData.expectedReturnDate} onChange={handleChange} /></div>
+                    <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Act Return</label><input name="actualReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold outline-none focus:border-[#002d72]" value={editData.actualReturnDate} onChange={handleChange} /></div>
                 </div>
                 <div className="flex gap-4">
                     <button onClick={handleReset} className="w-1/3 py-3 bg-red-50 text-red-500 font-black rounded-xl uppercase text-xs hover:bg-red-100 transition-colors">Reset to Default</button>
@@ -347,7 +366,7 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
         <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95">
             <div className="flex justify-between items-start mb-8 border-b pb-6">
                 <div><h3 className="text-4xl font-black text-[#002d72] italic uppercase">Bus #{bus.number}</h3><span className={`inline-block mt-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${bus.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{bus.status}</span></div>
-                <button onClick={onClose} className="text-slate-400 text-2xl font-bold hover:text-slate-600">✕</button>
+                <button onClick={onClose} className="text-slate-400 text-2xl font-bold hover:text-slate-600 transition-colors">✕</button>
             </div>
             <div className="bg-slate-50 p-4 rounded-xl mb-6"><p className="text-[10px] font-black uppercase text-slate-400 mb-2">Fault Details</p><p className="text-lg font-medium text-slate-800">{bus.notes || "No active faults."}</p></div>
             
@@ -358,10 +377,10 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
             </div>
 
             <div className="flex justify-between pt-6 border-t">
-                <button onClick={() => setShowHistory(true)} className="px-5 py-3 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-200">📜 History</button>
+                <button onClick={() => setShowHistory(true)} className="px-5 py-3 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-colors">📜 History</button>
                 <div className="flex gap-3">
-                    <button onClick={() => setIsEditing(true)} className="px-8 py-3 bg-slate-100 text-[#002d72] rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-200">Edit</button>
-                    <button onClick={onClose} className="px-8 py-3 bg-[#002d72] text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-[#001a3d]">Close</button>
+                    <button onClick={() => setIsEditing(true)} className="px-8 py-3 bg-slate-100 text-[#002d72] rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-colors">Edit</button>
+                    <button onClick={onClose} className="px-8 py-3 bg-[#002d72] text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-[#001a3d] transition-colors">Close</button>
                 </div>
             </div>
         </div>
@@ -369,7 +388,7 @@ const BusDetailView = ({ bus, onClose }: { bus: any; onClose: () => void }) => {
 };
 
 // --- COMPONENT: Data Entry Form ---
-const BusInputForm = () => {
+const BusInputForm = ({ showToast }: { showToast: (msg: string, type: 'success'|'error') => void }) => {
     const [formData, setFormData] = useState({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
     const handleChange = (e: any) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -377,7 +396,7 @@ const BusInputForm = () => {
         e.preventDefault();
         const busRef = doc(db, "buses", formData.number);
         const busSnap = await getDoc(busRef);
-        if (!busSnap.exists()) return alert("⛔ ACCESS DENIED: Bus not in registry.");
+        if (!busSnap.exists()) return showToast(`⛔ ACCESS DENIED: Bus #${formData.number} not in registry.`, 'error');
         
         const oldData = busSnap.data();
         let changes = [];
@@ -396,7 +415,7 @@ const BusInputForm = () => {
             await logHistory(formData.number, "UPDATE", "Routine Update via Data Entry", auth.currentUser?.email || 'Unknown');
         }
 
-        alert("Unit Updated!");
+        showToast(`Bus #${formData.number} record updated`, 'success');
         setFormData({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
     };
 
@@ -409,8 +428,8 @@ const BusInputForm = () => {
                 batch.update(doc(db, "buses", document.id), { status: 'Active', notes: '', location: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
             });
             await batch.commit();
-            alert("✅ Fleet Reset Complete. All buses are now Active.");
-        } catch (err) { console.error("Batch reset failed:", err); alert("Failed to reset fleet."); }
+            showToast("Fleet Reset Complete. All buses Active.", 'success');
+        } catch (err) { console.error("Batch reset failed:", err); showToast("Failed to reset fleet.", 'error'); }
     };
 
     return (
@@ -419,19 +438,19 @@ const BusInputForm = () => {
                 <h2 className="text-3xl font-black text-[#002d72] italic uppercase mb-8 text-center">Data Entry Terminal</h2>
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-2 gap-6">
-                        <input type="text" placeholder="Unit #" className="p-4 bg-slate-50 border-2 rounded-xl font-black text-[#002d72]" value={formData.number} onChange={handleChange} name="number" required />
-                        <select className="p-4 bg-slate-50 border-2 rounded-xl font-bold" value={formData.status} onChange={handleChange} name="status"><option value="Active">Ready for Service</option><option value="On Hold">Maintenance Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select>
+                        <input type="text" placeholder="Unit #" className="p-4 bg-slate-50 border-2 rounded-xl font-black text-[#002d72] outline-none focus:border-[#002d72] transition-colors" value={formData.number} onChange={handleChange} name="number" required />
+                        <select className="p-4 bg-slate-50 border-2 rounded-xl font-bold outline-none focus:border-[#002d72] transition-colors" value={formData.status} onChange={handleChange} name="status"><option value="Active">Ready for Service</option><option value="On Hold">Maintenance Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select>
                     </div>
-                    <input type="text" placeholder="Location" className="w-full p-4 bg-slate-50 border-2 rounded-xl" value={formData.location} onChange={handleChange} name="location" />
-                    <textarea placeholder="Maintenance Notes" className="w-full p-4 bg-slate-50 border-2 rounded-xl h-24" value={formData.notes} onChange={handleChange} name="notes" />
+                    <input type="text" placeholder="Location" className="w-full p-4 bg-slate-50 border-2 rounded-xl outline-none focus:border-[#002d72] transition-colors" value={formData.location} onChange={handleChange} name="location" />
+                    <textarea placeholder="Maintenance Notes" className="w-full p-4 bg-slate-50 border-2 rounded-xl h-24 outline-none focus:border-[#002d72] transition-colors" value={formData.notes} onChange={handleChange} name="notes" />
                     
                     <div className="grid grid-cols-3 gap-4">
-                        <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">OOS Date</label><input name="oosStartDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={formData.oosStartDate} onChange={handleChange} /></div>
-                        <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Exp Return</label><input name="expectedReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={formData.expectedReturnDate} onChange={handleChange} /></div>
-                        <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Act Return</label><input name="actualReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={formData.actualReturnDate} onChange={handleChange} /></div>
+                        <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">OOS Date</label><input name="oosStartDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold outline-none focus:border-[#002d72]" value={formData.oosStartDate} onChange={handleChange} /></div>
+                        <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Exp Return</label><input name="expectedReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold outline-none focus:border-[#002d72]" value={formData.expectedReturnDate} onChange={handleChange} /></div>
+                        <div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Act Return</label><input name="actualReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold outline-none focus:border-[#002d72]" value={formData.actualReturnDate} onChange={handleChange} /></div>
                     </div>
 
-                    <button className="w-full py-4 bg-[#002d72] hover:bg-[#ef7c00] text-white rounded-xl font-black uppercase tracking-widest transition-all shadow-lg">Update Record</button>
+                    <button className="w-full py-4 bg-[#002d72] hover:bg-[#ef7c00] text-white rounded-xl font-black uppercase tracking-widest transition-all shadow-lg transform active:scale-95">Update Record</button>
                 </form>
                 <div className="mt-12 pt-8 border-t border-slate-100 text-center">
                     <button onClick={handleGlobalReset} className="text-red-500 hover:text-red-700 hover:bg-red-50 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">⚠️ Reset Entire Fleet to Ready</button>
@@ -441,6 +460,7 @@ const BusInputForm = () => {
     );
 };
 
+// --- MAIN APPLICATION ---
 export default function MartaInventory() {
   const [user, setUser] = useState<any>(null);
   const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover'>('inventory');
@@ -452,8 +472,13 @@ export default function MartaInventory() {
   const [password, setPassword] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'number', direction: 'asc' });
   const [activeFilter, setActiveFilter] = useState<string>('Total Fleet');
+  const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
   const holdStatuses = ['On Hold', 'Engine', 'Body Shop', 'Vendor', 'Brakes', 'Safety'];
+
+  const triggerToast = (msg: string, type: 'success' | 'error') => {
+      setToast({ msg, type });
+  };
 
   const getBusSpecs = (num: string) => {
     const n = parseInt(num);
@@ -507,6 +532,7 @@ export default function MartaInventory() {
 
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), `MARTA_Fleet_Report.xlsx`);
+    triggerToast("Excel Report Downloaded", 'success');
   };
 
   useEffect(() => {
@@ -576,21 +602,24 @@ export default function MartaInventory() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-[#ef7c00] selection:text-white relative">
       
+      {/* TOAST COMPONENT */}
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
       {/* DISPLAY MODAL (Read Only with Edit Toggle) */}
       {inventoryMode === 'grid' && selectedBusDetail && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} />
+            <BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} showToast={triggerToast} />
         </div>
       )}
 
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm">
+      <nav className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-3">
             <div className="w-2 h-6 bg-[#002d72] rounded-full"></div>
             <span className="font-black text-lg italic uppercase tracking-tighter text-[#002d72]">Fleet Manager</span>
         </div>
         <div className="flex gap-4 items-center">
           {['inventory', 'input', 'tracker', 'analytics', 'handover'].map(v => (
-            <button key={v} onClick={() => setView(v as any)} className={`text-[9px] font-black uppercase tracking-widest border-b-2 pb-1 ${view === v ? 'border-[#ef7c00] text-[#002d72]' : 'border-transparent text-slate-400 hover:text-[#002d72]'}`}>{v.replace('input', 'Data Entry').replace('handover', 'Handover').replace('analytics', 'Analytics')}</button>
+            <button key={v} onClick={() => setView(v as any)} className={`text-[9px] font-black uppercase tracking-widest border-b-2 pb-1 transition-all ${view === v ? 'border-[#ef7c00] text-[#002d72]' : 'border-transparent text-slate-400 hover:text-[#002d72]'}`}>{v.replace('input', 'Data Entry').replace('handover', 'Handover').replace('analytics', 'Analytics')}</button>
           ))}
           <div className="h-4 w-[1px] bg-slate-200"></div>
           <button onClick={exportToExcel} className="text-[#002d72] hover:text-[#ef7c00] text-[10px] font-black uppercase transition-all tracking-widest">Export Excel</button>
@@ -602,11 +631,11 @@ export default function MartaInventory() {
         {view === 'tracker' ? (
           <div className="h-[85vh] bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative"><BusTracker /></div>
         ) : view === 'input' ? (
-          <BusInputForm />
+          <BusInputForm showToast={triggerToast} />
         ) : view === 'analytics' ? (
-          <AnalyticsDashboard buses={buses} />
+          <AnalyticsDashboard buses={buses} showToast={triggerToast} />
         ) : view === 'handover' ? (
-          <ShiftHandover buses={buses} />
+          <ShiftHandover buses={buses} showToast={triggerToast} />
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -616,8 +645,11 @@ export default function MartaInventory() {
                 { label: 'On Hold', val: buses.filter(b => holdStatuses.includes(b.status)).length, color: 'text-red-600' },
                 { label: 'In Shop', val: buses.filter(b => b.status === 'In Shop').length, color: 'text-[#ef7c00]' }
               ].map((m, i) => (
-                <div key={i} onClick={() => setActiveFilter(m.label)} className={`bg-white py-4 px-6 rounded-xl shadow-sm border flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-[1.02] ${activeFilter === m.label ? 'border-[#002d72] bg-blue-50/50 shadow-inner' : 'border-slate-100 hover:border-slate-300'}`}>
-                    <p className="text-[8px] font-black uppercase text-slate-400 mb-0.5 tracking-widest">{m.label}</p>
+                <div key={i} onClick={() => setActiveFilter(m.label)} className={`bg-white py-4 px-6 rounded-xl shadow-sm border flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md ${activeFilter === m.label ? 'border-[#002d72] bg-blue-50/50 shadow-inner' : 'border-slate-100 hover:border-slate-300'}`}>
+                    <p className="text-[8px] font-black uppercase text-slate-400 mb-0.5 tracking-widest flex items-center gap-2">
+                        {m.label}
+                        {m.label === 'Ready' && <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span></span>}
+                    </p>
                     <p className={`text-2xl font-black tabular-nums ${m.color}`}>{m.val}</p>
                 </div>
               ))}
@@ -640,7 +672,7 @@ export default function MartaInventory() {
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
                 {inventoryMode === 'list' ? (
                     <>
-                        <div className="grid grid-cols-10 gap-4 p-5 border-b border-slate-100 bg-slate-50/50 text-[9px] font-black uppercase tracking-widest text-slate-400 select-none">
+                        <div className="grid grid-cols-10 gap-4 p-5 border-b border-slate-100 bg-slate-50/50 text-[9px] font-black uppercase tracking-widest text-slate-400 select-none backdrop-blur-sm">
                             <div onClick={() => requestSort('number')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Unit # {getSortIcon('number')}</div>
                             <div onClick={() => requestSort('series')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Series {getSortIcon('series')}</div>
                             <div onClick={() => requestSort('status')} className="col-span-1 cursor-pointer hover:text-[#002d72] flex items-center">Status {getSortIcon('status')}</div>
@@ -670,7 +702,7 @@ export default function MartaInventory() {
                                                             'bg-orange-100 text-orange-700 border-orange-200';
 
                                     return (
-                                        <div key={bus.docId} className={`group ${rowClass}`}>
+                                        <div key={bus.docId} className={`group ${rowClass} transition-all duration-200 hover:scale-[1.002] hover:shadow-lg`}>
                                             <div onClick={() => setSelectedBusDetail(bus)} className="grid grid-cols-10 gap-4 p-5 items-center cursor-pointer">
                                                 <div className={`col-span-1 text-lg font-black ${statusTextColor}`}>#{bus.number}</div>
                                                 <div className="col-span-1"><span className="bg-white/50 border border-black/5 text-slate-500 text-[9px] font-bold px-2 py-1 rounded-md">{specs.length}</span></div>
@@ -696,7 +728,7 @@ export default function MartaInventory() {
                                 else if (bus.status !== 'Active') colors = "bg-orange-50 border-orange-200 text-orange-800 hover:border-orange-400";
 
                                 return (
-                                    <div key={bus.docId} onClick={() => setSelectedBusDetail(bus)} className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer shadow-sm ${colors}`}>
+                                    <div key={bus.docId} onClick={() => setSelectedBusDetail(bus)} className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer shadow-sm transition-all hover:scale-110 hover:shadow-xl ${colors}`}>
                                         <span className="text-xs font-black italic tracking-tighter">#{bus.number}</span>
                                         {bus.status !== 'Active' && <span className="text-[7px] font-bold uppercase opacity-60 leading-none mt-0.5">{bus.status}</span>}
                                     </div>

@@ -72,11 +72,10 @@ const calculateDaysOOS = (start: string) => {
     return Math.max(0, Math.ceil((now.getTime() - s.getTime()) / (1000 * 3600 * 24)));
 };
 
-// --- COMPONENT: HIGH-PERFORMANCE PARTS LIST (V3) ---
+// --- COMPONENT: HIGH-PERFORMANCE PARTS LIST (V4 - Direct Link) ---
 const PartsInventory = ({ showToast }: { showToast: (msg: string, type: 'success'|'error') => void }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [displayLimit, setDisplayLimit] = useState(100);
-    const [selectedPart, setSelectedPart] = useState<any>(null); 
     const [sortConfig, setSortConfig] = useState<{ key: 'partNumber' | 'name', direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
 
     // 1. Filter 12k items instantly
@@ -120,45 +119,6 @@ const PartsInventory = ({ showToast }: { showToast: (msg: string, type: 'success
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col relative">
-            
-            {/* PART DETAIL MODAL (With Google Image Search) */}
-            {selectedPart && (
-                <div className="fixed inset-0 z-[4000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedPart(null)}>
-                    <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md relative" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => setSelectedPart(null)} className="absolute top-4 right-4 text-slate-300 hover:text-slate-600 text-2xl font-bold">✕</button>
-                        
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Part Detail Explorer</h3>
-                        
-                        {/* COPY NUMBER BLOCK */}
-                        <div 
-                            className="bg-slate-50 border-2 border-slate-100 rounded-xl p-6 mb-4 text-center cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all group"
-                            onClick={() => handleCopy(selectedPart.partNumber)}
-                        >
-                            <p className="text-4xl font-black text-[#002d72] font-mono tracking-tight group-hover:scale-110 transition-transform">{selectedPart.partNumber}</p>
-                            <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase group-hover:text-blue-500">Tap to Copy</p>
-                        </div>
-
-                        {/* DESCRIPTION */}
-                        <div className="mb-6">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Description</p>
-                            <p className="text-lg font-bold text-slate-800 leading-snug">{selectedPart.name}</p>
-                        </div>
-
-                        {/* GOOGLE IMAGES BUTTON */}
-                        <a 
-                            href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(selectedPart.name + " " + selectedPart.partNumber + " bus part")}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-center gap-2 w-full py-4 bg-[#ef7c00] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-orange-600 hover:scale-[1.02] transition-all"
-                        >
-                            <span>🔍</span> See on Google Images
-                        </a>
-
-                        <button onClick={() => setSelectedPart(null)} className="w-full mt-4 py-3 bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg font-black uppercase text-xs hover:bg-slate-200 transition-colors">Close</button>
-                    </div>
-                </div>
-            )}
-
             <div className="flex justify-between items-end mb-6 px-2">
                 <div>
                     <h2 className="text-3xl font-black text-[#002d72] italic uppercase tracking-tighter leading-none">Parts Registry</h2>
@@ -198,15 +158,17 @@ const PartsInventory = ({ showToast }: { showToast: (msg: string, type: 'success
                                     </div>
                                     <div className="col-span-8 font-bold text-slate-600 uppercase text-[11px] flex items-center leading-tight">{p.name}</div>
                                     
-                                    {/* VIEW DETAILS BUTTON */}
+                                    {/* DIRECT GOOGLE IMAGES LINK */}
                                     <div className="col-span-1 flex justify-center">
-                                        <button 
-                                            onClick={() => setSelectedPart(p)}
-                                            className="text-lg opacity-20 hover:opacity-100 hover:scale-110 transition-all text-[#002d72]"
-                                            title="View Details"
+                                        <a 
+                                            href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(p.name + " " + p.partNumber + " bus part")}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-lg opacity-50 hover:opacity-100 hover:scale-125 transition-all text-[#002d72] no-underline"
+                                            title="Search on Google Images"
                                         >
                                             👁️
-                                        </button>
+                                        </a>
                                     </div>
                                 </div>
                             ))}
@@ -336,7 +298,7 @@ const BusDetailView = ({ bus, onClose, showToast }: { bus: any; onClose: () => v
     };
 
     if (showHistory) return (
-        <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg h-[600px] flex flex-col animate-in zoom-in-95">
+        <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg h-[600px] flex flex-col">
             <div className="flex justify-between items-center mb-4 border-b pb-4 font-black text-[#002d72] uppercase"><span>History: #{bus.number}</span><button onClick={()=>setShowHistory(false)} className="text-xs text-slate-400">Back</button></div>
             <div className="flex-grow overflow-y-auto space-y-3">
                 {historyLogs.map(l => (
@@ -518,7 +480,7 @@ export default function MartaInventory() {
       </nav>
 
       <main className="max-w-[1600px] mx-auto p-6">
-        {view === 'tracker' ? <div className="h-[85vh] bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative"><BusTracker /></div> :
+        {view === 'tracker' ? <div className="h-[85vh] bg-white rounded-2xl shadow-sm border overflow-hidden relative"><BusTracker /></div> :
          view === 'input' ? <BusInputForm showToast={(m, t) => setToast({msg:m, type:t})} /> :
          view === 'analytics' ? <div className="animate-in fade-in duration-500"><StatusCharts buses={buses} /><AnalyticsDashboard buses={buses} showToast={(m, t) => setToast({msg:m, type:t})} /></div> :
          view === 'handover' ? <ShiftHandover buses={buses} showToast={(m, t) => setToast({msg:m, type:t})} /> :

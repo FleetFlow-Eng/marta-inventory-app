@@ -1,12 +1,13 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db, auth } from './firebaseConfig'; 
-import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc, writeBatch, getDocs, getDoc, addDoc, deleteDoc, limit, updateDoc, increment } from "firebase/firestore";
+import { collection, query, orderBy, doc, serverTimestamp, setDoc, writeBatch, getDocs, getDoc, addDoc, deleteDoc, limit, updateDoc, increment } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import dynamic from 'next/dynamic';
 
+// Dynamic import for map to keep initial load fast
 const BusTracker = dynamic(() => import('./BusTracker'), { 
   ssr: false,
   loading: () => (
@@ -59,169 +60,92 @@ const logHistory = async (busNumber: string, action: string, details: string, us
     }
 };
 
-// --- COMPONENT: PARTS INVENTORY (With CSV Import) ---
-const PartsInventory = ({ showToast }: { showToast: (msg: string, type: 'success'|'error') => void }) => {
+// --- COMPONENT: READ-ONLY PARTS LIST (OPTIMIZED) ---
+const PartsInventory = () => {
     const [parts, setParts] = useState<any[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [newPart, setNewPart] = useState({ name: '', partNumber: '', quantity: 0, bin: '', type: 'Universal' });
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const q = query(collection(db, "parts"), orderBy("name"));
-        return onSnapshot(q, (snap) => setParts(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
-    }, []);
-
-    const handleAddPart = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if(!newPart.name) return;
-        try {
-            await addDoc(collection(db, "parts"), { ...newPart, timestamp: serverTimestamp() });
-            showToast("Part added successfully", 'success');
-            setNewPart({ name: '', partNumber: '', quantity: 0, bin: '', type: 'Universal' });
-        } catch(err) { showToast("Failed to add part", 'error'); }
-    };
-
-    const updateQty = async (id: string, delta: number) => {
-        try { await updateDoc(doc(db, "parts", id), { quantity: increment(delta) }); } catch(err) { console.error(err); }
-    };
-
-    const deletePart = async (id: string) => {
-        if(!confirm("Delete this item?")) return;
-        await deleteDoc(doc(db, "parts", id));
-    };
-
-    // --- CLEAR DATABASE FUNCTION ---
-    const clearDatabase = async () => {
-        if(!confirm("⚠️ DANGER: This will delete ALL parts from the inventory.\n\nOnly do this if you want to wipe the data and upload a fresh CSV.")) return;
-        
-        try {
-            const snap = await getDocs(collection(db, "parts"));
-            const batch = writeBatch(db);
-            snap.docs.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-            showToast("Database Cleared.", 'success');
-        } catch(err) {
-            showToast("Failed to clear database.", 'error');
-        }
-    };
-
-    // --- CSV IMPORT FUNCTION ---
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            const text = event.target?.result as string;
-            const rows = text.split('\n').slice(1); // Skip header row
-            
-            const batch = writeBatch(db);
-            let count = 0;
-
-            rows.forEach(row => {
-                const cols = row.split(',');
-                if (cols.length >= 2) { // Ensure row has data
-                    // CSV Format expected: Name, Part#, Bin, Qty, Type
-                    const partData = {
-                        name: cols[0]?.trim() || "Unknown Part",
-                        partNumber: cols[1]?.trim() || "N/A",
-                        bin: cols[2]?.trim() || "—",
-                        quantity: parseInt(cols[3]?.trim()) || 0,
-                        type: cols[4]?.trim() || "Universal",
-                        timestamp: serverTimestamp()
-                    };
-                    const docRef = doc(collection(db, "parts"));
-                    batch.set(docRef, partData);
-                    count++;
-                }
-            });
-
-            if (count > 0) {
-                await batch.commit();
-                showToast(`Successfully imported ${count} parts!`, 'success');
-            } else {
-                showToast("No valid data found in CSV.", 'error');
+        // Optimized: Using getDocs instead of onSnapshot to prevent constant re-rendering lag
+        const fetchParts = async () => {
+            try {
+                const q = query(collection(db, "parts"), orderBy("name"));
+                const snap = await getDocs(q);
+                // Map only necessary fields to keep memory usage low
+                const loadedParts = snap.docs.map(d => ({
+                    id: d.id,
+                    name: d.data().name,
+                    partNumber: d.data().partNumber
+                }));
+                setParts(loadedParts);
+            } catch (err) {
+                console.error("Error loading parts inventory:", err);
+            } finally {
+                setLoading(false);
             }
         };
-        reader.readAsText(file);
-        // Reset input value to allow re-uploading same file if needed
-        if (fileInputRef.current) fileInputRef.current.value = "";
-    };
+        fetchParts();
+    }, []);
 
-    const filteredParts = parts.filter(p => 
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        p.partNumber.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Memoize the filter so it doesn't re-run on every render frame
+    const filteredParts = useMemo(() => {
+        if (!searchTerm) return parts;
+        const lowerSearch = searchTerm.toLowerCase();
+        return parts.filter(p => 
+            (p.name && p.name.toLowerCase().includes(lowerSearch)) || 
+            (p.partNumber && p.partNumber.toLowerCase().includes(lowerSearch))
+        );
+    }, [parts, searchTerm]);
 
     return (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* CSV UPLOAD & CLEAR CONTROLS */}
-            <div className="flex justify-end gap-3 mb-4">
-                <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-                
-                <button onClick={() => clearDatabase()} className="text-xs font-bold text-red-400 hover:text-red-600 underline">
-                    🗑️ Clear Database
-                </button>
-                <div className="w-[1px] h-4 bg-slate-300"></div>
-                <button onClick={() => fileInputRef.current?.click()} className="text-xs font-bold text-[#002d72] hover:text-[#ef7c00] underline">
-                    📂 Import CSV
-                </button>
-            </div>
-
-            <div className="bg-white p-8 rounded-2xl shadow-xl border-t-8 border-[#002d72] mb-8">
-                <h2 className="text-2xl font-black text-[#002d72] italic uppercase mb-6">Add New Part</h2>
-                <form onSubmit={handleAddPart} className="flex gap-4 items-end">
-                    <div className="flex-grow"><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Part Name</label><input className="w-full p-3 bg-slate-50 border rounded-lg font-bold outline-none focus:border-[#002d72]" placeholder="e.g. Brake Caliper" value={newPart.name} onChange={e=>setNewPart({...newPart, name: e.target.value})} required /></div>
-                    <div className="w-40"><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Part #</label><input className="w-full p-3 bg-slate-50 border rounded-lg font-bold outline-none focus:border-[#002d72]" placeholder="X-9902" value={newPart.partNumber} onChange={e=>setNewPart({...newPart, partNumber: e.target.value})} /></div>
-                    <div className="w-24"><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Qty</label><input type="number" className="w-full p-3 bg-slate-50 border rounded-lg font-bold outline-none focus:border-[#002d72]" value={newPart.quantity} onChange={e=>setNewPart({...newPart, quantity: parseInt(e.target.value)})} /></div>
-                    <div className="w-32"><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Bin Loc</label><input className="w-full p-3 bg-slate-50 border rounded-lg font-bold outline-none focus:border-[#002d72]" placeholder="A-12" value={newPart.bin} onChange={e=>setNewPart({...newPart, bin: e.target.value})} /></div>
-                    <div className="w-40"><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Type</label><select className="w-full p-3 bg-slate-50 border rounded-lg font-bold outline-none" value={newPart.type} onChange={e=>setNewPart({...newPart, type: e.target.value})}><option>Universal</option><option>Gillig</option><option>New Flyer</option><option>Engine</option></select></div>
-                    <button className="px-6 py-3 bg-[#002d72] text-white font-black rounded-lg uppercase tracking-widest hover:bg-[#ef7c00] transition-colors shadow-lg">Add</button>
-                </form>
-            </div>
-
-            <div className="flex justify-between items-center mb-6">
-                <input type="text" placeholder="Search Inventory..." className="w-full max-w-md p-3 bg-white border border-slate-200 rounded-lg font-bold outline-none focus:border-[#002d72]" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                <div className="flex gap-2">
-                    <div className="px-4 py-2 bg-slate-100 rounded-lg"><span className="text-xs font-bold text-slate-500">Total Items: <span className="text-slate-900">{parts.length}</span></span></div>
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
+            <div className="flex justify-between items-end mb-6">
+                <div>
+                    <h2 className="text-3xl font-black text-[#002d72] italic uppercase tracking-tighter">Parts Reference</h2>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Master Inventory List</p>
+                </div>
+                <div className="w-full max-w-md">
+                    <input 
+                        type="text" 
+                        placeholder="Search by Description or Part #..." 
+                        className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold outline-none focus:border-[#002d72] transition-colors shadow-sm" 
+                        value={searchTerm} 
+                        onChange={e => setSearchTerm(e.target.value)} 
+                    />
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <table className="w-full text-left">
-                    <thead className="bg-slate-50 border-b border-slate-200">
-                        <tr>
-                            <th className="p-4 text-[9px] font-black uppercase text-slate-400 tracking-widest">Part Name</th>
-                            <th className="p-4 text-[9px] font-black uppercase text-slate-400 tracking-widest">Number</th>
-                            <th className="p-4 text-[9px] font-black uppercase text-slate-400 tracking-widest">Bin</th>
-                            <th className="p-4 text-[9px] font-black uppercase text-slate-400 tracking-widest">Type</th>
-                            <th className="p-4 text-[9px] font-black uppercase text-slate-400 tracking-widest text-center">Stock Level</th>
-                            <th className="p-4 text-[9px] font-black uppercase text-slate-400 tracking-widest text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {filteredParts.length === 0 ? (
-                            <tr><td colSpan={6} className="p-12 text-center text-slate-400 italic">Inventory list is empty.</td></tr>
-                        ) : filteredParts.map(part => (
-                            <tr key={part.id} className={`hover:bg-slate-50 transition-colors group ${part.quantity === 0 ? 'bg-red-50/50' : ''}`}>
-                                <td className="p-4 font-bold text-slate-700">{part.name}</td>
-                                <td className="p-4 text-xs font-mono text-slate-500">{part.partNumber || '--'}</td>
-                                <td className="p-4 text-xs font-bold text-[#002d72]">{part.bin || 'Unknown'}</td>
-                                <td className="p-4"><span className="px-2 py-1 bg-slate-100 rounded text-[9px] font-black uppercase text-slate-500">{part.type}</span></td>
-                                <td className="p-4 text-center">
-                                    <div className="flex items-center justify-center gap-3">
-                                        <button onClick={() => updateQty(part.id, -1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-200 hover:bg-red-200 text-slate-600 hover:text-red-600 font-bold transition-colors">-</button>
-                                        <span className={`w-8 text-center font-black ${part.quantity < 3 ? 'text-red-500' : 'text-slate-800'}`}>{part.quantity}</span>
-                                        <button onClick={() => updateQty(part.id, 1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-200 hover:bg-green-200 text-slate-600 hover:text-green-600 font-bold transition-colors">+</button>
-                                    </div>
-                                </td>
-                                <td className="p-4 text-right">
-                                    <button onClick={() => deletePart(part.id)} className="text-slate-300 hover:text-red-500 transition-colors">🗑️</button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+            <div className="bg-white rounded-2xl shadow-lg border border-slate-200 flex-grow overflow-hidden flex flex-col">
+                {/* Fixed Header */}
+                <div className="bg-slate-50 border-b border-slate-200 grid grid-cols-12 gap-4 p-4 text-[9px] font-black uppercase text-slate-400 tracking-widest">
+                    <div className="col-span-3">Part Number</div>
+                    <div className="col-span-9">Description</div>
+                </div>
+
+                {/* Scrollable Body */}
+                <div className="overflow-y-auto flex-grow p-0">
+                    {loading ? (
+                        <div className="p-12 text-center text-slate-400 font-bold animate-pulse">Loading Inventory...</div>
+                    ) : filteredParts.length === 0 ? (
+                        <div className="p-12 text-center text-slate-400 italic">No matching parts found.</div>
+                    ) : (
+                        <div className="divide-y divide-slate-100">
+                            {filteredParts.map((part) => (
+                                <div key={part.id} className="grid grid-cols-12 gap-4 p-4 hover:bg-blue-50 transition-colors cursor-default">
+                                    <div className="col-span-3 font-mono font-bold text-[#002d72] select-all">{part.partNumber || '---'}</div>
+                                    <div className="col-span-9 font-bold text-slate-700">{part.name}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                
+                <div className="bg-slate-50 border-t border-slate-200 p-3 text-center">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                        Showing {filteredParts.length} Records
+                    </p>
+                </div>
             </div>
         </div>
     );
@@ -628,7 +552,6 @@ const BusInputForm = ({ showToast }: { showToast: (msg: string, type: 'success'|
     );
 };
 
-// --- MAIN APPLICATION ---
 export default function MartaInventory() {
   const [user, setUser] = useState<any>(null);
   const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'parts'>('inventory');
@@ -805,7 +728,7 @@ export default function MartaInventory() {
         ) : view === 'handover' ? (
           <ShiftHandover buses={buses} showToast={triggerToast} />
         ) : view === 'parts' ? (
-          <PartsInventory showToast={triggerToast} />
+          <PartsInventory />
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

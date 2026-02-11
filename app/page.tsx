@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db, auth } from './firebaseConfig'; 
-import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc, addDoc, deleteDoc, getDoc, getDocs, limit, writeBatch } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc, addDoc, deleteDoc, getDoc, getDocs, limit, writeBatch, updateDoc, arrayUnion } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -70,6 +70,245 @@ const calculateDaysOOS = (start: string) => {
     const s = new Date(start);
     const now = new Date();
     return Math.max(0, Math.ceil((now.getTime() - s.getTime()) / (1000 * 3600 * 24)));
+};
+
+// --- COMPONENT: PERSONNEL MANAGER (TRACKER STYLE) ---
+const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'success'|'error') => void }) => {
+    const [personnel, setPersonnel] = useState<any[]>([]);
+    const [viewMode, setViewMode] = useState<'dashboard' | 'log'>('dashboard');
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [showIncidentModal, setShowIncidentModal] = useState(false);
+    const [selectedEmpId, setSelectedEmpId] = useState('');
+    
+    // New Employee Form
+    const [newEmpName, setNewEmpName] = useState('');
+    
+    // Incident Form
+    const [incData, setIncData] = useState({ type: 'Sick', date: '', count: 1, docReceived: false, notes: '' });
+
+    useEffect(() => {
+        const q = query(collection(db, "personnel"), orderBy("name"));
+        return onSnapshot(q, (snap) => setPersonnel(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
+    }, []);
+
+    // Helper: Flatten all incidents for the "Log" view
+    const allIncidents = useMemo(() => {
+        let logs: any[] = [];
+        personnel.forEach(p => {
+            if (p.incidents) {
+                p.incidents.forEach((inc: any) => {
+                    logs.push({ ...inc, employeeName: p.name, employeeId: p.id });
+                });
+            }
+        });
+        // Sort by date descending
+        return logs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [personnel]);
+
+    // Helper: Calculate Dashboard Stats
+    const stats = useMemo(() => {
+        const typeCounts: {[key: string]: number} = {};
+        let totalOccurrences = 0;
+        
+        allIncidents.forEach(inc => {
+            const c = parseInt(inc.count) || 1;
+            totalOccurrences += c;
+            typeCounts[inc.type] = (typeCounts[inc.type] || 0) + c;
+        });
+
+        const topOffenders = [...personnel].sort((a,b) => (b.totalOccurrences || 0) - (a.totalOccurrences || 0)).slice(0, 5);
+
+        return { totalOccurrences, typeCounts, topOffenders };
+    }, [allIncidents, personnel]);
+
+    const handleAddEmployee = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if(!newEmpName) return;
+        try {
+            await addDoc(collection(db, "personnel"), { 
+                name: newEmpName, totalOccurrences: 0, incidents: [], timestamp: serverTimestamp() 
+            });
+            showToast(`Added ${newEmpName}`, 'success');
+            setNewEmpName(''); setShowAddModal(false);
+        } catch(err) { showToast("Failed to add employee", 'error'); }
+    };
+
+    const handleLogIncident = async () => {
+        if(!selectedEmpId) return showToast("Select an employee", 'error');
+        try {
+            const empRef = doc(db, "personnel", selectedEmpId);
+            const newLog = {
+                type: incData.type,
+                date: incData.date || new Date().toISOString().split('T')[0],
+                count: Number(incData.count),
+                docReceived: incData.docReceived,
+                notes: incData.notes,
+                loggedAt: new Date().toISOString()
+            };
+            
+            await updateDoc(empRef, {
+                totalOccurrences: increment(Number(incData.count)),
+                incidents: arrayUnion(newLog)
+            });
+            
+            showToast("Incident Saved", 'success');
+            setShowIncidentModal(false);
+            setIncData({ type: 'Sick', date: '', count: 1, docReceived: false, notes: '' });
+        } catch(err) { showToast("Failed to save", 'error'); }
+    };
+
+    return (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
+            
+            {/* HEADER & CONTROLS */}
+            <div className="flex justify-between items-end mb-6">
+                <div>
+                    <h2 className="text-3xl font-black text-[#002d72] italic uppercase tracking-tighter">Attendance Tracker</h2>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Incident Dashboard & Logs</p>
+                </div>
+                <div className="flex gap-2">
+                    <div className="bg-white border rounded-lg p-1 flex">
+                        <button onClick={()=>setViewMode('dashboard')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all ${viewMode==='dashboard'?'bg-[#002d72] text-white shadow':'text-slate-400 hover:text-[#002d72]'}`}>Dashboard</button>
+                        <button onClick={()=>setViewMode('log')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all ${viewMode==='log'?'bg-[#002d72] text-white shadow':'text-slate-400 hover:text-[#002d72]'}`}>Master Log</button>
+                    </div>
+                    <button onClick={() => setShowIncidentModal(true)} className="px-6 py-2 bg-[#ef7c00] text-white rounded-lg font-black uppercase text-[10px] shadow-lg hover:bg-orange-600 transition-all">+ Log Incident</button>
+                    <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg font-black uppercase text-[10px] hover:bg-slate-300 transition-all">+ Emp</button>
+                </div>
+            </div>
+
+            {/* DASHBOARD VIEW */}
+            {viewMode === 'dashboard' && (
+                <div className="space-y-6 overflow-y-auto pb-10">
+                    {/* TOP STATS */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Occurrences</p>
+                            <p className="text-4xl font-black text-[#002d72]">{stats.totalOccurrences}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Employees Tracked</p>
+                            <p className="text-4xl font-black text-slate-700">{personnel.length}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Incidents by Type</p>
+                            <div className="space-y-1">
+                                {Object.entries(stats.typeCounts).slice(0,3).map(([k,v]) => (
+                                    <div key={k} className="flex justify-between text-xs font-bold text-slate-600"><span>{k}</span><span>{v}</span></div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* BREAKDOWN TABLE */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="p-4 border-b bg-slate-50"><h3 className="text-xs font-black text-[#002d72] uppercase tracking-widest">Incidents by Type</h3></div>
+                            <table className="w-full text-left text-xs">
+                                <thead className="text-slate-400 font-black uppercase bg-white border-b"><tr><th className="p-3">Type</th><th className="p-3 text-right">Total</th></tr></thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {Object.entries(stats.typeCounts).map(([type, count]) => (
+                                        <tr key={type}><td className="p-3 font-bold text-slate-700">{type}</td><td className="p-3 text-right font-mono font-bold">{count}</td></tr>
+                                    ))}
+                                    {Object.keys(stats.typeCounts).length === 0 && <tr><td colSpan={2} className="p-4 text-center text-slate-300 italic">No data yet.</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* TOP OFFENDERS */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="p-4 border-b bg-slate-50"><h3 className="text-xs font-black text-[#002d72] uppercase tracking-widest">Employees by Total Incidents</h3></div>
+                            <table className="w-full text-left text-xs">
+                                <thead className="text-slate-400 font-black uppercase bg-white border-b"><tr><th className="p-3">Employee Name</th><th className="p-3 text-right">Occurrences</th></tr></thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {stats.topOffenders.map(emp => (
+                                        <tr key={emp.id} className="hover:bg-red-50 transition-colors">
+                                            <td className="p-3 font-bold text-slate-700">{emp.name}</td>
+                                            <td className={`p-3 text-right font-black ${emp.totalOccurrences > 5 ? 'text-red-500' : 'text-slate-800'}`}>{emp.totalOccurrences}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* LOG VIEW (ATTENDANCE SHEET STYLE) */}
+            {viewMode === 'log' && (
+                <div className="bg-white rounded-2xl shadow-lg border border-slate-200 flex-grow overflow-hidden flex flex-col">
+                    <div className="bg-slate-50 border-b p-3 grid grid-cols-12 gap-2 text-[9px] font-black uppercase text-slate-400 tracking-widest">
+                        <div className="col-span-3">Employee Name</div>
+                        <div className="col-span-2">Incident Type</div>
+                        <div className="col-span-2">Date</div>
+                        <div className="col-span-1 text-center">Count</div>
+                        <div className="col-span-1 text-center">Doc?</div>
+                        <div className="col-span-3">Notes</div>
+                    </div>
+                    <div className="overflow-y-auto flex-grow divide-y divide-slate-100">
+                        {allIncidents.length === 0 ? <div className="p-10 text-center text-slate-300 italic">No attendance records found.</div> : allIncidents.map((log, i) => (
+                            <div key={i} className="grid grid-cols-12 gap-2 p-3 items-center hover:bg-blue-50 transition-colors text-xs">
+                                <div className="col-span-3 font-bold text-[#002d72]">{log.employeeName}</div>
+                                <div className="col-span-2 font-medium text-slate-600"><span className={`px-2 py-0.5 rounded text-[10px] uppercase font-black ${log.type==='Sick'?'bg-orange-100 text-orange-700':log.type==='FMLA'?'bg-blue-100 text-blue-700':'bg-red-100 text-red-700'}`}>{log.type}</span></div>
+                                <div className="col-span-2 font-mono text-slate-500">{log.date}</div>
+                                <div className="col-span-1 text-center font-black">{log.count}</div>
+                                <div className="col-span-1 text-center">{log.docReceived ? '✅' : '❌'}</div>
+                                <div className="col-span-3 text-slate-500 truncate italic">{log.notes || '-'}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* MODALS */}
+            {showAddModal && (
+                <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white p-6 rounded-2xl w-full max-w-sm">
+                        <h3 className="text-xl font-black text-[#002d72] mb-4">Add Employee</h3>
+                        <input className="w-full p-3 border rounded mb-4 font-bold" placeholder="Full Name (e.g. John Doe)" value={newEmpName} onChange={e=>setNewEmpName(e.target.value)} />
+                        <div className="flex gap-2"><button onClick={()=>setShowAddModal(false)} className="flex-1 py-3 bg-slate-100 rounded font-bold text-xs">Cancel</button><button onClick={handleAddEmployee} className="flex-1 py-3 bg-[#002d72] text-white rounded font-bold text-xs">Add</button></div>
+                    </div>
+                </div>
+            )}
+
+            {showIncidentModal && (
+                <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white p-8 rounded-2xl w-full max-w-md shadow-2xl">
+                        <h3 className="text-2xl font-black text-[#ef7c00] mb-6 uppercase">Log Attendance Incident</h3>
+                        
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Employee</label>
+                        <select className="w-full p-3 border-2 rounded-lg font-bold mb-4" value={selectedEmpId} onChange={e=>setSelectedEmpId(e.target.value)}>
+                            <option value="">-- Select Employee --</option>
+                            {personnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase">Type</label>
+                            <select className="w-full p-3 border-2 rounded-lg font-bold text-sm" value={incData.type} onChange={e=>setIncData({...incData, type:e.target.value})}>
+                                <option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option>
+                            </select></div>
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase">Occurrences</label>
+                            <input type="number" className="w-full p-3 border-2 rounded-lg font-bold text-sm" value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} /></div>
+                        </div>
+
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Date</label>
+                        <input type="date" className="w-full p-3 border-2 rounded-lg font-bold mb-4 text-sm" value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} />
+
+                        <div className="flex items-center gap-3 mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100 cursor-pointer" onClick={()=>setIncData({...incData, docReceived:!incData.docReceived})}>
+                            <div className={`w-5 h-5 rounded border flex items-center justify-center ${incData.docReceived ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white border-slate-300'}`}>{incData.docReceived && '✓'}</div>
+                            <span className="text-xs font-bold text-blue-800">Documentation Received?</span>
+                        </div>
+
+                        <textarea className="w-full p-3 border-2 rounded-lg h-24 mb-6 font-medium text-sm" placeholder="Additional notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} />
+
+                        <div className="flex gap-4">
+                            <button onClick={()=>setShowIncidentModal(false)} className="w-1/3 py-3 bg-slate-100 rounded-xl font-black uppercase text-xs">Cancel</button>
+                            <button onClick={handleLogIncident} className="w-2/3 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-blue-900">Save Record</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 };
 
 // --- COMPONENT: HIGH-PERFORMANCE PARTS LIST (V5) ---
@@ -491,7 +730,7 @@ const BusInputForm = ({ showToast }: { showToast: (m:string, t:'success'|'error'
 
 export default function FleetManager() {
   const [user, setUser] = useState<any>(null);
-  const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'parts'>('inventory');
+  const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'parts' | 'personnel'>('inventory');
   const [inventoryMode, setInventoryMode] = useState<'list' | 'grid'>('grid');
   const [buses, setBuses] = useState<any[]>([]);
   const [selectedBusDetail, setSelectedBusDetail] = useState<any>(null);
@@ -503,6 +742,10 @@ export default function FleetManager() {
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
   const holdStatuses = ['On Hold', 'Engine', 'Body Shop', 'Vendor', 'Brakes', 'Safety'];
+
+  const triggerToast = (msg: string, type: 'success' | 'error') => {
+      setToast({ msg, type });
+  };
 
   useEffect(() => { onAuthStateChanged(auth, u => setUser(u)); }, []);
   useEffect(() => { if (!user) return; return onSnapshot(query(collection(db, "buses"), orderBy("number", "asc")), s => setBuses(s.docs.map(d => ({...d.data(), docId: d.id})))); }, [user]);
@@ -531,10 +774,6 @@ export default function FleetManager() {
     setToast({msg:"Excel Downloaded", type:'success'});
   };
 
-  const triggerToast = (msg: string, type: 'success' | 'error') => {
-      setToast({ msg, type });
-  };
-
   if (!user) return (
     <div className="min-h-screen flex items-center justify-center bg-[#001a3d] p-4 relative overflow-hidden">
       <form onSubmit={async e => { e.preventDefault(); try { await signInWithEmailAndPassword(auth, email, password); } catch(e){} }} className="bg-white p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-[#ef7c00] relative z-10 animate-in fade-in zoom-in">
@@ -560,8 +799,8 @@ export default function FleetManager() {
       <nav className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-2"><div className="w-2 h-6 bg-[#002d72] rounded-full"></div><span className="font-black text-lg italic uppercase tracking-tighter text-[#002d72]">Fleet Manager</span></div>
         <div className="flex gap-4 items-center">
-          {['inventory', 'input', 'tracker', 'analytics', 'handover', 'parts'].map(v => (
-            <button key={v} onClick={() => setView(v as any)} className={`text-[9px] font-black uppercase tracking-widest border-b-2 pb-1 transition-all ${view === v ? 'border-[#ef7c00] text-[#002d72]' : 'border-transparent text-slate-400 hover:text-[#002d72]'}`}>{v.replace('input', 'Data Entry').replace('parts', 'Parts List')}</button>
+          {['inventory', 'input', 'tracker', 'analytics', 'handover', 'parts', 'personnel'].map(v => (
+            <button key={v} onClick={() => setView(v as any)} className={`text-[9px] font-black uppercase tracking-widest border-b-2 pb-1 transition-all ${view === v ? 'border-[#ef7c00] text-[#002d72]' : 'border-transparent text-slate-400 hover:text-[#002d72]'}`}>{v.replace('input', 'Data Entry').replace('parts', 'Parts List').replace('personnel', 'Personnel')}</button>
           ))}
           <button onClick={exportExcel} className="text-[#002d72] text-[10px] font-black uppercase hover:text-[#ef7c00]">Excel</button>
           <button onClick={() => signOut(auth)} className="text-red-500 text-[10px] font-black uppercase">Logout</button>
@@ -573,7 +812,8 @@ export default function FleetManager() {
          view === 'input' ? <BusInputForm showToast={(m, t) => setToast({msg:m, type:t})} /> :
          view === 'analytics' ? <div className="animate-in fade-in duration-500"><StatusCharts buses={buses} /><AnalyticsDashboard buses={buses} showToast={(m, t) => setToast({msg:m, type:t})} /></div> :
          view === 'handover' ? <ShiftHandover buses={buses} showToast={(m, t) => setToast({msg:m, type:t})} /> :
-         view === 'parts' ? <PartsInventory showToast={triggerToast} /> : (
+         view === 'parts' ? <PartsInventory showToast={triggerToast} /> :
+         view === 'personnel' ? <PersonnelManager showToast={triggerToast} /> : (
           <>
             <div className="grid grid-cols-4 gap-4 mb-8">
               {[{label:'Total Fleet',val:buses.length,c:'text-slate-900'},{label:'Ready',val:buses.filter(b=>b.status==='Active'||b.status==='In Shop').length,c:'text-green-600'},{label:'On Hold',val:buses.filter(b=>holdStatuses.includes(b.status)).length,c:'text-red-600'},{label:'In Shop',val:buses.filter(b=>b.status==='In Shop').length,c:'text-[#ef7c00]'}].map(m=>(

@@ -62,7 +62,7 @@ const calculateDaysOOS = (start: string) => {
     return Math.max(0, Math.ceil((now.getTime() - s.getTime()) / (1000 * 3600 * 24)));
 };
 
-// --- MODULE 1: PERSONNEL MANAGER (With Word Export) ---
+// --- MODULE 1: PERSONNEL MANAGER (With Letter Export) ---
 const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'success'|'error') => void }) => {
     const [personnel, setPersonnel] = useState<any[]>([]);
     const [viewMode, setViewMode] = useState<'dashboard' | 'log'>('dashboard');
@@ -71,8 +71,6 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
     const [selectedEmp, setSelectedEmp] = useState<any>(null);
     const [newEmpName, setNewEmpName] = useState('');
     const [incData, setIncData] = useState({ type: 'Sick', date: '', count: 1, docReceived: false, supervisorReviewDate: '', notes: '' });
-    
-    // Search Filters
     const [rosterSearch, setRosterSearch] = useState('');
 
     useEffect(() => {
@@ -114,18 +112,14 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                 monthlyCounts[month].Total += c;
             }
         });
-        
-        // Full roster list sorted by occurrences
-        const fullRoster = [...personnel].sort((a,b) => (b.totalOccurrences || 0) - (a.totalOccurrences || 0));
-        
-        return { totalOccurrences, typeCounts, fullRoster, monthlyCounts, monthNames };
+        const topOffenders = [...personnel].sort((a,b) => (b.totalOccurrences || 0) - (a.totalOccurrences || 0));
+        return { totalOccurrences, typeCounts, topOffenders, monthlyCounts, monthNames };
     }, [allIncidents, personnel]);
 
-    // Filtered Roster for "Employees by Total Incidents" card
     const filteredRoster = useMemo(() => {
-        if (!rosterSearch) return stats.fullRoster;
-        return stats.fullRoster.filter(p => p.name.toLowerCase().includes(rosterSearch.toLowerCase()));
-    }, [stats.fullRoster, rosterSearch]);
+        if (!rosterSearch) return stats.topOffenders;
+        return stats.topOffenders.filter(p => p.name.toLowerCase().includes(rosterSearch.toLowerCase()));
+    }, [stats.topOffenders, rosterSearch]);
 
     const handleAddEmployee = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -149,63 +143,109 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         } catch(err) { showToast("Failed to save", 'error'); }
     };
 
-    // --- UPDATED WORD DOCUMENT GENERATOR ---
+    // --- NOTICE OF DISCIPLINE GENERATOR ---
     const handleExportWord = () => {
         if(!selectedEmp) return;
         
         const oneYearAgo = new Date();
         oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Employee Record</title><style>
-            body { font-family: 'Calibri', sans-serif; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th { background-color: #f2f2f2; color: #000; padding: 10px; border: 1px solid #000; text-align: left; }
-            td { padding: 8px; border: 1px solid #000; text-align: left; }
-            .red-text { color: red; }
-        </style></head><body>`;
         
-        const title = `<h2 style="text-align:center;">Employee Attendance Record</h2>
-                       <p><strong>Employee Name:</strong> ${selectedEmp.name}</p>
-                       <p><strong>Total Occurrences:</strong> ${selectedEmp.totalOccurrences || 0}</p>
-                       <p><strong>Report Date:</strong> ${new Date().toLocaleDateString()}</p>`;
-
-        let table = `<table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Incident Type</th>
-                    <th>Occurrences</th>
-                    <th>Doc Received</th>
-                    <th>Supervisor Review</th>
-                    <th>Notes</th>
-                </tr>
-            </thead>
-            <tbody>`;
-
-        const sortedIncidents = (selectedEmp.incidents || []).sort((a:any, b:any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-        sortedIncidents.forEach((inc: any) => {
+        const rollingIncidents = (selectedEmp.incidents || []).sort((a:any, b:any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        // Calculate Level based on Rolling Year Points
+        let activePoints = 0;
+        let incidentRows = "";
+        
+        rollingIncidents.forEach((inc: any) => {
             const incDate = new Date(inc.date);
             const isOld = incDate < oneYearAgo;
+            const points = parseInt(inc.count) || 0;
             
-            // Logic: If date is older than 1 year, the whole row text becomes red
-            const style = isOld ? "class='red-text'" : "";
-            
-            table += `<tr ${style}>
-                <td>${inc.date}</td>
-                <td>${inc.type}</td>
-                <td>${inc.count}</td>
-                <td>${inc.docReceived ? 'Yes' : 'No'}</td>
-                <td>${inc.supervisorReviewDate || ''}</td>
-                <td>${inc.notes || ''}</td>
-            </tr>`;
+            if(!isOld) activePoints += points;
+
+            const rowStyle = isOld ? "color: red;" : "color: black;";
+            incidentRows += `<tr><td style="border:1px solid #000; padding:5px; ${rowStyle}">${points}</td><td style="border:1px solid #000; padding:5px; ${rowStyle}">${inc.date} (${inc.type})</td></tr>`;
         });
 
-        table += `</tbody></table></body></html>`;
+        let disciplineLevel = "None";
+        if(activePoints >= 3) disciplineLevel = "Verbal Warning";
+        if(activePoints >= 4) disciplineLevel = "Written Warning";
+        if(activePoints >= 5) disciplineLevel = "Final Written Warning";
+        if(activePoints >= 6) disciplineLevel = "Discharge";
 
-        const blob = new Blob(['\ufeff', header + title + table], { type: 'application/msword' });
-        saveAs(blob, `${selectedEmp.name.replace(' ','_')}_Record.doc`);
-        showToast("Word Document Downloaded", 'success');
+        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Discipline Notice</title><style>
+            body { font-family: 'Arial', sans-serif; font-size: 11pt; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 10px; }
+            th, td { border: 1px solid #000; padding: 5px; text-align: center; }
+            .header { text-align: center; font-weight: bold; margin-bottom: 20px; }
+            .section { margin-bottom: 15px; }
+            .bold { font-weight: bold; }
+        </style></head><body>`;
+        
+        const content = `
+            <p style="text-align:right; font-size:10pt;">Curi 20 E</p>
+            <div class="header">
+                <p>MARTA ATTENDANCE PROGRAM<br>NOTICE OF DISCIPLINE</p>
+            </div>
+            <p><strong>TO:</strong> ${selectedEmp.name} <span style="float:right;"><strong>DATE:</strong> ${new Date().toLocaleDateString()}</span></p>
+            
+            <p class="section">MARTA's Attendance Program states that an employee who accumulates excessive occurrences of absence within any twelve month period (rolling year) will be disciplined according to the following:</p>
+            
+            <table>
+                <tr><th width="40%">Number of Occurrences</th><th width="60%">Level of Discipline</th></tr>
+                <tr><td>1-2</td><td>None</td></tr>
+                <tr><td>3</td><td>Verbal Warning</td></tr>
+                <tr><td>4</td><td>Written Warning</td></tr>
+                <tr><td>5</td><td>Final Written Warning</td></tr>
+                <tr><td>6+</td><td>Discharge</td></tr>
+            </table>
+
+            <p class="section">My records indicate that you have accumulated <strong>${activePoints} occurrences</strong> during the past rolling twelve months. The Occurrences are as follows:</p>
+
+            <table style="width:60%; margin:auto;">
+                <tr><th>Count</th><th>Date / Type</th></tr>
+                ${incidentRows}
+            </table>
+
+            <p class="section">Therefore, in accordance with the schedule of progressive discipline, this is your <strong>${disciplineLevel}</strong> for excessive absenteeism under the rule.</p>
+
+            <p class="section">Please be advised that your rate of absenteeism is not acceptable and YOUR corrective action is required. Additional occurrences will result in the progressive disciplinary action indicated above.</p>
+
+            <p class="section">If you have a personal problem that is affecting your attendance, it is recommended that you call Humana, MARTA's Employee Assistance Program (EAP), at 1-800-448-4358. MARTA sincerely hopes that you will improve your attendance and that further discipline will not be necessary.</p>
+
+            <div class="header" style="margin-top:30px; border-top: 1px solid #000; padding-top:10px;">ACKNOWLEDGEMENT</div>
+            <p>I acknowledge receipt of this Notice of Discipline and that I have been informed of the help available to me through MARTA's EAP and of potential for progressive discipline, up to and including discharge.</p>
+
+            <table style="border:none; margin-top:40px;">
+                <tr style="border:none;">
+                    <td style="border:none; border-bottom:1px solid #000; text-align:left; width:40%;">&nbsp;</td>
+                    <td style="border:none; width:10%;"></td>
+                    <td style="border:none; border-bottom:1px solid #000; text-align:left; width:50%;">&nbsp;</td>
+                </tr>
+                <tr style="border:none;">
+                    <td style="border:none; text-align:left;">Date</td>
+                    <td style="border:none;"></td>
+                    <td style="border:none; text-align:left;">Employee</td>
+                </tr>
+            </table>
+            
+            <table style="border:none; margin-top:40px;">
+                <tr style="border:none;">
+                    <td style="border:none; border-bottom:1px solid #000; text-align:left; width:40%;">&nbsp;</td>
+                    <td style="border:none; width:10%;"></td>
+                    <td style="border:none; border-bottom:1px solid #000; text-align:left; width:50%;">&nbsp;</td>
+                </tr>
+                <tr style="border:none;">
+                    <td style="border:none; text-align:left;">Date</td>
+                    <td style="border:none;"></td>
+                    <td style="border:none; text-align:left;">Foreman/Supervisor/Superintendent</td>
+                </tr>
+            </table>
+        </body></html>`;
+
+        const blob = new Blob(['\ufeff', header + content], { type: 'application/msword' });
+        saveAs(blob, `${selectedEmp.name.replace(' ','_')}_Discipline_Notice.doc`);
+        showToast("Notice Generated", 'success');
     };
 
     return (
@@ -231,7 +271,7 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                                 <p className="text-xs font-bold text-slate-500">Total Occurrences: <span className="text-red-500">{selectedEmp.totalOccurrences || 0}</span></p>
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={handleExportWord} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-black text-[10px] uppercase shadow hover:bg-blue-700 transition-colors">Export Word Record</button>
+                                <button onClick={handleExportWord} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-black text-[10px] uppercase shadow hover:bg-blue-700 transition-colors">📄 Export Notice</button>
                                 <button onClick={()=>setSelectedEmp(null)} className="text-2xl text-slate-300 hover:text-slate-500">✕</button>
                             </div>
                         </div>
@@ -285,11 +325,11 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"><div className="p-4 border-b bg-slate-50"><h3 className="text-xs font-black text-[#002d72] uppercase tracking-widest">Monthly Incident Summary</h3></div><table className="w-full text-left text-xs"><thead className="text-slate-400 font-black uppercase bg-white border-b"><tr><th className="p-3">Month</th><th className="p-3 text-right">Sick</th><th className="p-3 text-right">FMLA</th><th className="p-3 text-right">No Show</th><th className="p-3 text-right">Total</th></tr></thead><tbody className="divide-y divide-slate-50">{stats.monthNames.map(month => { const data = stats.monthlyCounts[month] || {}; if (!data.Total) return null; return (<tr key={month}><td className="p-3 font-bold text-slate-700">{month}</td><td className="p-3 text-right font-mono text-orange-600">{data['Sick'] || 0}</td><td className="p-3 text-right font-mono text-blue-600">{data['FMLA'] || 0}</td><td className="p-3 text-right font-mono text-red-600">{(data['No Call/No Show'] || 0) + (data['Failure to Report'] || 0)}</td><td className="p-3 text-right font-black">{data.Total || 0}</td></tr>); })}</tbody></table></div>
                         
-                        {/* UPDATED EMPLOYEE ROSTER WITH SEARCH */}
+                        {/* EMPLOYEE ROSTER WITH SEARCH */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-[400px]">
                             <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
                                 <h3 className="text-xs font-black text-[#002d72] uppercase tracking-widest">Employee Roster</h3>
-                                <input type="text" placeholder="Search Name..." className="text-xs p-1 border rounded w-32" value={rosterSearch} onChange={e=>setRosterSearch(e.target.value)} />
+                                <input type="text" placeholder="Search Name..." className="text-xs p-1 border rounded w-32 font-bold" value={rosterSearch} onChange={e=>setRosterSearch(e.target.value)} />
                             </div>
                             <div className="overflow-y-auto flex-grow">
                                 <table className="w-full text-left text-xs">
@@ -461,9 +501,7 @@ const BusDetailView = ({ bus, onClose, showToast }: { bus: any; onClose: () => v
     const [showHistory, setShowHistory] = useState(false);
     const [historyLogs, setHistoryLogs] = useState<any[]>([]); 
     const [editData, setEditData] = useState({ status: bus.status || 'Active', location: bus.location || '', notes: bus.notes || '', oosStartDate: bus.oosStartDate || '', expectedReturnDate: bus.expectedReturnDate || '', actualReturnDate: bus.actualReturnDate || '' });
-    
     useEffect(() => { if (showHistory) return onSnapshot(query(collection(db, "buses", bus.number, "history"), orderBy("timestamp", "desc")), (snap) => setHistoryLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))); }, [showHistory, bus.number]);
-    
     const handleSave = async () => {
         try {
             const busRef = doc(db, "buses", bus.number);
@@ -478,13 +516,11 @@ const BusDetailView = ({ bus, onClose, showToast }: { bus: any; onClose: () => v
             showToast(`Bus #${bus.number} updated`, 'success'); setIsEditing(false);
         } catch (err) { showToast("Save failed", 'error'); }
     };
-
     const handleDeleteLog = async (logId: string) => {
         if(!confirm("Are you sure you want to delete this log entry?")) return;
         try { await deleteDoc(doc(db, "buses", bus.number, "history", logId)); showToast("Log deleted", 'success'); } 
         catch(err) { showToast("Failed to delete log", 'error'); }
     };
-
     const handleResetBus = async () => {
         if(!confirm("⚠️ WARNING: This will clear ALL notes, locations, and dates for this bus and set it to 'Active'. Continue?")) return;
         try {

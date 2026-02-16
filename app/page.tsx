@@ -62,13 +62,17 @@ const calculateDaysOOS = (start: string) => {
     return Math.max(0, Math.ceil((now.getTime() - s.getTime()) / (1000 * 3600 * 24)));
 };
 
-// --- MODULE 1: PERSONNEL MANAGER (With Delete & Letter) ---
+// --- MODULE 1: PERSONNEL MANAGER (With Letter Export) ---
 const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'success'|'error') => void }) => {
     const [personnel, setPersonnel] = useState<any[]>([]);
     const [viewMode, setViewMode] = useState<'dashboard' | 'log'>('dashboard');
     const [showAddModal, setShowAddModal] = useState(false);
     const [showIncidentModal, setShowIncidentModal] = useState(false);
-    const [selectedEmp, setSelectedEmp] = useState<any>(null);
+    
+    // FIXED: Added selectedEmpId back to state
+    const [selectedEmpId, setSelectedEmpId] = useState(''); // Used for Dropdown
+    const [selectedEmp, setSelectedEmp] = useState<any>(null); // Used for Popup
+    
     const [newEmpName, setNewEmpName] = useState('');
     const [incData, setIncData] = useState({ type: 'Sick', date: '', count: 1, docReceived: false, supervisorReviewDate: '', notes: '' });
     const [rosterSearch, setRosterSearch] = useState('');
@@ -151,57 +155,41 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         } catch(err) { showToast("Failed to add employee", 'error'); }
     };
 
+    // FIXED: Now works for both Popup (selectedEmp) AND Modal (selectedEmpId)
     const handleLogIncident = async () => {
-        if(!selectedEmp) return showToast("Select an employee", 'error');
+        const targetId = selectedEmp ? selectedEmp.id : selectedEmpId;
+        
+        if(!targetId) return showToast("Select an employee", 'error');
+        
         try {
-            const empRef = doc(db, "personnel", selectedEmp.id);
+            const empRef = doc(db, "personnel", targetId);
             const newLog = {
                 type: incData.type, date: incData.date || new Date().toISOString().split('T')[0],
                 count: Number(incData.count), docReceived: incData.docReceived, supervisorReviewDate: incData.supervisorReviewDate, notes: incData.notes, loggedAt: new Date().toISOString()
             };
             await updateDoc(empRef, { totalOccurrences: increment(Number(incData.count)), incidents: arrayUnion(newLog) });
-            showToast("Incident Saved", 'success'); setIncData({ type: 'Sick', date: '', count: 1, docReceived: false, supervisorReviewDate: '', notes: '' });
+            showToast("Incident Saved", 'success'); 
+            setShowIncidentModal(false);
+            setIncData({ type: 'Sick', date: '', count: 1, docReceived: false, supervisorReviewDate: '', notes: '' });
         } catch(err) { showToast("Failed to save", 'error'); }
     };
 
-    // --- NEW: DELETE INCIDENT FUNCTION ---
     const handleDeleteIncident = async (empId: string, incident: any) => {
         if(!confirm("Are you sure you want to permanently delete this incident record?")) return;
         try {
             const empRef = doc(db, "personnel", empId);
-            
-            // 1. Get current data to ensure we filter the exact array
             const empSnap = await getDoc(empRef);
             if (!empSnap.exists()) return;
-            
             const currentIncidents = empSnap.data().incidents || [];
-            
-            // 2. Filter out the incident (using loggedAt as unique ID if possible, or exact match)
-            // Note: The object from 'allIncidents' has extra fields like employeeName/Id, we need to match carefully.
             const updatedIncidents = currentIncidents.filter((i: any) => i.loggedAt !== incident.loggedAt);
-            
-            // 3. Recalculate Total Points locally to be safe
             const newTotal = updatedIncidents.reduce((sum: number, i: any) => sum + (Number(i.count) || 0), 0);
-            
-            // 4. Update DB
-            await updateDoc(empRef, {
-                incidents: updatedIncidents,
-                totalOccurrences: newTotal
-            });
-            
+            await updateDoc(empRef, { incidents: updatedIncidents, totalOccurrences: newTotal });
             showToast("Incident Deleted", 'success');
-            // If inside popup, update selectedEmp state (optional, snap listener handles it usually)
-            if (selectedEmp && selectedEmp.id === empId) {
-                setSelectedEmp({ ...selectedEmp, incidents: updatedIncidents, totalOccurrences: newTotal });
-            }
-
-        } catch (err) {
-            console.error(err);
-            showToast("Delete Failed", 'error');
-        }
+            if (selectedEmp && selectedEmp.id === empId) { setSelectedEmp({ ...selectedEmp, incidents: updatedIncidents, totalOccurrences: newTotal }); }
+        } catch (err) { console.error(err); showToast("Delete Failed", 'error'); }
     };
 
-    // --- WORD EXPORT ---
+    // --- NOTICE OF DISCIPLINE GENERATOR ---
     const handleExportWord = () => {
         if(!selectedEmp) return;
         
@@ -370,7 +358,6 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"><div className="p-4 border-b bg-slate-50"><h3 className="text-xs font-black text-[#002d72] uppercase tracking-widest">Monthly Incident Summary</h3></div><table className="w-full text-left text-xs"><thead className="text-slate-400 font-black uppercase bg-white border-b"><tr><th className="p-3">Month</th><th className="p-3 text-right">Sick</th><th className="p-3 text-right">FMLA</th><th className="p-3 text-right">No Show</th><th className="p-3 text-right">Total</th></tr></thead><tbody className="divide-y divide-slate-50">{stats.monthNames.map(month => { const data = stats.monthlyCounts[month] || {}; if (!data.Total) return null; return (<tr key={month}><td className="p-3 font-bold text-slate-700">{month}</td><td className="p-3 text-right font-mono text-orange-600">{data['Sick'] || 0}</td><td className="p-3 text-right font-mono text-blue-600">{data['FMLA'] || 0}</td><td className="p-3 text-right font-mono text-red-600">{(data['No Call/No Show'] || 0) + (data['Failure to Report'] || 0)}</td><td className="p-3 text-right font-black">{data.Total || 0}</td></tr>); })}</tbody></table></div>
                         
-                        {/* EMPLOYEE ROSTER WITH SEARCH */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-[400px]">
                             <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
                                 <h3 className="text-xs font-black text-[#002d72] uppercase tracking-widest">Employee Roster</h3>

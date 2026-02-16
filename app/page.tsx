@@ -143,7 +143,7 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         } catch(err) { showToast("Failed to save", 'error'); }
     };
 
-    // --- STRICT NOTICE OF DISCIPLINE GENERATOR (NO TABLES) ---
+    // --- NOTICE OF DISCIPLINE GENERATOR (CORRECTED FORMAT) ---
     const handleExportWord = () => {
         if(!selectedEmp) return;
         
@@ -163,8 +163,13 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         rollingIncidents.forEach((inc: any, index: number) => {
             const points = parseInt(inc.count) || 0;
             activePoints += points;
-            // List formatting: "1    03/22/2025"
-            incidentListHTML += `<p style="margin-left: 40px; margin-bottom: 2px;">${index + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${inc.date}</p>`;
+            
+            // Format Date US Style MM/DD/YYYY
+            const d = new Date(inc.date);
+            const formattedDate = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+
+            // List formatting: "1    03/22/2025" with explicit font
+            incidentListHTML += `<p style="margin-left: 40px; margin-bottom: 2px; font-family: 'Arial', sans-serif; font-size: 11pt;">${index + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${formattedDate}</p>`;
         });
 
         let disciplineLevel = "None";
@@ -178,24 +183,20 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         const formalName = nameParts.length > 1 ? `${nameParts[nameParts.length-1]}, ${nameParts[0]}` : selectedEmp.name;
 
         const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Notice of Discipline</title><style>
-            body { font-family: 'Arial', sans-serif; font-size: 11pt; line-height: 1.2; }
-            p { margin-top: 5px; margin-bottom: 5px; }
-            .header { text-align: center; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; }
-            .right-align { text-align: right; }
+            body { font-family: 'Arial', sans-serif; font-size: 11pt; line-height: 1.1; color: #000000; }
+            p { margin-top: 5px; margin-bottom: 5px; font-family: 'Arial', sans-serif; font-size: 11pt; }
+            .header { text-align: center; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; font-family: 'Arial', sans-serif; }
             .bold { font-weight: bold; }
-            .indent { margin-left: 20px; }
-            .schedule { margin-left: 40px; font-family: 'Courier New', monospace; font-size: 10pt; }
-            .red-text { color: red; } 
+            .schedule { margin-left: 40px; font-family: 'Arial', sans-serif; font-size: 11pt; }
         </style></head><body>`;
         
         const content = `
-            <p class="right-align" style="font-size:10pt;">Curi 20 E</p>
             <br>
             <p>TO: <strong>${formalName}</strong></p>
             <div class="header">
                 <p>MARTA ATTENDANCE PROGRAM<br>NOTICE OF DISCIPLINE</p>
             </div>
-            <p class="right-align">DATE: <strong>${new Date().toLocaleDateString()}</strong></p>
+            <p style="text-align: right;">DATE: <strong>${new Date().toLocaleDateString()}</strong></p>
             <br>
             <p>MARTA's Attendance Program states that an employee who accumulates excessive occurrences of absence within any twelve month period (rolling year) will be disciplined according to the following:</p>
             <br>
@@ -319,7 +320,7 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                             </div>
                             <div className="overflow-y-auto flex-grow">
                                 <table className="w-full text-left text-xs">
-                                    <thead className="text-slate-400 font-black uppercase bg-white border-b sticky top-0"><tr><th className="p-3">Employee Name</th><th className="p-3 text-right">Occurrences</th></tr></thead>
+                                    <thead className="text-slate-400 font-black uppercase bg-white border-b sticky top-0"><tr><th className="p-3">Employee Name</th><th className="p-3 text-right">Count</th></tr></thead>
                                     <tbody className="divide-y divide-slate-50">
                                         {filteredRoster.map(emp => (
                                             <tr key={emp.id} onClick={() => setSelectedEmp(emp)} className="hover:bg-blue-50 transition-colors cursor-pointer">

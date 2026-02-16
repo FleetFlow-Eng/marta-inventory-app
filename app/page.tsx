@@ -71,6 +71,9 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
     const [selectedEmp, setSelectedEmp] = useState<any>(null);
     const [newEmpName, setNewEmpName] = useState('');
     const [incData, setIncData] = useState({ type: 'Sick', date: '', count: 1, docReceived: false, supervisorReviewDate: '', notes: '' });
+    
+    // Search Filters
+    const [rosterSearch, setRosterSearch] = useState('');
 
     useEffect(() => {
         const q = query(collection(db, "personnel"), orderBy("name"));
@@ -111,9 +114,18 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                 monthlyCounts[month].Total += c;
             }
         });
-        const topOffenders = [...personnel].sort((a,b) => (b.totalOccurrences || 0) - (a.totalOccurrences || 0)).slice(0, 10);
-        return { totalOccurrences, typeCounts, topOffenders, monthlyCounts, monthNames };
+        
+        // Full roster list sorted by occurrences
+        const fullRoster = [...personnel].sort((a,b) => (b.totalOccurrences || 0) - (a.totalOccurrences || 0));
+        
+        return { totalOccurrences, typeCounts, fullRoster, monthlyCounts, monthNames };
     }, [allIncidents, personnel]);
+
+    // Filtered Roster for "Employees by Total Incidents" card
+    const filteredRoster = useMemo(() => {
+        if (!rosterSearch) return stats.fullRoster;
+        return stats.fullRoster.filter(p => p.name.toLowerCase().includes(rosterSearch.toLowerCase()));
+    }, [stats.fullRoster, rosterSearch]);
 
     const handleAddEmployee = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -137,46 +149,59 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         } catch(err) { showToast("Failed to save", 'error'); }
     };
 
-    // --- WORD DOCUMENT GENERATOR (Specific to Personnel) ---
+    // --- UPDATED WORD DOCUMENT GENERATOR ---
     const handleExportWord = () => {
         if(!selectedEmp) return;
         
         const oneYearAgo = new Date();
         oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export HTML to Word Document with JavaScript</title><style>
-            body { font-family: 'Arial', sans-serif; }
+        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Employee Record</title><style>
+            body { font-family: 'Calibri', sans-serif; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th { background-color: #002d72; color: white; padding: 10px; border: 1px solid #000; }
-            td { padding: 8px; border: 1px solid #000; text-align: center; }
-            .notes { text-align: left; }
-            .old-record { color: red; font-weight: bold; }
+            th { background-color: #f2f2f2; color: #000; padding: 10px; border: 1px solid #000; text-align: left; }
+            td { padding: 8px; border: 1px solid #000; text-align: left; }
+            .red-text { color: red; }
         </style></head><body>`;
         
-        const title = `<h1 style="text-align:center; color:#002d72;">Personnel Incident Record</h1>
-                       <h2 style="text-align:center;">Employee: ${selectedEmp.name}</h2>
-                       <p style="text-align:center;">Generated on: ${new Date().toLocaleDateString()}</p>`;
+        const title = `<h2 style="text-align:center;">Employee Attendance Record</h2>
+                       <p><strong>Employee Name:</strong> ${selectedEmp.name}</p>
+                       <p><strong>Total Occurrences:</strong> ${selectedEmp.totalOccurrences || 0}</p>
+                       <p><strong>Report Date:</strong> ${new Date().toLocaleDateString()}</p>`;
 
-        let table = `<table><thead><tr><th>Date</th><th>Type</th><th>Occurrences</th><th>Doc Received</th><th>Sup. Review</th><th>Notes</th></tr></thead><tbody>`;
+        let table = `<table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Incident Type</th>
+                    <th>Occurrences</th>
+                    <th>Doc Received</th>
+                    <th>Supervisor Review</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>`;
 
         const sortedIncidents = (selectedEmp.incidents || []).sort((a:any, b:any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         sortedIncidents.forEach((inc: any) => {
             const incDate = new Date(inc.date);
             const isOld = incDate < oneYearAgo;
-            const rowClass = isOld ? "class='old-record'" : "";
             
-            table += `<tr ${rowClass}>
+            // Logic: If date is older than 1 year, the whole row text becomes red
+            const style = isOld ? "class='red-text'" : "";
+            
+            table += `<tr ${style}>
                 <td>${inc.date}</td>
                 <td>${inc.type}</td>
                 <td>${inc.count}</td>
                 <td>${inc.docReceived ? 'Yes' : 'No'}</td>
-                <td>${inc.supervisorReviewDate || '-'}</td>
-                <td class='notes'>${inc.notes || ''}</td>
+                <td>${inc.supervisorReviewDate || ''}</td>
+                <td>${inc.notes || ''}</td>
             </tr>`;
         });
 
-        table += `</tbody></table><br/><br/><p><strong>Total Occurrences: ${selectedEmp.totalOccurrences || 0}</strong></p></body></html>`;
+        table += `</tbody></table></body></html>`;
 
         const blob = new Blob(['\ufeff', header + title + table], { type: 'application/msword' });
         saveAs(blob, `${selectedEmp.name.replace(' ','_')}_Record.doc`);
@@ -197,7 +222,6 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                 </div>
             </div>
 
-            {/* EMPLOYEE DETAIL POPUP (UPDATED WITH WORD EXPORT) */}
             {selectedEmp && (
                 <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in zoom-in-95">
                     <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -233,10 +257,10 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                                     <thead className="bg-slate-50 border-b font-black text-slate-500"><tr><th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3 text-center">Pts</th><th className="p-3">Notes</th></tr></thead>
                                     <tbody className="divide-y">
                                         {selectedEmp.incidents && selectedEmp.incidents.length > 0 ? selectedEmp.incidents.slice().reverse().map((inc: any, i: number) => {
-                                            const isOld = (new Date() - new Date(inc.date)) / (1000 * 60 * 60 * 24) > 365;
+                                            const isOld = (new Date().getTime() - new Date(inc.date).getTime()) / (1000 * 60 * 60 * 24) > 365;
                                             return (
-                                                <tr key={i} className={isOld ? "bg-red-50 text-red-600" : ""}>
-                                                    <td className="p-3 font-mono">{inc.date} {isOld && <span className="text-[8px] font-black uppercase ml-1">(Expired)</span>}</td>
+                                                <tr key={i} className={isOld ? "bg-red-50 text-red-600 font-medium" : ""}>
+                                                    <td className="p-3 font-mono">{inc.date} {isOld && <span className="text-[8px] font-black uppercase ml-1">(>1yr)</span>}</td>
                                                     <td className="p-3 font-bold">{inc.type}</td>
                                                     <td className="p-3 text-center font-black">{inc.count}</td>
                                                     <td className="p-3 italic truncate max-w-[150px]">{inc.notes}</td>
@@ -251,7 +275,6 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                 </div>
             )}
 
-            {/* DASHBOARD VIEW */}
             {viewMode === 'dashboard' && (
                 <div className="space-y-6 overflow-y-auto pb-10">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -261,7 +284,27 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"><div className="p-4 border-b bg-slate-50"><h3 className="text-xs font-black text-[#002d72] uppercase tracking-widest">Monthly Incident Summary</h3></div><table className="w-full text-left text-xs"><thead className="text-slate-400 font-black uppercase bg-white border-b"><tr><th className="p-3">Month</th><th className="p-3 text-right">Sick</th><th className="p-3 text-right">FMLA</th><th className="p-3 text-right">No Show</th><th className="p-3 text-right">Total</th></tr></thead><tbody className="divide-y divide-slate-50">{stats.monthNames.map(month => { const data = stats.monthlyCounts[month] || {}; if (!data.Total) return null; return (<tr key={month}><td className="p-3 font-bold text-slate-700">{month}</td><td className="p-3 text-right font-mono text-orange-600">{data['Sick'] || 0}</td><td className="p-3 text-right font-mono text-blue-600">{data['FMLA'] || 0}</td><td className="p-3 text-right font-mono text-red-600">{(data['No Call/No Show'] || 0) + (data['Failure to Report'] || 0)}</td><td className="p-3 text-right font-black">{data.Total || 0}</td></tr>); })}</tbody></table></div>
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"><div className="p-4 border-b bg-slate-50"><h3 className="text-xs font-black text-[#002d72] uppercase tracking-widest">Top Offenders</h3></div><table className="w-full text-left text-xs"><thead className="text-slate-400 font-black uppercase bg-white border-b"><tr><th className="p-3">Employee Name</th><th className="p-3 text-right">Count</th></tr></thead><tbody className="divide-y divide-slate-50">{stats.topOffenders.map(emp => (<tr key={emp.id} onClick={() => setSelectedEmp(emp)} className="hover:bg-red-50 transition-colors cursor-pointer"><td className="p-3 font-bold text-slate-700">{emp.name}</td><td className={`p-3 text-right font-black ${emp.totalOccurrences > 5 ? 'text-red-500' : 'text-slate-800'}`}>{emp.totalOccurrences}</td></tr>))}</tbody></table></div>
+                        
+                        {/* UPDATED EMPLOYEE ROSTER WITH SEARCH */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-[400px]">
+                            <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+                                <h3 className="text-xs font-black text-[#002d72] uppercase tracking-widest">Employee Roster</h3>
+                                <input type="text" placeholder="Search Name..." className="text-xs p-1 border rounded w-32" value={rosterSearch} onChange={e=>setRosterSearch(e.target.value)} />
+                            </div>
+                            <div className="overflow-y-auto flex-grow">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="text-slate-400 font-black uppercase bg-white border-b sticky top-0"><tr><th className="p-3">Employee Name</th><th className="p-3 text-right">Count</th></tr></thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {filteredRoster.map(emp => (
+                                            <tr key={emp.id} onClick={() => setSelectedEmp(emp)} className="hover:bg-blue-50 transition-colors cursor-pointer">
+                                                <td className="p-3 font-bold text-slate-700">{emp.name}</td>
+                                                <td className={`p-3 text-right font-black ${emp.totalOccurrences > 5 ? 'text-red-500' : 'text-slate-800'}`}>{emp.totalOccurrences}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
@@ -510,7 +553,7 @@ export default function FleetManager() {
 
   const holdStatuses = ['On Hold', 'Engine', 'Body Shop', 'Vendor', 'Brakes', 'Safety'];
   
-  // ADMIN CHECK
+  // ADMIN CHECK: Add your emails here
   const isAdmin = user && (
       user.email === 'anetowestfield@gmail.com' || 
       user.email === 'supervisor@fleet.com' ||

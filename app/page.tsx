@@ -1,7 +1,7 @@
 "use client";
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db, auth } from './firebaseConfig'; 
-import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc, addDoc, deleteDoc, getDoc, getDocs, limit, writeBatch, updateDoc, arrayUnion, increment } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc, addDoc, deleteDoc, getDoc, limit, writeBatch, updateDoc, arrayUnion, increment } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -62,14 +62,18 @@ const calculateDaysOOS = (start: string) => {
     return Math.max(0, Math.ceil((now.getTime() - s.getTime()) / (1000 * 3600 * 24)));
 };
 
-// --- MODULE 1: PERSONNEL MANAGER (Mobile Responsive) ---
+// --- MODULE 1: PERSONNEL MANAGER (FULL FEATURE) ---
 const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'success'|'error') => void }) => {
     const [personnel, setPersonnel] = useState<any[]>([]);
     const [viewMode, setViewMode] = useState<'dashboard' | 'log'>('dashboard');
     const [showAddModal, setShowAddModal] = useState(false);
     const [showIncidentModal, setShowIncidentModal] = useState(false);
-    const [selectedEmpId, setSelectedEmpId] = useState('');
-    const [selectedEmp, setSelectedEmp] = useState<any>(null);
+    
+    // Selection States
+    const [selectedEmpId, setSelectedEmpId] = useState(''); // For Dropdown
+    const [selectedEmp, setSelectedEmp] = useState<any>(null); // For Popup Profile
+    
+    // Forms & Filters
     const [newEmpName, setNewEmpName] = useState('');
     const [incData, setIncData] = useState({ type: 'Sick', date: '', count: 1, docReceived: false, supervisorReviewDate: '', notes: '' });
     const [rosterSearch, setRosterSearch] = useState('');
@@ -80,6 +84,7 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         return onSnapshot(q, (snap) => setPersonnel(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
     }, []);
 
+    // --- DATA PROCESSING ---
     const allIncidents = useMemo(() => {
         let logs: any[] = [];
         personnel.forEach(p => {
@@ -114,10 +119,12 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                 monthlyCounts[month].Total += c;
             }
         });
+        // Sort roster by highest occurrences
         const topOffenders = [...personnel].sort((a,b) => (b.totalOccurrences || 0) - (a.totalOccurrences || 0));
         return { totalOccurrences, typeCounts, topOffenders, monthlyCounts, monthNames };
     }, [allIncidents, personnel]);
 
+    // --- FILTERING ---
     const filteredLog = useMemo(() => {
         let logs = [...allIncidents];
         if (logFilter.search) logs = logs.filter(l => l.employeeName.toLowerCase().includes(logFilter.search.toLowerCase()));
@@ -130,16 +137,17 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         });
     }, [allIncidents, logFilter]);
 
-    const jumpToLog = (typeFilter: string = 'All') => {
-        setLogFilter(prev => ({ ...prev, type: typeFilter, search: '' }));
-        setViewMode('log');
-    };
-
     const filteredRoster = useMemo(() => {
         if (!rosterSearch) return stats.topOffenders;
         return stats.topOffenders.filter(p => p.name.toLowerCase().includes(rosterSearch.toLowerCase()));
     }, [stats.topOffenders, rosterSearch]);
 
+    const jumpToLog = (typeFilter: string = 'All') => {
+        setLogFilter(prev => ({ ...prev, type: typeFilter, search: '' }));
+        setViewMode('log');
+    };
+
+    // --- ACTIONS ---
     const handleAddEmployee = async (e: React.FormEvent) => {
         e.preventDefault();
         if(!newEmpName) return;
@@ -179,23 +187,30 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         } catch (err) { console.error(err); showToast("Delete Failed", 'error'); }
     };
 
+    // --- WORD EXPORT (EXACT REPLICA - NO TABLES) ---
     const handleExportWord = () => {
         if(!selectedEmp) return;
+        
         const oneYearAgo = new Date();
         oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        
         const rollingIncidents = (selectedEmp.incidents || []).filter((inc:any) => {
-            const d = new Date(inc.date); return d >= oneYearAgo;
+            const d = new Date(inc.date);
+            return d >= oneYearAgo;
         }).sort((a:any, b:any) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
         let activePoints = 0;
-        let incidentListHTML = "";
+        let incidentRows = "";
         
         rollingIncidents.forEach((inc: any, index: number) => {
             const points = parseInt(inc.count) || 0;
             activePoints += points;
             const d = new Date(inc.date);
+            // Strict MM/DD/YYYY format
             const formattedDate = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
-            incidentListHTML += `<p style="margin-left: 40px; margin-bottom: 2px; font-family: 'Arial', sans-serif; font-size: 11pt;">${index + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${formattedDate}</p>`;
+            
+            // Using non-breaking spaces for tab-like layout instead of tables
+            incidentRows += `<p style="margin-left: 80px; margin-bottom: 2px; font-family: 'Arial'; font-size: 11pt;">${index + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${formattedDate}</p>`;
         });
 
         let disciplineLevel = "None";
@@ -204,13 +219,99 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         if(activePoints >= 5) disciplineLevel = "Final Written Warning";
         if(activePoints >= 6) disciplineLevel = "Discharge";
 
+        // "Last, First" name format
         const nameParts = selectedEmp.name.split(' ');
         const formalName = nameParts.length > 1 ? `${nameParts[nameParts.length-1]}, ${nameParts[0]}` : selectedEmp.name;
+        
         const today = new Date();
         const reportDate = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
 
-        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Notice of Discipline</title><style>body { font-family: 'Arial', sans-serif; font-size: 11pt; line-height: 1.1; color: #000000; } p { margin-top: 5px; margin-bottom: 5px; font-family: 'Arial', sans-serif; font-size: 11pt; } .header { text-align: center; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; font-family: 'Arial', sans-serif; } .right-align { text-align: right; } .bold { font-weight: bold; } .schedule { margin-left: 40px; font-family: 'Arial', sans-serif; font-size: 11pt; }</style></head><body>`;
-        const content = `<br><p>TO: <strong>${formalName}</strong></p><div class="header"><p>MARTA ATTENDANCE PROGRAM<br>NOTICE OF DISCIPLINE</p></div><p style="text-align: right;">DATE: <strong>${reportDate}</strong></p><br><p>MARTA's Attendance Program states that an employee who accumulates excessive occurrences of absence within any twelve month period (rolling year) will be disciplined according to the following:</p><br><p class="schedule">Number of Occurrences&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Level of Discipline</p><p class="schedule">1-2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None</p><p class="schedule">3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Verbal Warning</p><p class="schedule">4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Written Warning</p><p class="schedule">5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;* Final Written Warning Discharge</p><br><p>My records indicate that you have accumulated <strong>${activePoints} occurrences</strong> during the past rolling twelve months. The Occurrences are as follows:</p><br><p style="margin-left: 40px; font-weight:bold;">Occurrences</p>${incidentListHTML || '<p style="margin-left: 40px;">None recorded.</p>'}<br><p>Therefore, in accordance with the schedule of progressive discipline, this is your <strong>${disciplineLevel}</strong> for excessive absenteeism under the rule.</p><br><p>Please be advised that your rate of absenteeism is not acceptable and YOUR corrective action is required. Additional occurrences will result in the progressive disciplinary action indicated above.</p><br><p>If you have a personal problem that is affecting your attendance, it is recommended that you call Humana, MARTA's Employee Assistance Program (EAP), at 1-800-448-4358. MARTA sincerely hopes that you will improve your attendance and that further discipline will not be necessary.</p><br><br><p class="header" style="border-top: 1px solid #000; padding-top: 5px; width: 200px; margin: auto;">ACKNOWLEDGEMENT</p><p>I acknowledge receipt of this Notice of Discipline and that I have been informed of the help available to me through MARTA's EAP and of potential for progressive discipline, up to and including discharge.</p><br><br><br><p>__________________________ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; __________________________</p><p>Date &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Employee</p><br><p>__________________________ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; __________________________</p><p>Date &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Foreman/Supervisor/Superintendent</p><br><p>__________________________ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; __________________________</p><p>Date &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; General Foreman/Manager/General Superintendent</p></body></html>`;
+        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Notice of Discipline</title><style>
+            body { font-family: 'Arial', sans-serif; font-size: 11pt; line-height: 1.1; color: #000000; }
+            p { margin-top: 4px; margin-bottom: 4px; font-family: 'Arial', sans-serif; font-size: 11pt; }
+            .header-center { text-align: center; font-weight: bold; margin-bottom: 25px; margin-top: 20px; text-transform: uppercase; font-family: 'Arial'; }
+            .right-align { text-align: right; }
+            .bold { font-weight: bold; }
+            .indent { margin-left: 40px; }
+        </style></head><body>`;
+        
+        const content = `
+            <br>
+            <table style="width:100%; border:none; font-family: 'Arial'; font-size:11pt;">
+                <tr>
+                    <td style="width:60%;">TO: &nbsp; ${formalName}</td>
+                    <td style="width:40%; text-align:right;">DATE: &nbsp; ${reportDate}</td>
+                </tr>
+            </table>
+            
+            <div class="header-center">
+                <p>MARTA ATTENDANCE PROGRAM</p>
+                <p>NOTICE OF DISCIPLINE</p>
+            </div>
+            
+            <p>MARTA's Attendance Program states that an employee who accumulates excessive occurrences of absence within any twelve month period (rolling year) will be disciplined according to the following:</p>
+            <br>
+            <p class="indent" style="font-size:10pt;">Number of Occurrences&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Level of Discipline</p>
+            <p class="indent" style="font-size:10pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1-2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None</p>
+            <p class="indent" style="font-size:10pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Verbal Warning</p>
+            <p class="indent" style="font-size:10pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Written Warning</p>
+            <p class="indent" style="font-size:10pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;* Final Written Warning</p>
+            <p class="indent" style="font-size:10pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Discharge</p>
+            <br>
+            <p>My records indicate that you have accumulated <strong>${activePoints} occurrences</strong> during the past rolling twelve months. The Occurrences are as follows:</p>
+            <br>
+            <p class="indent" style="text-decoration: underline;">Occurrences</p>
+            ${incidentRows || '<p class="indent">None recorded.</p>'}
+            <br>
+            <p>Therefore, in accordance with the schedule of progressive discipline, this is your <strong>${disciplineLevel}</strong> for excessive absenteeism under the rule.</p>
+            <br>
+            <p>Please be advised that your rate of absenteeism is not acceptable and YOUR corrective action is required. Additional occurrences will result in the progressive disciplinary action indicated above.</p>
+            <br>
+            <p>If you have a personal problem that is affecting your attendance, it is recommended that you call Humana, MARTA's Employee Assistance Program (EAP), at 1-800-448-4358. MARTA sincerely hopes that you will improve your attendance and that further discipline will not be necessary.</p>
+            <br><br>
+            <div style="text-align:center; border-top:1px solid #000; padding-top:5px; width:40%; margin:auto; font-weight:bold; font-family:'Arial'; font-size:11pt;">ACKNOWLEDGEMENT</div>
+            <p>I acknowledge receipt of this Notice of Discipline and that I have been informed of the help available to me through MARTA's EAP and of potential for progressive discipline, up to and including discharge.</p>
+            <br><br><br>
+            
+            <table style="width:100%; border:none; font-family: 'Arial'; font-size:11pt;">
+                <tr>
+                    <td style="width:45%; border-bottom:1px solid #000;">&nbsp;</td>
+                    <td style="width:10%;"></td>
+                    <td style="width:45%; border-bottom:1px solid #000;">&nbsp;</td>
+                </tr>
+                <tr>
+                    <td>Date</td>
+                    <td></td>
+                    <td>Employee</td>
+                </tr>
+            </table>
+            <br><br>
+            <table style="width:100%; border:none; font-family: 'Arial'; font-size:11pt;">
+                <tr>
+                    <td style="width:45%; border-bottom:1px solid #000;">&nbsp;</td>
+                    <td style="width:10%;"></td>
+                    <td style="width:45%; border-bottom:1px solid #000;">&nbsp;</td>
+                </tr>
+                <tr>
+                    <td>Date</td>
+                    <td></td>
+                    <td>Foreman/Supervisor/Superintendent</td>
+                </tr>
+            </table>
+            <br><br>
+            <table style="width:100%; border:none; font-family: 'Arial'; font-size:11pt;">
+                <tr>
+                    <td style="width:45%; border-bottom:1px solid #000;">&nbsp;</td>
+                    <td style="width:10%;"></td>
+                    <td style="width:45%; border-bottom:1px solid #000;">&nbsp;</td>
+                </tr>
+                <tr>
+                    <td>Date</td>
+                    <td></td>
+                    <td>General Foreman/Manager/General Superintendent</td>
+                </tr>
+            </table>
+        </body></html>`;
 
         const blob = new Blob(['\ufeff', header + content], { type: 'application/msword' });
         saveAs(blob, `${selectedEmp.name.replace(' ','_')}_Notice.doc`);
@@ -218,8 +319,9 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
     };
 
     return (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
-            <div className="flex justify-between items-end mb-6 flex-wrap gap-2">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col bg-slate-50">
+            {/* TOP NAVIGATION BAR */}
+            <div className="flex justify-between items-end mb-6 flex-wrap gap-2 px-1">
                 <div><h2 className="text-3xl font-black text-[#002d72] italic uppercase tracking-tighter">Attendance Tracker</h2><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Incident Dashboard & Logs</p></div>
                 <div className="flex gap-2 flex-wrap">
                     <div className="bg-white border rounded-lg p-1 flex">
@@ -231,6 +333,7 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                 </div>
             </div>
 
+            {/* EMPLOYEE DETAIL POPUP (WITH WORD EXPORT) */}
             {selectedEmp && (
                 <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in zoom-in-95">
                     <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -248,16 +351,17 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                             <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 mb-6">
                                 <h4 className="text-[10px] font-black text-blue-800 uppercase tracking-widest mb-3">Log New Incident</h4>
                                 <div className="grid grid-cols-2 gap-4 mb-3">
-                                    <select className="p-2 border rounded font-bold text-xs" value={incData.type} onChange={e=>setIncData({...incData, type:e.target.value})}><option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option></select>
-                                    <input type="number" className="p-2 border rounded font-bold text-xs" placeholder="Count" value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} />
+                                    <select className="p-2 border rounded font-bold text-xs text-black bg-white" value={incData.type} onChange={e=>setIncData({...incData, type:e.target.value})}><option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option></select>
+                                    <input type="number" className="p-2 border rounded font-bold text-xs text-black bg-white" placeholder="Count" value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} />
                                 </div>
                                 <div className="flex gap-2 mb-3">
-                                    <input type="date" className="p-2 border rounded font-bold text-xs flex-grow" value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} />
+                                    <input type="date" className="p-2 border rounded font-bold text-xs flex-grow text-black bg-white" value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} />
                                     <div className={`p-2 border rounded cursor-pointer font-bold text-xs flex items-center gap-2 ${incData.docReceived?'bg-green-100 border-green-200 text-green-700':'bg-white text-slate-400'}`} onClick={()=>setIncData({...incData, docReceived:!incData.docReceived})}><span>Doc?</span>{incData.docReceived && '✓'}</div>
                                 </div>
-                                <input className="w-full p-2 border rounded font-bold text-xs mb-3" placeholder="Notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} />
+                                <input className="w-full p-2 border rounded font-bold text-xs mb-3 text-black bg-white" placeholder="Notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} />
                                 <button onClick={handleLogIncident} className="w-full py-2 bg-[#002d72] text-white rounded font-black text-xs hover:bg-[#ef7c00]">Add Record</button>
                             </div>
+
                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Incident History</h4>
                             <div className="border rounded-xl overflow-hidden overflow-x-auto">
                                 <table className="w-full text-left text-xs min-w-[400px]">
@@ -268,9 +372,9 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                                             return (
                                                 <tr key={i} className={isOld ? "bg-red-50 text-red-600 font-medium" : ""}>
                                                     <td className="p-3 font-mono">{inc.date} {isOld && <span className="text-[8px] font-black uppercase ml-1">(>1yr)</span>}</td>
-                                                    <td className="p-3 font-bold">{inc.type}</td>
-                                                    <td className="p-3 text-center font-black">{inc.count}</td>
-                                                    <td className="p-3 italic truncate max-w-[150px]">{inc.notes}</td>
+                                                    <td className="p-3 font-bold text-black">{inc.type}</td>
+                                                    <td className="p-3 text-center font-black text-black">{inc.count}</td>
+                                                    <td className="p-3 italic truncate max-w-[150px] text-slate-600">{inc.notes}</td>
                                                     <td className="p-3 text-center"><button onClick={() => handleDeleteIncident(selectedEmp.id, inc)} className="text-red-400 hover:text-red-600 font-bold">🗑️</button></td>
                                                 </tr>
                                             );
@@ -283,6 +387,7 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                 </div>
             )}
 
+            {/* DASHBOARD VIEW */}
             {viewMode === 'dashboard' && (
                 <div className="space-y-6 overflow-y-auto pb-10">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -291,9 +396,9 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Incidents by Type</p><div className="space-y-1">{Object.entries(stats.typeCounts).slice(0,3).map(([k,v]) => (<div key={k} onClick={()=>jumpToLog(k)} className="flex justify-between text-xs font-bold text-slate-600 cursor-pointer hover:text-[#ef7c00]"><span>{k}</span><span>{v}</span></div>))}</div></div>
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"><div className="p-4 border-b bg-slate-50"><h3 className="text-xs font-black text-[#002d72] uppercase tracking-widest">Monthly Incident Summary</h3></div><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="text-slate-400 font-black uppercase bg-white border-b"><tr><th className="p-3">Month</th><th className="p-3 text-right">Sick</th><th className="p-3 text-right">FMLA</th><th className="p-3 text-right">No Show</th><th className="p-3 text-right">Total</th></tr></thead><tbody className="divide-y divide-slate-50">{stats.monthNames.map(month => { const data = stats.monthlyCounts[month] || {}; if (!data.Total) return null; return (<tr key={month}><td className="p-3 font-bold text-slate-700">{month}</td><td className="p-3 text-right font-mono text-orange-600">{data['Sick'] || 0}</td><td className="p-3 text-right font-mono text-blue-600">{data['FMLA'] || 0}</td><td className="p-3 text-right font-mono text-red-600">{(data['No Call/No Show'] || 0) + (data['Failure to Report'] || 0)}</td><td className="p-3 text-right font-black">{data.Total || 0}</td></tr>); })}</tbody></table></div></div>
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"><div className="p-4 border-b bg-slate-50"><h3 className="text-xs font-black text-[#002d72] uppercase tracking-widest">Monthly Incident Summary</h3></div><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="text-slate-400 font-black uppercase bg-white border-b"><tr><th className="p-3">Month</th><th className="p-3 text-right">Sick</th><th className="p-3 text-right">FMLA</th><th className="p-3 text-right">No Show</th><th className="p-3 text-right">Total</th></tr></thead><tbody className="divide-y divide-slate-50">{stats.monthNames.map(month => { const data = stats.monthlyCounts[month] || {}; if (!data.Total) return null; return (<tr key={month}><td className="p-3 font-bold text-slate-700">{month}</td><td className="p-3 text-right font-mono text-orange-600">{data['Sick'] || 0}</td><td className="p-3 text-right font-mono text-blue-600">{data['FMLA'] || 0}</td><td className="p-3 text-right font-mono text-red-600">{(data['No Call/No Show'] || 0) + (data['Failure to Report'] || 0)}</td><td className="p-3 text-right font-black text-slate-800">{data.Total || 0}</td></tr>); })}</tbody></table></div></div>
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-[400px]">
-                            <div className="p-4 border-b bg-slate-50 flex justify-between items-center"><h3 className="text-xs font-black text-[#002d72] uppercase tracking-widest">Employee Roster</h3><input type="text" placeholder="Search Name..." className="text-xs p-1 border rounded w-32 font-bold" value={rosterSearch} onChange={e=>setRosterSearch(e.target.value)} /></div>
+                            <div className="p-4 border-b bg-slate-50 flex justify-between items-center"><h3 className="text-xs font-black text-[#002d72] uppercase tracking-widest">Employee Roster</h3><input type="text" placeholder="Search Name..." className="text-xs p-1 border rounded w-32 font-bold text-black bg-white" value={rosterSearch} onChange={e=>setRosterSearch(e.target.value)} /></div>
                             <div className="overflow-y-auto flex-grow"><table className="w-full text-left text-xs"><thead className="text-slate-400 font-black uppercase bg-white border-b sticky top-0"><tr><th className="p-3">Employee Name</th><th className="p-3 text-right">Count</th></tr></thead><tbody className="divide-y divide-slate-50">{filteredRoster.map(emp => (<tr key={emp.id} onClick={() => setSelectedEmp(emp)} className="hover:bg-blue-50 transition-colors cursor-pointer"><td className="p-3 font-bold text-slate-700">{emp.name}</td><td className={`p-3 text-right font-black ${emp.totalOccurrences > 5 ? 'text-red-500' : 'text-slate-800'}`}>{emp.totalOccurrences}</td></tr>))}</tbody></table></div>
                         </div>
                     </div>
@@ -303,19 +408,19 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
             {viewMode === 'log' && (
                 <div className="bg-white rounded-2xl shadow-lg border border-slate-200 flex-grow overflow-hidden flex flex-col">
                     <div className="p-4 border-b flex gap-4 bg-slate-50 flex-wrap">
-                        <input className="p-2 border rounded font-bold text-xs flex-grow min-w-[150px]" placeholder="Search Employee..." value={logFilter.search} onChange={e=>setLogFilter({...logFilter, search:e.target.value})} />
-                        <select className="p-2 border rounded font-bold text-xs" value={logFilter.type} onChange={e=>setLogFilter({...logFilter, type:e.target.value})}><option value="All">All Types</option><option>Sick</option><option>FMLA</option><option>No Call/No Show</option></select>
-                        <select className="p-2 border rounded font-bold text-xs" value={logFilter.sort} onChange={e=>setLogFilter({...logFilter, sort:e.target.value})}><option value="desc">Newest First</option><option value="asc">Oldest First</option></select>
+                        <input className="p-2 border rounded font-bold text-xs flex-grow min-w-[150px] text-black bg-white" placeholder="Search Employee..." value={logFilter.search} onChange={e=>setLogFilter({...logFilter, search:e.target.value})} />
+                        <select className="p-2 border rounded font-bold text-xs text-black bg-white" value={logFilter.type} onChange={e=>setLogFilter({...logFilter, type:e.target.value})}><option value="All">All Types</option><option>Sick</option><option>FMLA</option><option>No Call/No Show</option></select>
+                        <select className="p-2 border rounded font-bold text-xs text-black bg-white" value={logFilter.sort} onChange={e=>setLogFilter({...logFilter, sort:e.target.value})}><option value="desc">Newest First</option><option value="asc">Oldest First</option></select>
                     </div>
                     <div className="overflow-x-auto flex-grow">
                         <div className="min-w-[700px] bg-slate-50 border-b p-3 grid grid-cols-12 gap-2 text-[9px] font-black uppercase text-slate-400 tracking-widest"><div className="col-span-3">Employee Name</div><div className="col-span-2">Incident Type</div><div className="col-span-2">Date</div><div className="col-span-1 text-center">Count</div><div className="col-span-1 text-center">Doc?</div><div className="col-span-2">Notes</div><div className="col-span-1 text-center">Action</div></div>
-                        <div className="min-w-[700px] divide-y divide-slate-100">{filteredLog.length === 0 ? <div className="p-10 text-center text-slate-300 italic">No attendance records found.</div> : filteredLog.map((log, i) => (<div key={i} className="grid grid-cols-12 gap-2 p-3 items-center hover:bg-blue-50 transition-colors text-xs"><div className="col-span-3 font-bold text-[#002d72]">{log.employeeName}</div><div className="col-span-2 font-medium text-slate-600"><span className={`px-2 py-0.5 rounded text-[10px] uppercase font-black ${log.type==='Sick'?'bg-orange-100 text-orange-700':log.type==='FMLA'?'bg-blue-100 text-blue-700':'bg-red-100 text-red-700'}`}>{log.type}</span></div><div className="col-span-2 font-mono text-slate-500">{log.date}</div><div className="col-span-1 text-center font-black">{log.count}</div><div className="col-span-1 text-center">{log.docReceived ? '✅' : '❌'}</div><div className="col-span-2 text-slate-500 truncate italic">{log.notes || '-'}</div><div className="col-span-1 text-center"><button onClick={() => handleDeleteIncident(log.employeeId, log)} className="text-red-400 hover:text-red-600 font-bold">🗑️</button></div></div>))}</div>
+                        <div className="min-w-[700px] divide-y divide-slate-100">{filteredLog.length === 0 ? <div className="p-10 text-center text-slate-300 italic">No attendance records found.</div> : filteredLog.map((log, i) => (<div key={i} className="grid grid-cols-12 gap-2 p-3 items-center hover:bg-blue-50 transition-colors text-xs"><div className="col-span-3 font-bold text-[#002d72]">{log.employeeName}</div><div className="col-span-2 font-medium text-slate-600"><span className={`px-2 py-0.5 rounded text-[10px] uppercase font-black ${log.type==='Sick'?'bg-orange-100 text-orange-700':log.type==='FMLA'?'bg-blue-100 text-blue-700':'bg-red-100 text-red-700'}`}>{log.type}</span></div><div className="col-span-2 font-mono text-slate-500">{log.date}</div><div className="col-span-1 text-center font-black text-slate-800">{log.count}</div><div className="col-span-1 text-center text-slate-600">{log.docReceived ? '✅' : '❌'}</div><div className="col-span-2 text-slate-500 truncate italic">{log.notes || '-'}</div><div className="col-span-1 text-center"><button onClick={() => handleDeleteIncident(log.employeeId, log)} className="text-red-400 hover:text-red-600 font-bold">🗑️</button></div></div>))}</div>
                     </div>
                 </div>
             )}
 
-            {showAddModal && (<div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"><div className="bg-white p-6 rounded-2xl w-full max-w-sm"><h3 className="text-xl font-black text-[#002d72] mb-4">Add Employee</h3><input className="w-full p-3 border rounded mb-4 font-bold" placeholder="Full Name (e.g. John Doe)" value={newEmpName} onChange={e=>setNewEmpName(e.target.value)} /><div className="flex gap-2"><button onClick={()=>setShowAddModal(false)} className="flex-1 py-3 bg-slate-100 rounded font-bold text-xs">Cancel</button><button onClick={handleAddEmployee} className="flex-1 py-3 bg-[#002d72] text-white rounded font-bold text-xs">Add</button></div></div></div>)}
-            {showIncidentModal && (<div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"><div className="bg-white p-8 rounded-2xl w-full max-w-md shadow-2xl"><h3 className="text-2xl font-black text-[#ef7c00] mb-6 uppercase">Log Attendance Incident</h3><label className="text-[10px] font-black text-slate-400 uppercase">Employee</label><select className="w-full p-3 border-2 rounded-lg font-bold mb-4" value={selectedEmpId} onChange={e=>setSelectedEmpId(e.target.value)}><option value="">-- Select Employee --</option>{personnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><div className="grid grid-cols-2 gap-4 mb-4"><div><label className="text-[10px] font-black text-slate-400 uppercase">Type</label><select className="w-full p-3 border-2 rounded-lg font-bold text-sm" value={incData.type} onChange={e=>setIncData({...incData, type:e.target.value})}><option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option></select></div><div><label className="text-[10px] font-black text-slate-400 uppercase">Occurrences</label><input type="number" className="w-full p-3 border-2 rounded-lg font-bold text-sm" value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} /></div></div><label className="text-[10px] font-black text-slate-400 uppercase">Date</label><input type="date" className="w-full p-3 border-2 rounded-lg font-bold mb-4 text-sm" value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} /><div className="flex items-center gap-3 mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100 cursor-pointer" onClick={()=>setIncData({...incData, docReceived:!incData.docReceived})}><div className={`w-5 h-5 rounded border flex items-center justify-center ${incData.docReceived ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white border-slate-300'}`}>{incData.docReceived && '✓'}</div><span className="text-xs font-bold text-blue-800">Documentation Received?</span></div><textarea className="w-full p-3 border-2 rounded-lg h-24 mb-6 font-medium text-sm" placeholder="Additional notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} /><div className="flex gap-4"><button onClick={()=>setShowIncidentModal(false)} className="w-1/3 py-3 bg-slate-100 rounded-xl font-black uppercase text-xs">Cancel</button><button onClick={handleLogIncident} className="w-2/3 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-blue-900">Save Record</button></div></div></div>)}
+            {showAddModal && (<div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"><div className="bg-white p-6 rounded-2xl w-full max-w-sm"><h3 className="text-xl font-black text-[#002d72] mb-4">Add Employee</h3><input className="w-full p-3 border rounded mb-4 font-bold text-black bg-white" placeholder="Full Name (e.g. John Doe)" value={newEmpName} onChange={e=>setNewEmpName(e.target.value)} /><div className="flex gap-2"><button onClick={()=>setShowAddModal(false)} className="flex-1 py-3 bg-slate-100 rounded font-bold text-xs text-black">Cancel</button><button onClick={handleAddEmployee} className="flex-1 py-3 bg-[#002d72] text-white rounded font-bold text-xs">Add</button></div></div></div>)}
+            {showIncidentModal && (<div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"><div className="bg-white p-8 rounded-2xl w-full max-w-md shadow-2xl"><h3 className="text-2xl font-black text-[#ef7c00] mb-6 uppercase">Log Attendance Incident</h3><label className="text-[10px] font-black text-slate-400 uppercase">Employee</label><select className="w-full p-3 border-2 rounded-lg font-bold mb-4 text-black bg-white" value={selectedEmpId} onChange={e=>setSelectedEmpId(e.target.value)}><option value="">-- Select Employee --</option>{personnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><div className="grid grid-cols-2 gap-4 mb-4"><div><label className="text-[10px] font-black text-slate-400 uppercase">Type</label><select className="w-full p-3 border-2 rounded-lg font-bold text-sm text-black bg-white" value={incData.type} onChange={e=>setIncData({...incData, type:e.target.value})}><option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option></select></div><div><label className="text-[10px] font-black text-slate-400 uppercase">Occurrences</label><input type="number" className="w-full p-3 border-2 rounded-lg font-bold text-sm text-black bg-white" value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} /></div></div><label className="text-[10px] font-black text-slate-400 uppercase">Date</label><input type="date" className="w-full p-3 border-2 rounded-lg font-bold mb-4 text-sm text-black bg-white" value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} /><div className="flex items-center gap-3 mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100 cursor-pointer" onClick={()=>setIncData({...incData, docReceived:!incData.docReceived})}><div className={`w-5 h-5 rounded border flex items-center justify-center ${incData.docReceived ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white border-slate-300'}`}>{incData.docReceived && '✓'}</div><span className="text-xs font-bold text-blue-800">Documentation Received?</span></div><textarea className="w-full p-3 border-2 rounded-lg h-24 mb-6 font-medium text-sm text-black bg-white" placeholder="Additional notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} /><div className="flex gap-4"><button onClick={()=>setShowIncidentModal(false)} className="w-1/3 py-3 bg-slate-100 rounded-xl font-black uppercase text-xs text-black">Cancel</button><button onClick={handleLogIncident} className="w-2/3 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-blue-900">Save Record</button></div></div></div>)}
         </div>
     );
 };
@@ -363,7 +468,7 @@ const PartsInventory = ({ showToast }: { showToast: (msg: string, type: 'success
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col relative">
             <div className="flex justify-between items-end mb-6 px-2">
                 <div><h2 className="text-3xl font-black text-[#002d72] italic uppercase tracking-tighter leading-none">Parts Registry</h2><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">Local Reference (Search {localParts.length.toLocaleString()} Items)</p></div>
-                <div className="flex items-center gap-3 w-full max-w-lg"><button onClick={() => setIsLargeText(!isLargeText)} className={`h-12 w-12 flex items-center justify-center rounded-2xl border-2 font-black transition-all ${isLargeText ? 'bg-[#002d72] border-[#002d72] text-white' : 'bg-white border-slate-200 text-slate-400 hover:border-[#002d72] hover:text-[#002d72]'}`} title="Toggle Text Size">Aa</button><div className="relative flex-grow"><input type="text" placeholder="Search Part # or Description..." className="w-full p-4 pl-12 bg-white border-2 border-slate-100 rounded-2xl font-bold outline-none focus:border-[#002d72] transition-all shadow-sm" value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setDisplayLimit(100); }} /><span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">🔍</span></div></div>
+                <div className="flex items-center gap-3 w-full max-w-lg"><button onClick={() => setIsLargeText(!isLargeText)} className={`h-12 w-12 flex items-center justify-center rounded-2xl border-2 font-black transition-all ${isLargeText ? 'bg-[#002d72] border-[#002d72] text-white' : 'bg-white border-slate-200 text-slate-400 hover:border-[#002d72] hover:text-[#002d72]'}`} title="Toggle Text Size">Aa</button><div className="relative flex-grow"><input type="text" placeholder="Search Part # or Description..." className="w-full p-4 pl-12 bg-white border-2 border-slate-100 rounded-2xl font-bold outline-none focus:border-[#002d72] transition-all shadow-sm text-black" value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setDisplayLimit(100); }} /><span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">🔍</span></div></div>
             </div>
             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 flex-grow overflow-hidden flex flex-col relative"><div className="bg-[#002d72] grid grid-cols-12 gap-4 p-5 text-[10px] font-black uppercase text-white tracking-widest select-none"><div className="col-span-3 cursor-pointer hover:text-[#ef7c00] flex items-center gap-1" onClick={() => handleSort('partNumber')}>Part Number {sortConfig.key === 'partNumber' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div><div className="col-span-8 cursor-pointer hover:text-[#ef7c00] flex items-center gap-1" onClick={() => handleSort('name')}>Description {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div><div className="col-span-1 text-center">View</div></div><div className="overflow-y-auto flex-grow bg-slate-50/30 custom-scrollbar">{visibleParts.length === 0 ? <div className="p-20 text-center text-slate-300 italic font-bold">No results found.</div> : (<div className="divide-y divide-slate-100">{visibleParts.map((p: any, i: number) => (<div key={i} className="grid grid-cols-12 gap-4 p-4 hover:bg-white transition-all group items-center"><div onClick={() => handleCopy(p.partNumber)} className={`col-span-3 font-mono font-black text-[#002d72] bg-blue-50 w-fit rounded-lg cursor-pointer hover:bg-[#ef7c00] hover:text-white transition-all active:scale-95 shadow-sm ${isLargeText ? 'text-xl px-4 py-2' : 'text-sm px-3 py-1'}`} title="Click to Copy">{p.partNumber}</div><div className={`col-span-8 font-bold text-slate-600 uppercase flex items-center ${isLargeText ? 'text-lg leading-normal' : 'text-[11px] leading-tight'}`}>{p.name}</div><div className="col-span-1 flex justify-center"><a href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(p.name + " " + p.partNumber + " bus part")}`} target="_blank" rel="noopener noreferrer" className={`opacity-50 hover:opacity-100 hover:scale-125 transition-all text-[#002d72] no-underline ${isLargeText ? 'text-2xl' : 'text-lg'}`} title="Search on Google Images">👁️</a></div></div>))}</div>)}</div></div>
         </div>
@@ -492,7 +597,7 @@ const BusDetailView = ({ bus, onClose, showToast }: { bus: any; onClose: () => v
     };
 
     if (showHistory) return (<div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg h-[600px] flex flex-col animate-in zoom-in-95"><div className="flex justify-between items-center mb-4 border-b pb-4 font-black text-[#002d72] uppercase"><span>History: #{bus.number}</span><button onClick={()=>setShowHistory(false)} className="text-xs text-slate-400">Back</button></div><div className="flex-grow overflow-y-auto space-y-3">{historyLogs.map(l => (<div key={l.id} className="p-3 bg-slate-50 rounded-lg border border-slate-100 relative group"><div className="flex justify-between text-[8px] font-black uppercase text-slate-400 mb-1"><span>{l.action}</span><span>{formatTime(l.timestamp)}</span></div><p className="text-xs font-bold text-slate-700 whitespace-pre-wrap leading-tight">{l.details}</p><button onClick={() => handleDeleteLog(l.id)} className="absolute top-2 right-2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold">DELETE</button></div>))}</div></div>);
-    if (isEditing) return (<div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95"><h3 className="text-2xl font-black text-[#002d72] mb-6 uppercase italic">Edit Bus #{bus.number}</h3><div className="grid grid-cols-2 gap-4 mb-4"><select className="p-3 bg-slate-50 border-2 rounded-lg font-bold" value={editData.status} onChange={e=>setEditData({...editData, status:e.target.value})}><option value="Active">Ready</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select><input className="p-3 bg-slate-50 border-2 rounded-lg font-bold" value={editData.location} onChange={e=>setEditData({...editData, location:e.target.value})} placeholder="Location" /></div><textarea className="w-full p-3 bg-slate-50 border-2 rounded-lg h-24 mb-4 font-bold" value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} placeholder="Maintenance Notes" /><div className="grid grid-cols-3 gap-4 mb-6 text-[9px] font-black uppercase text-slate-400"><div>OOS Date<input type="date" className="w-full p-2 border rounded mt-1 font-bold text-slate-900" value={editData.oosStartDate} onChange={e=>setEditData({...editData, oosStartDate:e.target.value})} /></div><div>Exp Return<input type="date" className="w-full p-2 border rounded mt-1 font-bold text-slate-900" value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div><div>Act Return<input type="date" className="w-full p-2 border rounded mt-1 font-bold text-slate-900" value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div></div><div className="flex gap-4"><button onClick={()=>setIsEditing(false)} className="w-1/2 py-3 bg-slate-100 rounded-xl font-black uppercase text-xs">Cancel</button><button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg">Save Changes</button></div></div>);
+    if (isEditing) return (<div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95"><h3 className="text-2xl font-black text-[#002d72] mb-6 uppercase italic">Edit Bus #{bus.number}</h3><div className="grid grid-cols-2 gap-4 mb-4"><select className="p-3 bg-slate-50 border-2 rounded-lg font-bold text-black bg-white" value={editData.status} onChange={e=>setEditData({...editData, status:e.target.value})}><option value="Active">Ready</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select><input className="p-3 bg-slate-50 border-2 rounded-lg font-bold text-black bg-white" value={editData.location} onChange={e=>setEditData({...editData, location:e.target.value})} placeholder="Location" /></div><textarea className="w-full p-3 bg-slate-50 border-2 rounded-lg h-24 mb-4 font-bold text-black bg-white" value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} placeholder="Maintenance Notes" /><div className="grid grid-cols-3 gap-4 mb-6 text-[9px] font-black uppercase text-slate-400"><div>OOS Date<input type="date" className="w-full p-2 border rounded mt-1 font-bold text-slate-900 bg-white" value={editData.oosStartDate} onChange={e=>setEditData({...editData, oosStartDate:e.target.value})} /></div><div>Exp Return<input type="date" className="w-full p-2 border rounded mt-1 font-bold text-slate-900 bg-white" value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div><div>Act Return<input type="date" className="w-full p-2 border rounded mt-1 font-bold text-slate-900 bg-white" value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div></div><div className="flex gap-4"><button onClick={()=>setIsEditing(false)} className="w-1/2 py-3 bg-slate-100 rounded-xl font-black uppercase text-xs text-black">Cancel</button><button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg">Save Changes</button></div></div>);
     return (
         <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95">
             <div className="flex justify-between items-start mb-6 border-b pb-4">
@@ -527,7 +632,7 @@ const BusInputForm = ({ showToast }: { showToast: (m:string, t:'success'|'error'
         showToast(`Bus #${formData.number} Updated`, 'success'); setFormData({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
     };
     return (
-        <div className="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-2xl shadow-xl border-t-8 border-[#002d72] animate-in slide-in-from-bottom-4 duration-500"><h2 className="text-3xl font-black text-[#002d72] italic uppercase mb-8 text-center tracking-tighter">Data Entry Terminal</h2><form onSubmit={handleSubmit} className="space-y-6"><div className="grid grid-cols-2 gap-6"><input type="text" placeholder="Unit #" className="p-4 bg-slate-50 border-2 rounded-xl font-black text-[#002d72] outline-none focus:border-[#002d72] transition-colors" value={formData.number} onChange={handleChange} name="number" required /><select className="p-4 bg-slate-50 border-2 rounded-xl font-bold outline-none focus:border-[#002d72] transition-colors" value={formData.status} onChange={handleChange} name="status"><option value="Active">Ready for Service</option><option value="On Hold">Maintenance Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select></div><input type="text" placeholder="Location" className="w-full p-4 bg-slate-50 border-2 rounded-xl outline-none focus:border-[#002d72] transition-colors" value={formData.location} onChange={handleChange} name="location" /><textarea placeholder="Maintenance Notes" className="w-full p-4 bg-slate-50 border-2 rounded-xl h-24 outline-none focus:border-[#002d72] transition-colors" value={formData.notes} onChange={handleChange} name="notes" /><div className="grid grid-cols-3 gap-4"><div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">OOS Date</label><input name="oosStartDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={formData.oosStartDate} onChange={handleChange} /></div><div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Exp Return</label><input name="expectedReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={formData.expectedReturnDate} onChange={handleChange} /></div><div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Act Return</label><input name="actualReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold" value={formData.actualReturnDate} onChange={handleChange} /></div></div><button className="w-full py-4 bg-[#002d72] hover:bg-[#ef7c00] text-white rounded-xl font-black uppercase tracking-widest transition-all transform active:scale-95 shadow-lg">Update Record</button></form></div>
+        <div className="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-2xl shadow-xl border-t-8 border-[#002d72] animate-in slide-in-from-bottom-4 duration-500"><h2 className="text-3xl font-black text-[#002d72] italic uppercase mb-8 text-center tracking-tighter">Data Entry Terminal</h2><form onSubmit={handleSubmit} className="space-y-6"><div className="grid grid-cols-2 gap-6"><input type="text" placeholder="Unit #" className="p-4 bg-slate-50 border-2 rounded-xl font-black text-[#002d72] outline-none focus:border-[#002d72] transition-colors bg-white" value={formData.number} onChange={handleChange} name="number" required /><select className="p-4 bg-slate-50 border-2 rounded-xl font-bold outline-none focus:border-[#002d72] transition-colors text-black bg-white" value={formData.status} onChange={handleChange} name="status"><option value="Active">Ready for Service</option><option value="On Hold">Maintenance Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select></div><input type="text" placeholder="Location" className="w-full p-4 bg-slate-50 border-2 rounded-xl outline-none focus:border-[#002d72] transition-colors text-black bg-white" value={formData.location} onChange={handleChange} name="location" /><textarea placeholder="Maintenance Notes" className="w-full p-4 bg-slate-50 border-2 rounded-xl h-24 outline-none focus:border-[#002d72] transition-colors text-black bg-white" value={formData.notes} onChange={handleChange} name="notes" /><div className="grid grid-cols-3 gap-4"><div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">OOS Date</label><input name="oosStartDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold text-black bg-white" value={formData.oosStartDate} onChange={handleChange} /></div><div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Exp Return</label><input name="expectedReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold text-black bg-white" value={formData.expectedReturnDate} onChange={handleChange} /></div><div><label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Act Return</label><input name="actualReturnDate" type="date" className="w-full p-2 bg-slate-50 border-2 rounded-lg text-xs font-bold text-black bg-white" value={formData.actualReturnDate} onChange={handleChange} /></div></div><button className="w-full py-4 bg-[#002d72] hover:bg-[#ef7c00] text-white rounded-xl font-black uppercase tracking-widest transition-all transform active:scale-95 shadow-lg">Update Record</button></form></div>
     );
 };
 
@@ -584,12 +689,12 @@ export default function FleetManager() {
   };
 
   if (!user) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#001a3d] p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 relative overflow-hidden">
       <form onSubmit={async e => { e.preventDefault(); try { await signInWithEmailAndPassword(auth, email, password); } catch(e){} }} className="bg-white p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-[#ef7c00] relative z-10 animate-in fade-in zoom-in">
         <h2 className="text-4xl font-black text-[#002d72] italic mb-8 text-center leading-none uppercase">FLEET OPS</h2>
         <div className="space-y-4">
-          <input className="w-full p-4 bg-slate-50 border-2 rounded-xl font-bold" placeholder="supervisor@fleet.com" value={email} onChange={e=>setEmail(e.target.value)} required />
-          <input className="w-full p-4 bg-slate-50 border-2 rounded-xl font-bold" placeholder="password123" type="password" value={password} onChange={e=>setPassword(e.target.value)} required />
+          <input className="w-full p-4 bg-slate-50 border-2 rounded-xl font-bold text-black" placeholder="supervisor@fleet.com" value={email} onChange={e=>setEmail(e.target.value)} required />
+          <input className="w-full p-4 bg-slate-50 border-2 rounded-xl font-bold text-black" placeholder="password123" type="password" value={password} onChange={e=>setPassword(e.target.value)} required />
           <button className="w-full bg-[#002d72] text-white py-5 rounded-xl font-black uppercase tracking-widest hover:bg-[#ef7c00] transition-all transform active:scale-95 shadow-xl">Authorized Login</button>
         </div>
       </form>
@@ -601,9 +706,9 @@ export default function FleetManager() {
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       {selectedBusDetail && (<div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"><BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} showToast={triggerToast} /></div>)}
 
-      <nav className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm">
+      <nav className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm overflow-x-auto">
         <div className="flex items-center gap-2"><div className="w-2 h-6 bg-[#002d72] rounded-full"></div><span className="font-black text-lg italic uppercase tracking-tighter text-[#002d72]">Fleet Manager</span></div>
-        <div className="flex gap-4 items-center">
+        <div className="flex gap-4 items-center whitespace-nowrap">
           {['inventory', 'input', 'tracker', 'handover', 'parts'].concat(isAdmin ? ['analytics', 'personnel'] : []).map(v => (
             <button key={v} onClick={() => setView(v as any)} className={`text-[9px] font-black uppercase tracking-widest border-b-2 pb-1 transition-all ${view === v ? 'border-[#ef7c00] text-[#002d72]' : 'border-transparent text-slate-400 hover:text-[#002d72]'}`}>{v.replace('input', 'Data Entry').replace('parts', 'Parts List').replace('personnel', 'Personnel')}</button>
           ))}
@@ -621,7 +726,7 @@ export default function FleetManager() {
          view === 'personnel' ? (isAdmin ? <PersonnelManager showToast={triggerToast} /> : <div className="p-20 text-center text-red-500 font-black">ACCESS DENIED</div>) : (
           <>
             <div className="grid grid-cols-4 gap-4 mb-8">{[{label:'Total Fleet',val:buses.length,c:'text-slate-900'},{label:'Ready',val:buses.filter(b=>b.status==='Active'||b.status==='In Shop').length,c:'text-green-600'},{label:'On Hold',val:buses.filter(b=>holdStatuses.includes(b.status)).length,c:'text-red-600'},{label:'In Shop',val:buses.filter(b=>b.status==='In Shop').length,c:'text-[#ef7c00]'}].map(m=>(<div key={m.label} onClick={()=>setActiveFilter(m.label)} className={`bg-white p-5 rounded-2xl shadow-sm border flex flex-col items-center cursor-pointer transition-all hover:scale-105 ${activeFilter===m.label?'border-[#002d72] bg-blue-50':'border-slate-100'}`}><p className="text-[8px] font-black uppercase text-slate-400 mb-1 tracking-widest">{m.label}</p><p className={`text-2xl font-black ${m.c}`}>{m.val}</p></div>))}</div>
-            <div className="mb-6 flex justify-between items-end gap-4"><input type="text" placeholder="Search Unit #..." className="w-full max-w-md pl-4 pr-10 py-3 bg-white border border-slate-200 rounded-lg text-sm font-bold focus:border-[#002d72] outline-none shadow-sm" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} /><div className="bg-white border rounded-lg p-1 flex"><button onClick={()=>setInventoryMode('list')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded ${inventoryMode==='list'?'bg-[#002d72] text-white shadow-md':'text-slate-400'}`}>List</button><button onClick={()=>setInventoryMode('grid')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded ${inventoryMode==='grid'?'bg-[#002d72] text-white shadow-md':'text-slate-400'}`}>Grid</button></div></div>
+            <div className="mb-6 flex justify-between items-end gap-4"><input type="text" placeholder="Search Unit #..." className="w-full max-w-md pl-4 pr-10 py-3 bg-white border border-slate-200 rounded-lg text-sm font-bold focus:border-[#002d72] outline-none shadow-sm text-black" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} /><div className="bg-white border rounded-lg p-1 flex"><button onClick={()=>setInventoryMode('list')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded ${inventoryMode==='list'?'bg-[#002d72] text-white shadow-md':'text-slate-400'}`}>List</button><button onClick={()=>setInventoryMode('grid')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded ${inventoryMode==='grid'?'bg-[#002d72] text-white shadow-md':'text-slate-400'}`}>Grid</button></div></div>
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
                 {inventoryMode === 'list' ? (<><div className="grid grid-cols-10 gap-4 p-5 border-b bg-slate-50/50 text-[9px] font-black uppercase text-slate-400 tracking-widest"><div onClick={()=>requestSort('number')} className="cursor-pointer hover:text-[#002d72]">Unit #</div><div>Series</div><div>Status</div><div>Location</div><div className="col-span-2">Fault Preview</div><div>Exp Return</div><div>Act Return</div><div>Days OOS</div></div><div className="divide-y divide-slate-100">{sortedBuses.map(b => (<div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`grid grid-cols-10 gap-4 p-5 items-center cursor-pointer hover:bg-slate-50 transition-all border-l-4 ${b.status==='Active'?'border-green-500':'border-red-500'}`}><div className="text-lg font-black text-[#002d72]">#{b.number}</div><div className="text-[9px] font-bold text-slate-400">{getBusSpecs(b.number).length}</div><div className={`text-[9px] font-black uppercase px-2 py-1 rounded-full w-fit ${b.status==='Active'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}`}>{b.status}</div><div className="text-xs font-bold text-slate-600">{b.location||'—'}</div><div className="col-span-2 text-xs font-bold text-slate-500 truncate italic">{b.notes||'No faults.'}</div><div className="text-xs font-bold text-slate-700">{b.expectedReturnDate||'—'}</div><div className="text-xs font-bold text-slate-700">{b.actualReturnDate||'—'}</div><div className="text-xs font-black text-red-600">{b.status!=='Active' ? `${calculateDaysOOS(b.oosStartDate)} days` : '—'}</div></div>))}</div></>) : (<div className="p-8 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-3">{sortedBuses.map(b => (<div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-110 shadow-sm ${b.status==='Active'?'bg-green-50 border-green-200 text-green-800':'bg-red-50 border-red-200 text-red-800'}`}><span className="text-xs font-black italic">#{b.number}</span>{b.status!=='Active'&&<span className="text-[7px] font-bold uppercase opacity-60 leading-none">{b.status}</span>}</div>))}</div>)}
             </div>

@@ -178,7 +178,7 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         } catch (err) { console.error(err); showToast("Delete Failed", 'error'); }
     };
 
-    // --- NOTICE OF DISCIPLINE GENERATOR (STRICT MATCH) ---
+    // --- NOTICE OF DISCIPLINE GENERATOR (NO TABLES, ONE PAGE) ---
     const handleExportWord = () => {
         if(!selectedEmp) return;
         
@@ -196,10 +196,17 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         rollingIncidents.forEach((inc: any, index: number) => {
             const points = parseInt(inc.count) || 0;
             activePoints += points;
+            
+            // Format Date (MM/DD/YYYY)
             const d = new Date(inc.date);
             const formattedDate = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
-            // Use paragraphs with non-breaking spaces for tab emulation
-            incidentListHTML += `<p style="margin:0; margin-left: 40pt; font-family: 'Arial'; font-size: 11pt;">${index + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${formattedDate}</p>`;
+            
+            // Red text check for older than 1 year (Using specific check)
+            const isOld = d < oneYearAgo;
+            const colorStyle = isOld ? "color:red;" : "color:black;";
+
+            // Tab emulation using non-breaking spaces
+            incidentListHTML += `<p style="margin:0; margin-left: 60pt; font-family: 'Arial'; font-size: 10pt; ${colorStyle}">${index + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${formattedDate}</p>`;
         });
 
         let disciplineLevel = "None";
@@ -208,7 +215,7 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         if(activePoints >= 5) disciplineLevel = "Final Written Warning";
         if(activePoints >= 6) disciplineLevel = "Discharge";
 
-        // Reverse Name
+        // "Last, First"
         const nameParts = selectedEmp.name.split(' ');
         const formalName = nameParts.length > 1 ? `${nameParts[nameParts.length-1]}, ${nameParts[0]}` : selectedEmp.name;
         
@@ -216,92 +223,95 @@ const PersonnelManager = ({ showToast }: { showToast: (msg: string, type: 'succe
         const reportDate = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
 
         const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Notice of Discipline</title><style>
-            @page { margin: 1.0in; }
-            body { font-family: 'Arial', sans-serif; font-size: 11pt; line-height: 1.15; color: #000000; }
-            p { margin: 6pt 0; }
-            .header-center { text-align: center; font-weight: bold; margin-top: 15pt; margin-bottom: 20pt; text-transform: uppercase; }
-            .section-title { font-weight: bold; margin-left: 40pt; margin-top: 10pt; }
-            .signatures { margin-top: 30pt; width: 100%; }
-            .sig-line { border-bottom: 1px solid #000; width: 250px; display: inline-block; }
+            body { font-family: 'Arial', sans-serif; font-size: 10pt; color: #000000; line-height: 1.1; margin: 0; padding: 0; }
+            p { margin: 0; padding: 0; margin-bottom: 6pt; }
+            .header-center { text-align: center; font-weight: bold; margin-bottom: 12pt; text-transform: uppercase; font-size: 11pt; }
+            .indent-row { margin-left: 60pt; font-family: 'Arial'; font-size: 10pt; }
+            .sig-line { border-bottom: 1px solid #000; width: 220px; display: inline-block; margin-top: 15pt; }
         </style></head><body>`;
         
+        // We use invisible table ONLY for the header "TO / DATE" alignment because Word handles it best, but borders are 0.
+        // The rest is pure paragraphs and spacing as requested.
         const content = `
-            <table style="width:100%; border:none; margin-bottom:10pt;">
-                <tr><td style="text-align:left;">TO: ${formalName}</td><td style="text-align:right;">DATE: ${reportDate}</td></tr>
+            <br>
+            <table style="width:100%; border:none; margin-bottom: 8pt;">
+                <tr>
+                    <td style="width:60%; font-family: 'Arial'; font-size: 10pt;">TO: ${formalName}</td>
+                    <td style="width:40%; text-align:right; font-family: 'Arial'; font-size: 10pt;">DATE: ${reportDate}</td>
+                </tr>
             </table>
-
+            
             <div class="header-center">
-                <p>MARTA ATTENDANCE PROGRAM</p>
-                <p>NOTICE OF DISCIPLINE</p>
+                <p>MARTA ATTENDANCE PROGRAM<br>NOTICE OF DISCIPLINE</p>
             </div>
-
+            
             <p>MARTA's Attendance Program states that an employee who accumulates excessive occurrences of absence within any twelve month period (rolling year) will be disciplined according to the following:</p>
             <br>
             
-            <p style="margin-left: 40pt;">Number of Occurrences&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Level of Discipline</p>
-            <p style="margin-left: 80pt;">1-2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None</p>
-            <p style="margin-left: 80pt;">3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Verbal Warning</p>
-            <p style="margin-left: 80pt;">4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Written Warning</p>
-            <p style="margin-left: 80pt;">5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;* Final Written Warning</p>
-            <p style="margin-left: 80pt;">6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Discharge</p>
+            <p style="margin-left: 30pt;">Number of Occurrences&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Level of Discipline</p>
+            <p class="indent-row">1-2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None</p>
+            <p class="indent-row">3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Verbal Warning</p>
+            <p class="indent-row">4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Written Warning</p>
+            <p class="indent-row">5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;* Final Written Warning</p>
+            <p class="indent-row">6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Discharge</p>
             <br>
 
             <p>My records indicate that you have accumulated <strong>${activePoints} occurrences</strong> during the past rolling twelve months. The Occurrences are as follows:</p>
 
-            <p style="margin-left: 40pt; font-weight:bold; text-decoration:underline;">Occurrences</p>
-            ${incidentListHTML || '<p style="margin-left: 40pt;">None recorded.</p>'}
+            <p style="margin-left: 60pt; text-decoration: underline;">Occurrences</p>
+            ${incidentListHTML || '<p class="indent-row">None recorded.</p>'}
             <br>
 
             <p>Therefore, in accordance with the schedule of progressive discipline, this is your <strong>${disciplineLevel}</strong> for excessive absenteeism under the rule.</p>
-
+            <br>
+            
             <p>Please be advised that your rate of absenteeism is not acceptable and YOUR corrective action is required. Additional occurrences will result in the progressive disciplinary action indicated above.</p>
-
+            <br>
+            
             <p>If you have a personal problem that is affecting your attendance, it is recommended that you call Humana, MARTA's Employee Assistance Program (EAP), at 1-800-448-4358. MARTA sincerely hopes that you will improve your attendance and that further discipline will not be necessary.</p>
             <br>
-
-            <div style="text-align:center; border-top:1px solid #000; border-bottom:1px solid #000; padding:3pt 0; width:50%; margin:auto; font-weight:bold; margin-top:20pt; margin-bottom:10pt;">ACKNOWLEDGEMENT</div>
-
+            
+            <div style="text-align:center; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:3pt 0; width:50%; margin:auto; font-weight:bold; margin-top:10pt; margin-bottom:10pt;">ACKNOWLEDGEMENT</div>
+            
             <p>I acknowledge receipt of this Notice of Discipline and that I have been informed of the help available to me through MARTA's EAP and of potential for progressive discipline, up to and including discharge.</p>
-            <br><br>
-
-            <table style="width:100%; border:none;">
-                <tr>
-                    <td style="width:50%; border-bottom:1px solid #000;">&nbsp;</td>
-                    <td style="width:5%;">&nbsp;</td>
-                    <td style="width:45%; border-bottom:1px solid #000;">&nbsp;</td>
-                </tr>
-                <tr>
-                    <td style="vertical-align:top;">Employee</td>
-                    <td></td>
-                    <td style="vertical-align:top;">Date</td>
-                </tr>
-            </table>
             <br>
 
-            <table style="width:100%; border:none;">
+            <table style="width:100%; border:none; margin-top: 15pt;">
                 <tr>
                     <td style="width:50%; border-bottom:1px solid #000;">&nbsp;</td>
-                    <td style="width:5%;">&nbsp;</td>
-                    <td style="width:45%; border-bottom:1px solid #000;">&nbsp;</td>
+                    <td style="width:10%;">&nbsp;</td>
+                    <td style="width:40%; border-bottom:1px solid #000;">&nbsp;</td>
                 </tr>
                 <tr>
-                    <td style="vertical-align:top;">Foreman/Supervisor/Superintendent</td>
+                    <td style="vertical-align:top; padding-top:2px;">Employee</td>
                     <td></td>
-                    <td style="vertical-align:top;">Date</td>
+                    <td style="vertical-align:top; padding-top:2px;">Date</td>
                 </tr>
             </table>
-            <br>
 
-            <table style="width:100%; border:none;">
+            <table style="width:100%; border:none; margin-top: 20pt;">
                 <tr>
                     <td style="width:50%; border-bottom:1px solid #000;">&nbsp;</td>
-                    <td style="width:5%;">&nbsp;</td>
-                    <td style="width:45%; border-bottom:1px solid #000;">&nbsp;</td>
+                    <td style="width:10%;">&nbsp;</td>
+                    <td style="width:40%; border-bottom:1px solid #000;">&nbsp;</td>
                 </tr>
                 <tr>
-                    <td style="vertical-align:top;">General Foreman/Manager/General Superintendent</td>
+                    <td style="vertical-align:top; padding-top:2px;">Foreman/Supervisor/Superintendent</td>
                     <td></td>
-                    <td style="vertical-align:top;">Date</td>
+                    <td style="vertical-align:top; padding-top:2px;">Date</td>
+                </tr>
+            </table>
+
+            <table style="width:100%; border:none; margin-top: 20pt;">
+                <tr>
+                    <td style="width:50%; border-bottom:1px solid #000;">&nbsp;</td>
+                    <td style="width:10%;">&nbsp;</td>
+                    <td style="width:40%; border-bottom:1px solid #000;">&nbsp;</td>
+                </tr>
+                <tr>
+                    <td style="vertical-align:top; padding-top:2px;">General Foreman/Manager/General Superintendent</td>
+                    <td></td>
+                    <td style="vertical-align:top; padding-top:2px;">Date</td>
                 </tr>
             </table>
         </body></html>`;

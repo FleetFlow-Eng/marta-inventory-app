@@ -7,6 +7,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import dynamic from 'next/dynamic';
 
+// Ensure partsData.json is in the same 'app' folder
 import localParts from './partsData.json';
 
 // --- DYNAMIC IMPORTS ---
@@ -279,7 +280,10 @@ const BusInputForm = ({ showToast, darkMode }: { showToast: (m:string, t:'succes
 export default function FleetManager() {
   const [user, setUser] = useState<any>(null);
   const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'personnel' | 'parts'>('inventory');
+  
+  // NEW: Updated inventoryMode to include 'tv'
   const [inventoryMode, setInventoryMode] = useState<'list' | 'grid' | 'tv'>('grid');
+  
   const [buses, setBuses] = useState<any[]>([]);
   const [selectedBusDetail, setSelectedBusDetail] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -316,6 +320,55 @@ export default function FleetManager() {
           document.exitFullscreen();
       }
   };
+
+  // Auto-scroll TV Board Marquee
+  useEffect(() => {
+      let animationFrameId: number;
+      let isPaused = false;
+      let scrollPos = 0;
+      
+      const scroll = () => {
+          if (inventoryMode === 'tv' && isFullscreen && tvBoardRef.current && !isPaused) {
+              const el = tvBoardRef.current;
+              // Only scroll if content is larger than the screen
+              if (el.scrollHeight > el.clientHeight) {
+                  // Reached the bottom
+                  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) {
+                      isPaused = true;
+                      setTimeout(() => { 
+                          if(tvBoardRef.current) {
+                              tvBoardRef.current.scrollTop = 0; 
+                              scrollPos = 0;
+                          }
+                          setTimeout(() => { isPaused = false; }, 2000); // 2 sec pause at top
+                      }, 4000); // 4 sec pause at bottom
+                  } else {
+                      scrollPos += 0.4; // Scroll speed
+                      el.scrollTop = scrollPos;
+                      // Detect manual scroll
+                      if (Math.abs(el.scrollTop - Math.round(scrollPos)) > 2) {
+                          scrollPos = el.scrollTop;
+                      }
+                  }
+              }
+          }
+          animationFrameId = requestAnimationFrame(scroll);
+      };
+
+      if (inventoryMode === 'tv' && isFullscreen) {
+          setTimeout(() => {
+              if (tvBoardRef.current) {
+                  tvBoardRef.current.scrollTop = 0;
+                  scrollPos = 0;
+                  animationFrameId = requestAnimationFrame(scroll);
+              }
+          }, 1000); // Delay start to let fullscreen layout settle
+      }
+
+      return () => {
+          if(animationFrameId) cancelAnimationFrame(animationFrameId);
+      };
+  }, [inventoryMode, isFullscreen]);
 
   const sortedBuses = [...buses].filter(b => {
     const matchesSearch = b.number.includes(searchTerm);
@@ -419,7 +472,7 @@ export default function FleetManager() {
                                     <div className={`text-lg font-black ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>#{b.number}</div>
                                     <div className={`text-[9px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{getBusSpecs(b.number).length}</div>
                                     <div className={`text-[9px] font-black uppercase px-2 py-1 rounded-full w-fit ${b.status==='Active'?'bg-green-500 text-white':'bg-red-500 text-white'}`}>{b.status}</div>
-                                    <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.location||'—'}</div>
+                                    <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.location || 'Location Unavailable'}</div>
                                     <div className={`col-span-2 text-xs font-medium truncate italic ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{b.notes||'No faults.'}</div>
                                     <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{b.expectedReturnDate||'—'}</div>
                                     <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{b.actualReturnDate||'—'}</div>
@@ -439,7 +492,7 @@ export default function FleetManager() {
                                     <span className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>#{b.number}</span>
                                     <span className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest ${b.status==='Active'?'bg-green-500 text-white':'bg-red-500 text-white'}`}>{b.status}</span>
                                 </div>
-                                <div className={`flex items-center gap-1 text-xs font-bold mb-2 truncate ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>📍 {b.location || 'Unknown loc'}</div>
+                                <div className={`flex items-center gap-1 text-xs font-bold mb-2 truncate ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>📍 {b.location || 'Location Unavailable'}</div>
                                 <div className={`text-[10px] italic line-clamp-2 mb-3 h-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>🔧 {b.notes || 'No active faults recorded.'}</div>
                                 {b.status !== 'Active' && <div className="mt-auto text-[10px] font-black text-white bg-red-600 p-1.5 rounded-lg text-center border border-red-700 shadow-inner tracking-widest">⏱️ DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}
                             </div>
@@ -447,9 +500,9 @@ export default function FleetManager() {
                     </div>
                 )}
 
-                {/* 3. HIGH-VISIBILITY TV BOARD (FULLSCREEN CAPABLE) */}
+                {/* 3. HIGH-VISIBILITY TV BOARD (SCROLLING MARQUEE) */}
                 {inventoryMode === 'tv' && (
-                    <div ref={tvBoardRef} className={`p-4 sm:p-6 overflow-y-auto ${isFullscreen ? (darkMode ? 'bg-slate-900' : 'bg-slate-100') : ''} ${!isFullscreen && darkMode ? 'bg-slate-900' : (!isFullscreen ? 'bg-slate-100' : '')} min-h-[75vh]`}>
+                    <div ref={tvBoardRef} className={`p-4 sm:p-6 overflow-y-auto custom-scrollbar ${isFullscreen ? (darkMode ? 'bg-slate-900' : 'bg-slate-100') : ''} ${!isFullscreen && darkMode ? 'bg-slate-900' : (!isFullscreen ? 'bg-slate-100' : '')} min-h-[75vh] h-full`}>
                         
                         {/* Fullscreen Header */}
                         {isFullscreen && (
@@ -472,7 +525,7 @@ export default function FleetManager() {
                         )}
 
                         {/* TV Grid - High Visibility Cards */}
-                        <div className={`grid gap-3 sm:gap-4 ${isFullscreen ? 'grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7'}`}>
+                        <div className={`grid gap-3 sm:gap-4 pb-20 ${isFullscreen ? 'grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7'}`}>
                             {sortedBuses.map(b => (
                                 <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`p-4 rounded-2xl flex flex-col justify-between border-4 shadow-lg cursor-pointer hover:scale-105 transition-transform ${
                                     b.status === 'Active' 
@@ -483,7 +536,7 @@ export default function FleetManager() {
                                         <span className={`text-4xl font-black leading-none tracking-tighter ${b.status==='Active' ? (darkMode?'text-green-400':'text-green-600') : (darkMode?'text-red-500':'text-red-600')}`}>#{b.number}</span>
                                     </div>
                                     <span className={`w-fit px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider mb-3 shadow-sm ${b.status==='Active'?'bg-green-500 text-white':'bg-red-600 text-white'}`}>{b.status}</span>
-                                    <div className={`text-sm font-black truncate leading-tight mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'YARD'}</div>
+                                    <div className={`text-xs font-black truncate leading-tight mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'Location Unavailable'}</div>
                                     <div className={`text-xs font-bold line-clamp-2 h-8 leading-tight ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{b.notes || ''}</div>
                                     {b.status !== 'Active' && <div className="mt-3 text-[11px] font-black text-white bg-red-600 rounded px-2 py-1.5 text-center tracking-widest shadow-inner">DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}
                                 </div>

@@ -7,8 +7,10 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import dynamic from 'next/dynamic';
 
+// Ensure partsData.json is in the same 'app' folder
 import localParts from './partsData.json';
 
+// --- DYNAMIC IMPORTS ---
 const BusTracker = dynamic(() => import('./BusTracker'), { 
   ssr: false,
   loading: () => (
@@ -21,16 +23,18 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
   )
 });
 
+// --- HELPER COMPONENTS ---
 const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) => {
     useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
     return (
-        <div className={`fixed bottom-6 right-6 z-[5000] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-10 duration-300 border-l-8 ${type === 'success' ? 'bg-white border-green-500 text-slate-800' : 'bg-white border-red-500 text-slate-800'}`}>
+        <div className={`fixed bottom-6 right-6 z-[7000] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-10 duration-300 border-l-8 ${type === 'success' ? 'bg-white border-green-500 text-slate-800' : 'bg-white border-red-500 text-slate-800'}`}>
             <span className="text-2xl">{type === 'success' ? '✅' : '📋'}</span>
             <div><p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{type === 'success' ? 'Success' : 'Notice'}</p><p className="text-sm font-bold text-slate-800">{message}</p></div>
         </div>
     );
 };
 
+// --- UTILITY FUNCTIONS ---
 const formatTime = (timestamp: any) => {
     if (!timestamp) return 'Just now';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -57,6 +61,8 @@ const calculateDaysOOS = (start: string) => {
     const now = new Date();
     return Math.max(0, Math.ceil((now.getTime() - s.getTime()) / (1000 * 3600 * 24)));
 };
+
+// --- COMPONENT DEFINITIONS ---
 
 const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClose: () => void; showToast: (m:string, t:'success'|'error')=>void, darkMode: boolean }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -276,36 +282,124 @@ const ShiftHandover = ({ buses, showToast }: { buses: any[], showToast: (m:strin
     );
 };
 
+// --- DATA ENTRY FORM (WITH ADD NEW BUS MODAL) ---
 const BusInputForm = ({ showToast, darkMode }: { showToast: (m:string, t:'success'|'error')=>void, darkMode: boolean }) => {
     const [formData, setFormData] = useState({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [newBusData, setNewBusData] = useState({ number: '', status: 'Active' });
+
     const handleChange = (e: any) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    
+    // UPDATE EXISTING BUS
     const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault(); const busRef = doc(db, "buses", formData.number); const busSnap = await getDoc(busRef);
-        if (!busSnap.exists()) return showToast(`⛔ Access Denied`, 'error');
-        const old = busSnap.data(); let changes = []; if (old.status !== formData.status) changes.push(`STATUS: ${old.status} ➝ ${formData.status}`); if (old.notes !== formData.notes) changes.push(`NOTES: "${old.notes || ''}" ➝ "${formData.notes}"`); if (old.oosStartDate !== formData.oosStartDate) changes.push(`OOS: ${old.oosStartDate || '—'} ➝ ${formData.oosStartDate}`);
+        e.preventDefault(); 
+        const busRef = doc(db, "buses", formData.number); 
+        const busSnap = await getDoc(busRef);
+        
+        if (!busSnap.exists()) {
+            return showToast(`⛔ Bus #${formData.number} does not exist. Use "Add New Bus" first.`, 'error');
+        }
+        
+        const old = busSnap.data(); let changes = []; 
+        if (old.status !== formData.status) changes.push(`STATUS: ${old.status} ➝ ${formData.status}`); 
+        if (old.notes !== formData.notes) changes.push(`NOTES: "${old.notes || ''}" ➝ "${formData.notes}"`); 
+        if (old.oosStartDate !== formData.oosStartDate) changes.push(`OOS: ${old.oosStartDate || '—'} ➝ ${formData.oosStartDate}`);
+        
         await setDoc(busRef, { ...formData, timestamp: serverTimestamp() }, { merge: true });
-        if (changes.length > 0) await logHistory(formData.number, "UPDATE", changes.join('\n'), auth.currentUser?.email || 'Unknown'); else await logHistory(formData.number, "UPDATE", "Routine Update via Terminal", auth.currentUser?.email || 'Unknown');
-        showToast(`Bus #${formData.number} Updated`, 'success'); setFormData({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
+        
+        if (changes.length > 0) {
+            await logHistory(formData.number, "UPDATE", changes.join('\n'), auth.currentUser?.email || 'Unknown'); 
+        } else {
+            await logHistory(formData.number, "UPDATE", "Routine Update via Terminal", auth.currentUser?.email || 'Unknown');
+        }
+        
+        showToast(`Bus #${formData.number} Updated`, 'success'); 
+        setFormData({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
     };
+
+    // ADD NEW BUS
+    const handleAddNewBus = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newBusData.number) return showToast("Bus number required", 'error');
+        
+        const busRef = doc(db, "buses", newBusData.number);
+        const snap = await getDoc(busRef);
+        if (snap.exists()) {
+            return showToast(`⛔ Bus #${newBusData.number} already exists!`, 'error');
+        }
+
+        try {
+            await setDoc(busRef, {
+                number: newBusData.number,
+                status: newBusData.status,
+                location: '',
+                notes: '',
+                oosStartDate: '',
+                expectedReturnDate: '',
+                actualReturnDate: '',
+                timestamp: serverTimestamp()
+            });
+            await logHistory(newBusData.number, "CREATED", "Bus added to registry.", auth.currentUser?.email || 'Unknown');
+            showToast(`Bus #${newBusData.number} Added`, 'success');
+            setShowAddModal(false);
+            setNewBusData({ number: '', status: 'Active' });
+        } catch (err) {
+            showToast("Failed to add bus", 'error');
+        }
+    };
+
     const inputClass = darkMode ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-black placeholder:text-gray-400';
+    
     return (
-        <div className={`max-w-2xl mx-auto mt-4 md:mt-10 p-6 md:p-8 rounded-2xl shadow-xl border-t-8 border-[#ef7c00] animate-in slide-in-from-bottom-4 duration-500 ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
-            <h2 className={`text-3xl font-black italic uppercase mb-8 text-center tracking-tighter ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Data Entry Terminal</h2>
-            <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-2 gap-6">
-                    <input type="text" placeholder="Unit #" className={`p-4 border-2 rounded-xl font-black outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.number} onChange={handleChange} name="number" required />
-                    <select className={`p-4 border-2 rounded-xl font-bold outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.status} onChange={handleChange} name="status"><option value="Active">Ready for Service</option><option value="On Hold">Maintenance Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select>
+        <>
+            <div className={`max-w-2xl mx-auto mt-4 md:mt-10 p-6 md:p-8 rounded-2xl shadow-xl border-t-8 border-[#ef7c00] animate-in slide-in-from-bottom-4 duration-500 ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
+                <div className="flex justify-between items-center mb-8">
+                    <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Data Entry</h2>
+                    <button type="button" onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-black uppercase text-[10px] tracking-widest shadow-md transition-all">+ Add New Bus</button>
                 </div>
-                <input type="text" placeholder="Location" className={`w-full p-4 border-2 rounded-xl outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.location} onChange={handleChange} name="location" />
-                <textarea placeholder="Maintenance Notes" className={`w-full p-4 border-2 rounded-xl h-24 outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.notes} onChange={handleChange} name="notes" />
-                <div className="grid grid-cols-3 gap-4">
-                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>OOS Date</label><input name="oosStartDate" type="date" className={`w-full p-2 border-2 rounded-lg text-xs font-bold ${inputClass}`} value={formData.oosStartDate} onChange={handleChange} /></div>
-                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Exp Return</label><input name="expectedReturnDate" type="date" className={`w-full p-2 border-2 rounded-lg text-xs font-bold ${inputClass}`} value={formData.expectedReturnDate} onChange={handleChange} /></div>
-                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Act Return</label><input name="actualReturnDate" type="date" className={`w-full p-2 border-2 rounded-lg text-xs font-bold ${inputClass}`} value={formData.actualReturnDate} onChange={handleChange} /></div>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid grid-cols-2 gap-6">
+                        <input type="text" placeholder="Unit # to Update" className={`p-4 border-2 rounded-xl font-black outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.number} onChange={handleChange} name="number" required />
+                        <select className={`p-4 border-2 rounded-xl font-bold outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.status} onChange={handleChange} name="status"><option value="Active">Ready for Service</option><option value="On Hold">Maintenance Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select>
+                    </div>
+                    <input type="text" placeholder="Location" className={`w-full p-4 border-2 rounded-xl outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.location} onChange={handleChange} name="location" />
+                    <textarea placeholder="Maintenance Notes" className={`w-full p-4 border-2 rounded-xl h-24 outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.notes} onChange={handleChange} name="notes" />
+                    <div className="grid grid-cols-3 gap-4">
+                        <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>OOS Date</label><input name="oosStartDate" type="date" className={`w-full p-2 border-2 rounded-lg text-xs font-bold ${inputClass}`} value={formData.oosStartDate} onChange={handleChange} /></div>
+                        <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Exp Return</label><input name="expectedReturnDate" type="date" className={`w-full p-2 border-2 rounded-lg text-xs font-bold ${inputClass}`} value={formData.expectedReturnDate} onChange={handleChange} /></div>
+                        <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Act Return</label><input name="actualReturnDate" type="date" className={`w-full p-2 border-2 rounded-lg text-xs font-bold ${inputClass}`} value={formData.actualReturnDate} onChange={handleChange} /></div>
+                    </div>
+                    <button className="w-full py-4 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase tracking-widest transition-all transform active:scale-95 shadow-lg">Update Record</button>
+                </form>
+            </div>
+
+            {/* ADD NEW BUS MODAL */}
+            {showAddModal && (
+                <div className="fixed inset-0 z-[8000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in-95">
+                    <div className={`p-8 rounded-xl shadow-2xl w-full max-w-md border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                        <h3 className={`text-2xl font-black mb-6 uppercase italic ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Add New Bus</h3>
+                        <form onSubmit={handleAddNewBus} className="space-y-4">
+                            <div>
+                                <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unit Number *</label>
+                                <input type="text" className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={newBusData.number} onChange={e => setNewBusData({...newBusData, number: e.target.value})} required placeholder="e.g., 2001" />
+                            </div>
+                            <div>
+                                <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Initial Status</label>
+                                <select className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={newBusData.status} onChange={e => setNewBusData({...newBusData, status: e.target.value})}>
+                                    <option value="Active">Ready for Service</option>
+                                    <option value="On Hold">Maintenance Hold</option>
+                                    <option value="In Shop">In Shop</option>
+                                </select>
+                            </div>
+                            <div className="flex gap-4 mt-6 pt-4 border-t border-slate-500/20">
+                                <button type="button" onClick={() => setShowAddModal(false)} className={`w-1/2 py-3 rounded-lg font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>Cancel</button>
+                                <button type="submit" className="w-1/2 py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg font-black uppercase text-xs shadow-lg transform active:scale-95 transition-all">Save Bus</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-                <button className="w-full py-4 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase tracking-widest transition-all transform active:scale-95 shadow-lg">Update Record</button>
-            </form>
-        </div>
+            )}
+        </>
     );
 };
 
@@ -352,7 +446,7 @@ export default function FleetManager() {
       }
   };
 
-  // Auto-scroll TV Board Marquee (FASTER SPEED)
+  // Auto-scroll TV Board Marquee
   useEffect(() => {
       let animationFrameId: number;
       let isPaused = false;
@@ -362,7 +456,6 @@ export default function FleetManager() {
           if (inventoryMode === 'tv' && isFullscreen && tvBoardRef.current && !isPaused) {
               const el = tvBoardRef.current;
               if (el.scrollHeight > el.clientHeight) {
-                  // Reached the bottom
                   if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) {
                       isPaused = true;
                       setTimeout(() => { 
@@ -373,10 +466,8 @@ export default function FleetManager() {
                           setTimeout(() => { isPaused = false; }, 2000); 
                       }, 4000); 
                   } else {
-                      // FASTER SCROLL SPEED
                       scrollPos += 1.2; 
                       el.scrollTop = scrollPos;
-                      // Detect manual scroll
                       if (Math.abs(el.scrollTop - Math.round(scrollPos)) > 2) {
                           scrollPos = el.scrollTop;
                       }

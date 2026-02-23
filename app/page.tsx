@@ -39,7 +39,7 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
 const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) => {
     useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
     return (
-        <div className={`fixed bottom-6 right-6 z-[7000] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-10 duration-300 border-l-8 ${type === 'success' ? 'bg-white border-green-500 text-slate-800' : 'bg-white border-red-500 text-slate-800'}`}>
+        <div className={`fixed bottom-6 right-6 z-[5000] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-10 duration-300 border-l-8 ${type === 'success' ? 'bg-white border-green-500 text-slate-800' : 'bg-white border-red-500 text-slate-800'}`}>
             <span className="text-2xl">{type === 'success' ? '✅' : '📋'}</span>
             <div><p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{type === 'success' ? 'Success' : 'Notice'}</p><p className="text-sm font-bold text-slate-800">{message}</p></div>
         </div>
@@ -85,7 +85,6 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClos
     useEffect(() => { if (showHistory) return onSnapshot(query(collection(db, "buses", bus.number, "history"), orderBy("timestamp", "desc")), (snap) => setHistoryLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))); }, [showHistory, bus.number]);
     
     const handleSave = async () => {
-        // Date Logic Check
         if (editData.oosStartDate) {
             const oos = new Date(editData.oosStartDate);
             if (editData.expectedReturnDate && new Date(editData.expectedReturnDate) < oos) {
@@ -133,8 +132,8 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClos
 
     const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
     const inputClass = darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-black';
-    const statusColorText = bus.status === 'Active' ? 'text-green-600' : bus.status === 'On Hold' ? 'text-orange-500' : 'text-red-600';
-    const statusColorBadge = bus.status === 'Active' ? 'bg-green-500' : bus.status === 'On Hold' ? 'bg-orange-500' : 'bg-red-500';
+    const statusColorText = bus.status === 'Active' ? 'text-green-600' : bus.status === 'In Shop' ? 'text-orange-500' : 'text-red-600';
+    const statusColorBadge = bus.status === 'Active' ? 'bg-green-500' : bus.status === 'In Shop' ? 'bg-orange-500' : 'bg-red-500';
 
     if (showHistory) return (<div className={`p-6 rounded-xl shadow-2xl w-full max-w-lg h-[600px] flex flex-col animate-in zoom-in-95 border ${bgClass}`}><div className={`flex justify-between items-center mb-4 border-b pb-4 font-black uppercase ${statusColorText}`}><span>History: #{bus.number}</span><button onClick={()=>setShowHistory(false)} className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Back</button></div><div className="flex-grow overflow-y-auto space-y-3">{historyLogs.map(l => (<div key={l.id} className={`p-3 rounded-lg border relative group ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}><div className={`flex justify-between text-[8px] font-black uppercase mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}><span>{l.action}</span><span>{formatTime(l.timestamp)}</span></div><p className={`text-xs font-bold whitespace-pre-wrap leading-tight ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{l.details}</p><button onClick={() => handleDeleteLog(l.id)} className="absolute top-2 right-2 text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold">DELETE</button></div>))}</div></div>);
     if (isEditing) return (<div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}><h3 className={`text-2xl font-black mb-6 uppercase italic ${statusColorText}`}>Edit Bus #{bus.number}</h3><div className="grid grid-cols-2 gap-4 mb-4"><select className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.status} onChange={e=>setEditData({...editData, status:e.target.value})}><option value="Active">Ready</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select><input className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.location} onChange={e=>setEditData({...editData, location:e.target.value})} placeholder="Location" /></div><textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-4 font-bold ${inputClass}`} value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} placeholder="Maintenance Notes" /><div className={`grid grid-cols-3 gap-4 mb-6 text-[9px] font-black uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}><div>OOS Date<input type="date" onClick={handleDateClick} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer ${inputClass}`} value={editData.oosStartDate} onChange={e=>setEditData({...editData, oosStartDate:e.target.value})} /></div><div>Exp Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer ${inputClass}`} value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div><div>Act Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer ${inputClass}`} value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div></div><div className="flex gap-4"><button onClick={()=>setIsEditing(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white' : 'bg-slate-100 text-black'}`}>Cancel</button><button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg">Save Changes</button></div></div>);
@@ -276,13 +275,13 @@ const PartsInventory = ({ showToast, darkMode }: { showToast: (msg: string, type
 
 // --- MODULE 3: FLEET ANALYTICS ---
 const StatusCharts = ({ buses }: { buses: any[] }) => {
-    const statusCounts: {[key: string]: number} = { 'Active': 0, 'On Hold': 0, 'In Shop': 0, 'Engine': 0, 'Body Shop': 0, 'Vendor': 0, 'Brakes': 0, 'Safety': 0 };
+    const statusCounts: {[key: string]: number} = { 'Active': 0, 'In Shop': 0, 'On Hold': 0, 'Engine': 0, 'Body Shop': 0, 'Vendor': 0, 'Brakes': 0, 'Safety': 0 };
     buses.forEach(b => { if (statusCounts[b.status] !== undefined) statusCounts[b.status]++; else statusCounts['Active']++; });
     const maxCount = Math.max(...Object.values(statusCounts), 1);
     const trendData = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); const ds = d.toISOString().split('T')[0]; return { label: ds.slice(5), count: buses.filter(b => b.oosStartDate === ds).length }; });
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 className="text-[10px] font-black text-[#002d72] uppercase tracking-widest mb-6">Status Breakdown</h3><div className="flex items-end gap-3 h-40">{Object.entries(statusCounts).map(([s, c]) => (<div key={s} className="flex-1 flex flex-col justify-end items-center group relative"><div className="absolute -top-6 text-[10px] font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">{c}</div><div className={`w-full rounded-t-md transition-all duration-500 ${s==='Active'?'bg-green-500':s==='On Hold'?'bg-orange-500':'bg-red-500'}`} style={{ height: `${(c/maxCount)*100 || 2}%` }}></div><p className="text-[8px] font-black text-slate-400 uppercase mt-2 -rotate-45 origin-left translate-y-2 whitespace-nowrap">{s}</p></div>))}</div></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 className="text-[10px] font-black text-[#002d72] uppercase tracking-widest mb-6">Status Breakdown</h3><div className="flex items-end gap-3 h-40">{Object.entries(statusCounts).map(([s, c]) => (<div key={s} className="flex-1 flex flex-col justify-end items-center group relative"><div className="absolute -top-6 text-[10px] font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">{c}</div><div className={`w-full rounded-t-md transition-all duration-500 ${s==='Active'?'bg-green-500':s==='In Shop'?'bg-orange-500':'bg-red-500'}`} style={{ height: `${(c/maxCount)*100 || 2}%` }}></div><p className="text-[8px] font-black text-slate-400 uppercase mt-2 -rotate-45 origin-left translate-y-2 whitespace-nowrap">{s}</p></div>))}</div></div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 className="text-[10px] font-black text-[#002d72] uppercase tracking-widest mb-6">7-Day Intake Trend</h3><div className="flex items-end gap-2 h-40">{trendData.map((d, i) => (<div key={i} className="flex-1 flex flex-col justify-end items-center group relative"><div className="absolute -top-6 text-[10px] font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">{d.count}</div><div className="w-full bg-blue-100 hover:bg-[#002d72] rounded-t-sm transition-all" style={{ height: `${(d.count/Math.max(...trendData.map(t=>t.count),1))*100 || 2}%` }}></div><p className="text-[8px] font-bold text-slate-400 mt-2">{d.label}</p></div>))}</div></div>
         </div>
     );
@@ -576,10 +575,17 @@ export default function FleetManager() {
     if (!matchesSearch) return false;
     if (activeFilter === 'Total Fleet') return true;
     if (activeFilter === 'Ready') return b.status === 'Active' || b.status === 'In Shop';
-    if (activeFilter === 'On Hold') return b.status === 'On Hold'; // Explicitly filtered
+    if (activeFilter === 'On Hold') return b.status === 'On Hold';
     if (activeFilter === 'In Shop') return b.status === 'In Shop';
     return true;
   }).sort((a, b) => {
+    // Correctly sort numbers mathematically rather than alphabetically
+    if (sortConfig.key === 'number') {
+        const numA = parseInt(a.number) || 0;
+        const numB = parseInt(b.number) || 0;
+        return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+    }
+    
     let aV = a[sortConfig.key] || ''; let bV = b[sortConfig.key] || '';
     if (sortConfig.key === 'daysOOS') { aV = calculateDaysOOS(a.oosStartDate); bV = calculateDaysOOS(b.oosStartDate); }
     if (aV < bV) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -642,7 +648,7 @@ export default function FleetManager() {
           <>
             {/* STAT CARDS */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {[{label:'Total Fleet',val:buses.length,c: darkMode?'text-white':'text-slate-900'},{label:'Ready',val:buses.filter(b=>b.status==='Active'||b.status==='In Shop').length,c:'text-green-500'},{label:'On Hold',val:buses.filter(b=>b.status==='On Hold').length,c:'text-orange-500'},{label:'In Shop',val:buses.filter(b=>b.status==='In Shop').length,c:'text-[#ef7c00]'}].map(m=>(
+                {[{label:'Total Fleet',val:buses.length,c: darkMode?'text-white':'text-slate-900'},{label:'Ready',val:buses.filter(b=>b.status==='Active'||b.status==='In Shop').length,c:'text-green-500'},{label:'On Hold',val:buses.filter(b=>b.status==='On Hold').length,c:'text-red-500'},{label:'In Shop',val:buses.filter(b=>b.status==='In Shop').length,c:'text-orange-500'}].map(m=>(
                     <div key={m.label} onClick={()=>setActiveFilter(m.label)} className={`p-5 rounded-2xl shadow-sm border flex flex-col items-center cursor-pointer transition-all hover:-translate-y-1 ${activeFilter===m.label ? (darkMode ? 'border-[#ef7c00] bg-slate-800' : 'border-[#002d72] bg-blue-50') : (darkMode ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-200 bg-white')}`}>
                         <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{m.label}</p>
                         <p className={`text-3xl font-black ${m.c}`}>{m.val}</p>
@@ -671,15 +677,15 @@ export default function FleetManager() {
                         </div>
                         <div className={`divide-y min-w-[800px] ${darkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
                             {sortedBuses.map(b => (
-                                <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`grid grid-cols-10 gap-4 p-5 items-center cursor-pointer transition-all border-l-4 ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} ${b.status==='Active' ? 'border-green-500' : (b.status === 'On Hold' ? 'border-orange-500' : 'border-red-500')}`}>
+                                <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`grid grid-cols-10 gap-4 p-5 items-center cursor-pointer transition-all border-l-4 ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} ${b.status==='Active' ? 'border-green-500' : (b.status === 'In Shop' ? 'border-orange-500' : 'border-red-500')}`}>
                                     <div className={`text-lg font-black ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>#{b.number}</div>
                                     <div className={`text-[9px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{getBusSpecs(b.number).length}</div>
-                                    <div className={`text-[9px] font-black uppercase px-2 py-1 rounded-full w-fit ${b.status==='Active' ? 'bg-green-500 text-white' : (b.status === 'On Hold' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white')}`}>{b.status}</div>
+                                    <div className={`text-[9px] font-black uppercase px-2 py-1 rounded-full w-fit ${b.status==='Active' ? 'bg-green-500 text-white' : (b.status === 'In Shop' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white')}`}>{b.status}</div>
                                     <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.location || 'Location Unavailable'}</div>
                                     <div className={`col-span-2 text-xs font-medium truncate italic ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{b.notes||'No faults.'}</div>
                                     <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{b.expectedReturnDate||'—'}</div>
                                     <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{b.actualReturnDate||'—'}</div>
-                                    <div className={`text-xs font-black ${b.status!=='Active' ? (b.status==='On Hold' ? 'text-orange-500' : 'text-red-500') : ''}`}>{b.status!=='Active' ? `${calculateDaysOOS(b.oosStartDate)} days` : '—'}</div>
+                                    <div className={`text-xs font-black ${b.status!=='Active' ? (b.status==='In Shop' ? 'text-orange-500' : 'text-red-500') : ''}`}>{b.status!=='Active' ? `${calculateDaysOOS(b.oosStartDate)} days` : '—'}</div>
                                 </div>
                             ))}
                         </div>
@@ -690,14 +696,14 @@ export default function FleetManager() {
                 {inventoryMode === 'grid' && (
                     <div className={`p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 ${darkMode ? 'bg-slate-900' : 'bg-slate-50/50'}`}>
                         {sortedBuses.map(b => (
-                            <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`p-4 rounded-2xl border-2 flex flex-col cursor-pointer hover:-translate-y-1 transition-all shadow-sm ${darkMode ? 'bg-slate-800' : 'bg-white'} ${b.status==='Active' ? (darkMode ? 'border-green-600/50 hover:border-green-400' : 'border-green-200 hover:border-green-500') : (b.status === 'On Hold' ? (darkMode ? 'border-orange-600/50 hover:border-orange-400' : 'border-orange-300 hover:border-orange-500') : (darkMode ? 'border-red-600/50 hover:border-red-400' : 'border-red-200 hover:border-red-500'))}`}>
+                            <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`p-4 rounded-2xl border-2 flex flex-col cursor-pointer hover:-translate-y-1 transition-all shadow-sm ${darkMode ? 'bg-slate-800' : 'bg-white'} ${b.status==='Active' ? (darkMode ? 'border-green-600/50 hover:border-green-400' : 'border-green-200 hover:border-green-500') : (b.status === 'In Shop' ? (darkMode ? 'border-orange-600/50 hover:border-orange-400' : 'border-orange-300 hover:border-orange-500') : (darkMode ? 'border-red-600/50 hover:border-red-400' : 'border-red-200 hover:border-red-500'))}`}>
                                 <div className="flex justify-between items-start mb-3">
                                     <span className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>#{b.number}</span>
-                                    <span className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest ${b.status==='Active' ? 'bg-green-500 text-white' : (b.status === 'On Hold' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white')}`}>{b.status}</span>
+                                    <span className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest ${b.status==='Active' ? 'bg-green-500 text-white' : (b.status === 'In Shop' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white')}`}>{b.status}</span>
                                 </div>
                                 <div className={`flex items-center gap-1 text-xs font-bold mb-2 truncate ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>📍 {b.location || 'Location Unavailable'}</div>
                                 <div className={`text-[10px] italic line-clamp-2 mb-3 h-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>🔧 {b.notes || 'No active faults recorded.'}</div>
-                                {b.status !== 'Active' && <div className={`mt-auto text-[10px] font-black text-white p-1.5 rounded-lg text-center shadow-inner tracking-widest ${b.status === 'On Hold' ? 'bg-orange-500 border border-orange-600' : 'bg-red-600 border border-red-700'}`}>⏱️ DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}
+                                {b.status !== 'Active' && <div className={`mt-auto text-[10px] font-black text-white p-1.5 rounded-lg text-center shadow-inner tracking-widest ${b.status === 'In Shop' ? 'bg-orange-500 border border-orange-600' : 'bg-red-600 border border-red-700'}`}>⏱️ DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}
                             </div>
                         ))}
                     </div>
@@ -733,21 +739,22 @@ export default function FleetManager() {
                                 <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`p-4 rounded-xl flex flex-col justify-between border-[3px] shadow-md cursor-pointer hover:scale-105 transition-transform ${
                                     b.status === 'Active' 
                                     ? (darkMode ? 'bg-slate-800 border-green-500' : 'bg-white border-green-500') 
-                                    : (b.status === 'On Hold' 
+                                    : (b.status === 'In Shop' 
                                         ? (darkMode ? 'bg-slate-800 border-orange-500' : 'bg-white border-orange-500') 
                                         : (darkMode ? 'bg-slate-800 border-red-600' : 'bg-white border-red-600'))
                                 }`}>
                                     <div className="flex justify-between items-start mb-3">
-                                        <span className={`text-4xl font-black leading-none tracking-tighter ${b.status==='Active' ? (darkMode?'text-green-400':'text-green-600') : (b.status==='On Hold' ? (darkMode?'text-orange-400':'text-orange-500') : (darkMode?'text-red-500':'text-red-600'))}`}>#{b.number}</span>
-                                        <span className={`w-fit px-2 py-1 rounded text-xs font-black uppercase tracking-wider shadow-sm text-white ${b.status==='Active' ? 'bg-green-500' : (b.status === 'On Hold' ? 'bg-orange-500' : 'bg-red-600')}`}>{b.status}</span>
+                                        <span className={`text-4xl font-black leading-none tracking-tighter ${b.status==='Active' ? (darkMode?'text-green-400':'text-green-600') : (b.status==='In Shop' ? (darkMode?'text-orange-400':'text-orange-500') : (darkMode?'text-red-500':'text-red-600'))}`}>#{b.number}</span>
+                                        <span className={`w-fit px-2 py-1 rounded text-xs font-black uppercase tracking-wider shadow-sm text-white ${b.status==='Active' ? 'bg-green-500' : (b.status === 'In Shop' ? 'bg-orange-500' : 'bg-red-600')}`}>{b.status}</span>
                                     </div>
                                     
                                     <div className={`text-sm font-black mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'Location Unavailable'}</div>
                                     
+                                    {/* FULL NOTES */}
                                     <div className={`text-xs font-bold leading-snug mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.notes || 'No active faults recorded.'}</div>
                                     
                                     <div className="mt-auto pt-2">
-                                        {b.status !== 'Active' && <div className={`text-xs font-black text-white rounded px-2 py-1.5 text-center tracking-widest shadow-inner ${b.status === 'On Hold' ? 'bg-orange-600' : 'bg-red-600'}`}>DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}
+                                        {b.status !== 'Active' && <div className={`text-xs font-black text-white rounded px-2 py-1.5 text-center tracking-widest shadow-inner ${b.status === 'In Shop' ? 'bg-orange-600' : 'bg-red-600'}`}>DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}
                                     </div>
                                 </div>
                             ))}

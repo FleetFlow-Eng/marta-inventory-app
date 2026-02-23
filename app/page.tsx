@@ -7,10 +7,8 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import dynamic from 'next/dynamic';
 
-// Ensure partsData.json is in the same 'app' folder
 import localParts from './partsData.json';
 
-// --- DYNAMIC IMPORTS ---
 const BusTracker = dynamic(() => import('./BusTracker'), { 
   ssr: false,
   loading: () => (
@@ -23,7 +21,6 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
   )
 });
 
-// --- HELPER COMPONENTS ---
 const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) => {
     useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
     return (
@@ -34,7 +31,6 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
     );
 };
 
-// --- UTILITY FUNCTIONS ---
 const formatTime = (timestamp: any) => {
     if (!timestamp) return 'Just now';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -61,8 +57,6 @@ const calculateDaysOOS = (start: string) => {
     const now = new Date();
     return Math.max(0, Math.ceil((now.getTime() - s.getTime()) / (1000 * 3600 * 24)));
 };
-
-// --- COMPONENT DEFINITIONS ---
 
 const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClose: () => void; showToast: (m:string, t:'success'|'error')=>void, darkMode: boolean }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -319,7 +313,6 @@ const BusInputForm = ({ showToast, darkMode }: { showToast: (m:string, t:'succes
 export default function FleetManager() {
   const [user, setUser] = useState<any>(null);
   
-  // ADDED 'analytics' and 'handover' explicitly into view state definition to prevent TS errors if they are selected.
   const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'personnel' | 'parts'>('inventory');
   const [inventoryMode, setInventoryMode] = useState<'list' | 'grid' | 'tv'>('grid');
   const [buses, setBuses] = useState<any[]>([]);
@@ -380,8 +373,8 @@ export default function FleetManager() {
                           setTimeout(() => { isPaused = false; }, 2000); 
                       }, 4000); 
                   } else {
-                      // INCREASED SCROLL SPEED from 0.4 to 0.8
-                      scrollPos += 0.8; 
+                      // FASTER SCROLL SPEED
+                      scrollPos += 1.2; 
                       el.scrollTop = scrollPos;
                       // Detect manual scroll
                       if (Math.abs(el.scrollTop - Math.round(scrollPos)) > 2) {
@@ -460,7 +453,6 @@ export default function FleetManager() {
       <nav className={`backdrop-blur-md border-b sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm overflow-x-auto ${darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
         <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-6 bg-[#ef7c00] rounded-full"></div><span className={`font-black text-lg italic uppercase tracking-tighter ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Fleet Manager</span></div>
         <div className="flex gap-4 items-center flex-nowrap">
-          {/* RESTORED ANALYTICS AND HANDOVER TABS HERE */}
           {['inventory', 'input', 'tracker', 'handover', 'parts'].concat(isAdmin ? ['analytics', 'personnel'] : []).map(v => (
             <button key={v} onClick={() => setView(v as any)} className={`text-[9px] font-black uppercase tracking-widest border-b-2 pb-1 transition-all whitespace-nowrap ${view === v ? 'border-[#ef7c00] text-[#ef7c00]' : (darkMode ? 'border-transparent text-slate-400 hover:text-white' : 'border-transparent text-slate-500 hover:text-[#002d72]')}`}>{v.replace('input', 'Data Entry').replace('parts', 'Parts List').replace('personnel', 'Personnel')}</button>
           ))}
@@ -541,45 +533,51 @@ export default function FleetManager() {
                     </div>
                 )}
 
-                {/* 3. HIGH-VISIBILITY TV BOARD (SMALLER CARDS, INCREASED COLUMNS) */}
+                {/* 3. WIDER TV BOARD WITH FULL NOTES (SCROLLING MARQUEE) */}
                 {inventoryMode === 'tv' && (
-                    <div ref={tvBoardRef} className={`p-3 sm:p-4 overflow-y-auto custom-scrollbar ${isFullscreen ? (darkMode ? 'bg-slate-900' : 'bg-slate-100') : ''} ${!isFullscreen && darkMode ? 'bg-slate-900' : (!isFullscreen ? 'bg-slate-100' : '')} min-h-[75vh] h-full`}>
+                    <div ref={tvBoardRef} className={`p-4 sm:p-6 overflow-y-auto custom-scrollbar ${isFullscreen ? (darkMode ? 'bg-slate-900' : 'bg-slate-100') : ''} ${!isFullscreen && darkMode ? 'bg-slate-900' : (!isFullscreen ? 'bg-slate-100' : '')} min-h-[75vh] h-full`}>
                         
                         {/* Fullscreen Header */}
                         {isFullscreen && (
-                            <div className={`flex justify-between items-end mb-4 border-b-2 pb-3 ${darkMode ? 'border-slate-800' : 'border-slate-300'}`}>
+                            <div className={`flex justify-between items-end mb-6 border-b-2 pb-4 ${darkMode ? 'border-slate-800' : 'border-slate-300'}`}>
                                 <div>
-                                    <h2 className="text-4xl font-black uppercase tracking-tighter text-[#ef7c00]">Fleet Status Board</h2>
-                                    <p className={`text-lg font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Total Units: {buses.length} | Down: <span className="text-red-500">{buses.filter(b=>b.status!=='Active').length}</span></p>
+                                    <h2 className="text-5xl font-black uppercase tracking-tighter text-[#ef7c00]">Fleet Status Board</h2>
+                                    <p className={`text-xl font-bold mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Total Units: {buses.length} | Down: <span className="text-red-500">{buses.filter(b=>b.status!=='Active').length}</span></p>
                                 </div>
-                                <button onClick={toggleFullScreen} className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-2xl transition-all transform active:scale-95">Exit Fullscreen</button>
+                                <button onClick={toggleFullScreen} className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl transition-all transform active:scale-95">Exit Fullscreen</button>
                             </div>
                         )}
 
                         {/* Launch Button (Visible only when NOT fullscreen) */}
                         {!isFullscreen && (
-                            <div className="mb-4 flex justify-end">
-                                <button onClick={toggleFullScreen} className="px-5 py-2.5 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-lg font-black uppercase text-xs shadow-lg flex items-center gap-2 transition-all transform active:scale-95">
+                            <div className="mb-6 flex justify-end">
+                                <button onClick={toggleFullScreen} className="px-6 py-3 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase text-xs shadow-lg flex items-center gap-2 transition-all transform active:scale-95">
                                     ⛶ Launch Fullscreen TV Mode
                                 </button>
                             </div>
                         )}
 
-                        {/* TV Grid - Smaller Cards, more columns */}
-                        <div className={`grid gap-2 sm:gap-3 pb-20 ${isFullscreen ? 'grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12' : 'grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8'}`}>
+                        {/* TV Grid - Wider Cards, Full Notes */}
+                        <div className={`grid gap-4 sm:gap-6 pb-20 ${isFullscreen ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}`}>
                             {sortedBuses.map(b => (
-                                <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`p-3 rounded-xl flex flex-col justify-between border-[3px] shadow-md cursor-pointer hover:scale-105 transition-transform ${
+                                <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`p-4 rounded-xl flex flex-col justify-between border-[3px] shadow-md cursor-pointer hover:scale-105 transition-transform ${
                                     b.status === 'Active' 
                                     ? (darkMode ? 'bg-slate-800 border-green-500' : 'bg-white border-green-500') 
                                     : (darkMode ? 'bg-slate-800 border-red-600' : 'bg-white border-red-600')
                                 }`}>
-                                    <div className="flex justify-between items-start mb-1.5">
-                                        <span className={`text-3xl font-black leading-none tracking-tighter ${b.status==='Active' ? (darkMode?'text-green-400':'text-green-600') : (darkMode?'text-red-500':'text-red-600')}`}>#{b.number}</span>
+                                    <div className="flex justify-between items-start mb-3">
+                                        <span className={`text-4xl font-black leading-none tracking-tighter ${b.status==='Active' ? (darkMode?'text-green-400':'text-green-600') : (darkMode?'text-red-500':'text-red-600')}`}>#{b.number}</span>
+                                        <span className={`w-fit px-2 py-1 rounded text-xs font-black uppercase tracking-wider shadow-sm ${b.status==='Active'?'bg-green-500 text-white':'bg-red-600 text-white'}`}>{b.status}</span>
                                     </div>
-                                    <span className={`w-fit px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider mb-2 shadow-sm ${b.status==='Active'?'bg-green-500 text-white':'bg-red-600 text-white'}`}>{b.status}</span>
-                                    <div className={`text-[11px] font-black truncate leading-tight mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'Location Unavailable'}</div>
-                                    <div className={`text-[10px] font-bold line-clamp-2 h-7 leading-tight ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{b.notes || ''}</div>
-                                    {b.status !== 'Active' && <div className="mt-2 text-[10px] font-black text-white bg-red-600 rounded px-1.5 py-1 text-center tracking-widest shadow-inner">DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}
+                                    
+                                    <div className={`text-sm font-black mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'Location Unavailable'}</div>
+                                    
+                                    {/* FULL NOTES: Removed line-clamp and fixed height */}
+                                    <div className={`text-xs font-bold leading-snug mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.notes || 'No active faults recorded.'}</div>
+                                    
+                                    <div className="mt-auto pt-2">
+                                        {b.status !== 'Active' && <div className="text-xs font-black text-white bg-red-600 rounded px-2 py-1.5 text-center tracking-widest shadow-inner">DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}
+                                    </div>
                                 </div>
                             ))}
                         </div>

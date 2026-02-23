@@ -39,7 +39,7 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
 const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) => {
     useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
     return (
-        <div className={`fixed bottom-6 right-6 z-[5000] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-10 duration-300 border-l-8 ${type === 'success' ? 'bg-white border-green-500 text-slate-800' : 'bg-white border-red-500 text-slate-800'}`}>
+        <div className={`fixed bottom-6 right-6 z-[8000] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-10 duration-300 border-l-8 ${type === 'success' ? 'bg-white border-green-500 text-slate-800' : 'bg-white border-red-500 text-slate-800'}`}>
             <span className="text-2xl">{type === 'success' ? '✅' : '📋'}</span>
             <div><p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{type === 'success' ? 'Success' : 'Notice'}</p><p className="text-sm font-bold text-slate-800">{message}</p></div>
         </div>
@@ -153,6 +153,7 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClos
     );
 };
 
+// --- RESTORED PERSONNEL MANAGER (ATTENDANCE TRACKER) ---
 const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, type: 'success'|'error') => void, darkMode: boolean }) => {
     const [personnel, setPersonnel] = useState<any[]>([]);
     const [viewMode, setViewMode] = useState<'dashboard' | 'log'>('dashboard');
@@ -165,23 +166,39 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
     const [rosterSearch, setRosterSearch] = useState('');
     const [logFilter, setLogFilter] = useState({ search: '', type: 'All', sort: 'desc' });
 
-    useEffect(() => { return onSnapshot(query(collection(db, "personnel"), orderBy("name")), (snap) => setPersonnel(snap.docs.map(d => ({ ...d.data(), id: d.id })))); }, []);
+    useEffect(() => { 
+        return onSnapshot(query(collection(db, "personnel"), orderBy("name")), (snap) => {
+            setPersonnel(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+        }); 
+    }, []);
 
     const allIncidents = useMemo(() => {
         let logs: any[] = [];
-        personnel.forEach(p => { if (p.incidents) { p.incidents.forEach((inc: any) => { logs.push({ ...inc, employeeName: p.name, employeeId: p.id }); }); } });
+        personnel.forEach(p => { 
+            if (p.incidents) { 
+                p.incidents.forEach((inc: any) => { logs.push({ ...inc, employeeName: p.name, employeeId: p.id }); }); 
+            } 
+        });
         return logs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [personnel]);
 
     const stats = useMemo(() => {
-        const typeCounts: {[key: string]: number} = {}; const monthlyCounts: {[key: string]: {[key: string]: number}} = {}; let totalOccurrences = 0;
+        const typeCounts: {[key: string]: number} = {}; 
+        const monthlyCounts: {[key: string]: {[key: string]: number}} = {}; 
+        let totalOccurrences = 0;
         const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        
         allIncidents.forEach(inc => {
-            const c = parseInt(inc.count) || 1; totalOccurrences += c; typeCounts[inc.type] = (typeCounts[inc.type] || 0) + c;
+            const c = parseInt(inc.count) || 1; 
+            totalOccurrences += c; 
+            typeCounts[inc.type] = (typeCounts[inc.type] || 0) + c;
             if (inc.date) {
                 const month = monthNames[new Date(inc.date).getMonth()];
                 if (!monthlyCounts[month]) monthlyCounts[month] = { Total: 0, Sick: 0, FMLA: 0, "No Call/No Show": 0, "Other": 0 };
-                if(inc.type === 'Sick' || inc.type === 'Late Reporting') monthlyCounts[month]['Sick'] += c; else if(inc.type === 'FMLA') monthlyCounts[month]['FMLA'] += c; else if(inc.type === 'No Call/No Show' || inc.type === 'Failure to Report') monthlyCounts[month]['No Call/No Show'] += c; else monthlyCounts[month]['Other'] += c;
+                if(inc.type === 'Sick' || inc.type === 'Late Reporting') monthlyCounts[month]['Sick'] += c; 
+                else if(inc.type === 'FMLA') monthlyCounts[month]['FMLA'] += c; 
+                else if(inc.type === 'No Call/No Show' || inc.type === 'Failure to Report') monthlyCounts[month]['No Call/No Show'] += c; 
+                else monthlyCounts[month]['Other'] += c;
                 monthlyCounts[month].Total += c;
             }
         });
@@ -196,28 +213,76 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
         return logs.sort((a, b) => { return logFilter.sort === 'asc' ? new Date(a.date).getTime() - new Date(b.date).getTime() : new Date(b.date).getTime() - new Date(a.date).getTime(); });
     }, [allIncidents, logFilter]);
 
-    const filteredRoster = useMemo(() => { if (!rosterSearch) return stats.topOffenders; return stats.topOffenders.filter(p => p.name.toLowerCase().includes(rosterSearch.toLowerCase())); }, [stats.topOffenders, rosterSearch]);
+    const filteredRoster = useMemo(() => { 
+        if (!rosterSearch) return stats.topOffenders; 
+        return stats.topOffenders.filter(p => p.name.toLowerCase().includes(rosterSearch.toLowerCase())); 
+    }, [stats.topOffenders, rosterSearch]);
 
-    const handleAddEmployee = async (e: React.FormEvent) => { e.preventDefault(); if(!newEmpName) return; try { await addDoc(collection(db, "personnel"), { name: newEmpName, totalOccurrences: 0, incidents: [], timestamp: serverTimestamp() }); showToast(`Added ${newEmpName}`, 'success'); setNewEmpName(''); setShowAddModal(false); } catch(err) { showToast("Failed to add employee", 'error'); } };
+    const handleAddEmployee = async (e: React.FormEvent) => { 
+        e.preventDefault(); 
+        if(!newEmpName) return; 
+        try { 
+            await addDoc(collection(db, "personnel"), { name: newEmpName, totalOccurrences: 0, incidents: [], timestamp: serverTimestamp() }); 
+            showToast(`Added ${newEmpName}`, 'success'); 
+            setNewEmpName(''); 
+            setShowAddModal(false); 
+        } catch(err) { showToast("Failed to add employee", 'error'); } 
+    };
+
     const handleLogIncident = async () => {
-        const targetId = selectedEmp ? selectedEmp.id : selectedEmpId; if(!targetId) return showToast("Select an employee", 'error');
+        const targetId = selectedEmp ? selectedEmp.id : selectedEmpId; 
+        if(!targetId) return showToast("Select an employee", 'error');
         try {
             const newLog = { type: incData.type, date: incData.date || new Date().toISOString().split('T')[0], count: Number(incData.count), docReceived: incData.docReceived, supervisorReviewDate: incData.supervisorReviewDate, notes: incData.notes, loggedAt: new Date().toISOString() };
             await updateDoc(doc(db, "personnel", targetId), { totalOccurrences: increment(Number(incData.count)), incidents: arrayUnion(newLog) });
-            showToast("Incident Saved", 'success'); setShowIncidentModal(false); setIncData({ type: 'Sick', date: '', count: 1, docReceived: false, supervisorReviewDate: '', notes: '' });
+            showToast("Incident Saved", 'success'); 
+            setShowIncidentModal(false); 
+            setIncData({ type: 'Sick', date: '', count: 1, docReceived: false, supervisorReviewDate: '', notes: '' });
         } catch(err) { showToast("Failed to save", 'error'); }
     };
+
     const handleDeleteIncident = async (empId: string, incident: any) => {
         if(!confirm("Are you sure you want to permanently delete this incident record?")) return;
         try {
-            const empSnap = await getDoc(doc(db, "personnel", empId)); if (!empSnap.exists()) return;
+            const empSnap = await getDoc(doc(db, "personnel", empId)); 
+            if (!empSnap.exists()) return;
             const updatedIncidents = (empSnap.data().incidents || []).filter((i: any) => i.loggedAt !== incident.loggedAt);
             const newTotal = updatedIncidents.reduce((sum: number, i: any) => sum + (Number(i.count) || 0), 0);
             await updateDoc(doc(db, "personnel", empId), { incidents: updatedIncidents, totalOccurrences: newTotal });
-            showToast("Incident Deleted", 'success'); if (selectedEmp && selectedEmp.id === empId) setSelectedEmp({ ...selectedEmp, incidents: updatedIncidents, totalOccurrences: newTotal });
+            showToast("Incident Deleted", 'success'); 
+            if (selectedEmp && selectedEmp.id === empId) setSelectedEmp({ ...selectedEmp, incidents: updatedIncidents, totalOccurrences: newTotal });
         } catch (err) { showToast("Delete Failed", 'error'); }
     };
-    const handleExportWord = () => { /* Logic hidden for brevity */ };
+
+    const handleExportWord = () => {
+        if(!selectedEmp) return;
+        const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        const rollingIncidents = (selectedEmp.incidents || []).filter((inc:any) => { const d = new Date(inc.date); return d >= oneYearAgo; }).sort((a:any, b:any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        let activePoints = 0; let incidentListHTML = "";
+        rollingIncidents.forEach((inc: any, index: number) => {
+            const points = parseInt(inc.count) || 0; activePoints += points;
+            const d = new Date(inc.date);
+            const formattedDate = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+            incidentListHTML += `<p style="margin:0; margin-left: 60pt; font-family: 'Arial'; font-size: 10pt;">${index + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${formattedDate}</p>`;
+        });
+        let disciplineLevel = "None"; 
+        if(activePoints >= 3) disciplineLevel = "Verbal Warning"; 
+        if(activePoints >= 4) disciplineLevel = "Written Warning"; 
+        if(activePoints >= 5) disciplineLevel = "Final Written Warning"; 
+        if(activePoints >= 6) disciplineLevel = "Discharge";
+        
+        const nameParts = selectedEmp.name.split(' ');
+        const formalName = nameParts.length > 1 ? `${nameParts[nameParts.length-1]}, ${nameParts[0]}` : selectedEmp.name;
+        const today = new Date();
+        const reportDate = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
+        
+        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Notice of Discipline</title><style>body { font-family: 'Arial', sans-serif; font-size: 10pt; color: #000000; line-height: 1.1; margin: 0; padding: 0; } p { margin: 0; padding: 0; margin-bottom: 6pt; } .header-center { text-align: center; font-weight: bold; margin-bottom: 12pt; text-transform: uppercase; font-size: 11pt; } .indent-row { margin-left: 60pt; font-family: 'Arial'; font-size: 10pt; }</style></head><body>`;
+        const content = `<br><table style="width:100%; border:none; margin-bottom: 8pt;"><tr><td style="width:60%; font-family: 'Arial'; font-size: 10pt;">TO: ${formalName}</td><td style="width:40%; text-align:right; font-family: 'Arial'; font-size: 10pt;">DATE: ${reportDate}</td></tr></table><div class="header-center"><p>MARTA ATTENDANCE PROGRAM<br>NOTICE OF DISCIPLINE</p></div><p>MARTA's Attendance Program states that an employee who accumulates excessive occurrences of absence within any twelve month period (rolling year) will be disciplined according to the following:</p><br><p style="margin-left: 30pt;">Number of Occurrences&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Level of Discipline</p><p class="indent-row">1-2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None</p><p class="indent-row">3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Verbal Warning</p><p class="indent-row">4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Written Warning</p><p class="indent-row">5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;* Final Written Warning</p><p class="indent-row">6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Discharge</p><br><p>My records indicate that you have accumulated <strong>${activePoints} occurrences</strong> during the past rolling twelve months. The Occurrences are as follows:</p><p style="margin-left: 60pt; text-decoration: underline;">Occurrences</p>${incidentListHTML || '<p class="indent-row">None recorded.</p>'}<br><p>Therefore, in accordance with the schedule of progressive discipline, this is your <strong>${disciplineLevel}</strong> for excessive absenteeism under the rule.</p><br><p>Please be advised that your rate of absenteeism is not acceptable and YOUR corrective action is required. Additional occurrences will result in the progressive disciplinary action indicated above.</p><br><p>If you have a personal problem that is affecting your attendance, it is recommended that you call Humana, MARTA's Employee Assistance Program (EAP), at 1-800-448-4358. MARTA sincerely hopes that you will improve your attendance and that further discipline will not be necessary.</p><br><div style="text-align:center; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:3pt 0; width:50%; margin:auto; font-weight:bold; margin-top:10pt; margin-bottom:10pt;">ACKNOWLEDGEMENT</div><p>I acknowledge receipt of this Notice of Discipline and that I have been informed of the help available to me through MARTA's EAP and of potential for progressive discipline, up to and including discharge.</p><br><table style="width:100%; border:none; margin-top: 15pt;"><tr><td style="width:50%; border-bottom:1px solid #000;">&nbsp;</td><td style="width:10%;">&nbsp;</td><td style="width:40%; border-bottom:1px solid #000;">&nbsp;</td></tr><tr><td style="vertical-align:top; padding-top:2px;">Employee</td><td></td><td style="vertical-align:top; padding-top:2px;">Date</td></tr></table><table style="width:100%; border:none; margin-top: 20pt;"><tr><td style="width:50%; border-bottom:1px solid #000;">&nbsp;</td><td style="width:10%;">&nbsp;</td><td style="width:40%; border-bottom:1px solid #000;">&nbsp;</td></tr><tr><td style="vertical-align:top; padding-top:2px;">Foreman/Supervisor/Superintendent</td><td></td><td style="vertical-align:top; padding-top:2px;">Date</td></tr></table><table style="width:100%; border:none; margin-top: 20pt;"><tr><td style="width:50%; border-bottom:1px solid #000;">&nbsp;</td><td style="width:10%;">&nbsp;</td><td style="width:40%; border-bottom:1px solid #000;">&nbsp;</td></tr><tr><td style="vertical-align:top; padding-top:2px;">General Foreman/Manager/General Superintendent</td><td></td><td style="vertical-align:top; padding-top:2px;">Date</td></tr></table></body></html>`;
+        
+        const blob = new Blob(['\ufeff', header + content], { type: 'application/msword' });
+        saveAs(blob, `${selectedEmp.name.replace(' ','_')}_Notice.doc`);
+        showToast("Notice Generated", 'success');
+    };
 
     const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
     const inputClass = darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-black';
@@ -232,8 +297,105 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                         <button onClick={()=>setViewMode('log')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all ${viewMode==='log'?'bg-[#002d72] text-white shadow':(darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]')}`}>Master Log</button>
                     </div>
                     <button onClick={() => setShowIncidentModal(true)} className="px-6 py-2 bg-[#ef7c00] text-white rounded-lg font-black uppercase text-[10px] shadow-lg hover:bg-orange-600 transition-all">+ Log Incident</button>
+                    
+                    {/* RESTORED + EMP BUTTON HERE */}
+                    <button onClick={() => setShowAddModal(true)} className={`px-4 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg transition-all ${darkMode ? 'bg-slate-700 text-slate-200 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>+ Emp</button>
                 </div>
             </div>
+
+            {/* RESTORED SELECTED EMPLOYEE MODAL (Export Notice Functionality) */}
+            {selectedEmp && (
+                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
+                    <div className={`rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ${darkMode ? 'bg-slate-800 text-white' : 'bg-white text-black'}`}>
+                        <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                            <div>
+                                <h3 className={`text-2xl font-black uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>{selectedEmp.name}</h3>
+                                <p className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Occurrences: <span className="text-red-500">{selectedEmp.totalOccurrences || 0}</span></p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={handleExportWord} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-black text-[10px] uppercase shadow hover:bg-blue-700 transition-colors">📄 Export Notice</button>
+                                <button onClick={()=>setSelectedEmp(null)} className="text-2xl text-slate-400 hover:text-red-500 transition-colors">✕</button>
+                            </div>
+                        </div>
+                        <div className="p-6 overflow-y-auto custom-scrollbar">
+                            <div className={`p-4 rounded-xl border mb-6 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-blue-50/50 border-blue-100'}`}>
+                                <h4 className={`text-[10px] font-black uppercase tracking-widest mb-3 ${darkMode ? 'text-[#ef7c00]' : 'text-blue-800'}`}>Log New Incident</h4>
+                                <div className="grid grid-cols-2 gap-4 mb-3">
+                                    <select className={`p-2 border rounded font-bold text-xs ${inputClass}`} value={incData.type} onChange={e=>setIncData({...incData, type:e.target.value})}><option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option></select>
+                                    <input type="number" className={`p-2 border rounded font-bold text-xs ${inputClass}`} placeholder="Count" value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} />
+                                </div>
+                                <div className="flex gap-2 mb-3">
+                                    <input type="date" className={`p-2 border rounded font-bold text-xs flex-grow ${inputClass}`} value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} />
+                                    <div className={`p-2 border rounded cursor-pointer font-bold text-xs flex items-center gap-2 ${incData.docReceived?(darkMode?'bg-green-900/50 border-green-700 text-green-400':'bg-green-100 border-green-200 text-green-700'):inputClass}`} onClick={()=>setIncData({...incData, docReceived:!incData.docReceived})}><span>Doc?</span>{incData.docReceived && '✓'}</div>
+                                </div>
+                                <input className={`w-full p-2 border rounded font-bold text-xs mb-3 ${inputClass}`} placeholder="Notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} />
+                                <button onClick={handleLogIncident} className="w-full py-2 bg-[#002d72] text-white rounded font-black text-xs hover:bg-[#ef7c00] transition-colors">Add Record</button>
+                            </div>
+
+                            <h4 className={`text-[10px] font-black uppercase tracking-widest mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Incident History</h4>
+                            <div className={`border rounded-xl overflow-hidden overflow-x-auto ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                                <table className="w-full text-left text-xs min-w-[400px]">
+                                    <thead className={`font-black ${darkMode ? 'bg-slate-900 text-slate-400 border-b border-slate-700' : 'bg-slate-50 text-slate-500 border-b border-slate-200'}`}><tr><th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3 text-center">Pts</th><th className="p-3">Notes</th><th className="p-3 text-center">Action</th></tr></thead>
+                                    <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
+                                        {selectedEmp.incidents && selectedEmp.incidents.length > 0 ? selectedEmp.incidents.map((inc: any, i: number) => {
+                                            const isOld = (new Date().getTime() - new Date(inc.date).getTime()) / (1000 * 60 * 60 * 24) > 365;
+                                            return (
+                                                <tr key={i} className={isOld ? (darkMode ? "bg-red-900/20 text-red-400 font-medium" : "bg-red-50 text-red-600 font-medium") : ""}>
+                                                    <td className="p-3 font-mono">{inc.date} {isOld && <span className="text-[8px] font-black uppercase ml-1">(>1yr)</span>}</td>
+                                                    <td className="p-3 font-bold">{inc.type}</td>
+                                                    <td className="p-3 text-center font-black">{inc.count}</td>
+                                                    <td className={`p-3 italic truncate max-w-[150px] ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{inc.notes}</td>
+                                                    <td className="p-3 text-center"><button onClick={() => handleDeleteIncident(selectedEmp.id, inc)} className="text-red-500 hover:text-red-400 font-bold">🗑️</button></td>
+                                                </tr>
+                                            );
+                                        }) : <tr><td colSpan={5} className={`p-4 text-center italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>No history found.</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* RESTORED ADD EMPLOYEE MODAL */}
+            {showAddModal && (
+                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
+                    <div className={`p-6 rounded-2xl w-full max-w-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                        <h3 className={`text-xl font-black mb-4 uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Add Employee</h3>
+                        <input className={`w-full p-3 border-2 rounded-lg mb-4 font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Full Name (e.g. John Doe)" value={newEmpName} onChange={e=>setNewEmpName(e.target.value)} />
+                        <div className="flex gap-2">
+                            <button onClick={()=>setShowAddModal(false)} className={`flex-1 py-3 rounded-lg font-bold text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'}`}>Cancel</button>
+                            <button onClick={handleAddEmployee} className="flex-1 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-lg font-bold text-xs transition-colors">Add Employee</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* RESTORED LOG INCIDENT MODAL */}
+            {showIncidentModal && (
+                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
+                    <div className={`p-8 rounded-2xl w-full max-w-md shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                        <h3 className="text-2xl font-black text-[#ef7c00] mb-6 uppercase">Log Attendance</h3>
+                        <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Employee</label>
+                        <select className={`w-full p-3 border-2 rounded-lg font-bold mb-4 outline-none focus:border-[#ef7c00] ${inputClass}`} value={selectedEmpId} onChange={e=>setSelectedEmpId(e.target.value)}><option value="">-- Select Employee --</option>{personnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div><label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Type</label><select className={`w-full p-3 border-2 rounded-lg font-bold text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.type} onChange={e=>setIncData({...incData, type:e.target.value})}><option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option></select></div>
+                            <div><label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Occurrences</label><input type="number" className={`w-full p-3 border-2 rounded-lg font-bold text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} /></div>
+                        </div>
+                        <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Date</label>
+                        <input type="date" className={`w-full p-3 border-2 rounded-lg font-bold mb-4 text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} />
+                        <div className={`flex items-center gap-3 mb-4 p-3 rounded-lg border cursor-pointer ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-blue-50 border-blue-100'}`} onClick={()=>setIncData({...incData, docReceived:!incData.docReceived})}>
+                            <div className={`w-5 h-5 rounded border flex items-center justify-center ${incData.docReceived ? 'bg-[#ef7c00] border-[#ef7c00] text-white' : (darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-300')}`}>{incData.docReceived && '✓'}</div>
+                            <span className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-blue-800'}`}>Documentation Received?</span>
+                        </div>
+                        <textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-6 font-medium text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Additional notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} />
+                        <div className="flex gap-4">
+                            <button onClick={()=>setShowIncidentModal(false)} className={`w-1/3 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'}`}>Cancel</button>
+                            <button onClick={handleLogIncident} className="w-2/3 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-[#ef7c00] transition-colors">Save Record</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {viewMode === 'dashboard' && (
                 <div className="space-y-6 overflow-y-auto pb-10">
@@ -244,8 +406,39 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className={`rounded-2xl shadow-sm border overflow-hidden flex flex-col h-[400px] ${bgClass}`}>
-                            <div className={`p-4 border-b flex justify-between items-center ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}><h3 className="text-xs font-black uppercase tracking-widest text-[#ef7c00]">Employee Roster</h3><input type="text" placeholder="Search Name..." className={`text-xs p-1 border rounded w-32 font-bold ${inputClass}`} value={rosterSearch} onChange={e=>setRosterSearch(e.target.value)} /></div>
-                            <div className="overflow-y-auto flex-grow"><table className="w-full text-left text-xs"><thead className={`font-black uppercase border-b sticky top-0 ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}><tr><th className="p-3">Employee Name</th><th className="p-3 text-right">Count</th></tr></thead><tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>{filteredRoster.map(emp => (<tr key={emp.id} onClick={() => setSelectedEmp(emp)} className={`cursor-pointer transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}`}><td className="p-3 font-bold">{emp.name}</td><td className={`p-3 text-right font-black ${emp.totalOccurrences > 5 ? 'text-red-500' : ''}`}>{emp.totalOccurrences}</td></tr>))}</tbody></table></div>
+                            <div className={`p-4 border-b flex justify-between items-center ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}><h3 className="text-xs font-black uppercase tracking-widest text-[#ef7c00]">Employee Roster</h3><input type="text" placeholder="Search Name..." className={`text-xs p-1 border rounded w-32 font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={rosterSearch} onChange={e=>setRosterSearch(e.target.value)} /></div>
+                            <div className="overflow-y-auto flex-grow custom-scrollbar"><table className="w-full text-left text-xs"><thead className={`font-black uppercase border-b sticky top-0 ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}><tr><th className="p-3">Employee Name</th><th className="p-3 text-right">Count</th></tr></thead><tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>{filteredRoster.map(emp => (<tr key={emp.id} onClick={() => setSelectedEmp(emp)} className={`cursor-pointer transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}`}><td className="p-3 font-bold">{emp.name}</td><td className={`p-3 text-right font-black ${emp.totalOccurrences > 5 ? 'text-red-500' : ''}`}>{emp.totalOccurrences}</td></tr>))}</tbody></table></div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* RESTORED MASTER LOG TAB */}
+            {viewMode === 'log' && (
+                <div className={`rounded-2xl shadow-lg border flex-grow overflow-hidden flex flex-col ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                    <div className={`p-4 border-b flex gap-4 flex-wrap ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                        <input className={`p-2 border rounded font-bold text-xs flex-grow min-w-[150px] outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Search Employee..." value={logFilter.search} onChange={e=>setLogFilter({...logFilter, search:e.target.value})} />
+                        <select className={`p-2 border rounded font-bold text-xs outline-none focus:border-[#ef7c00] ${inputClass}`} value={logFilter.type} onChange={e=>setLogFilter({...logFilter, type:e.target.value})}><option value="All">All Types</option><option>Sick</option><option>FMLA</option><option>No Call/No Show</option></select>
+                        <select className={`p-2 border rounded font-bold text-xs outline-none focus:border-[#ef7c00] ${inputClass}`} value={logFilter.sort} onChange={e=>setLogFilter({...logFilter, sort:e.target.value})}><option value="desc">Newest First</option><option value="asc">Oldest First</option></select>
+                    </div>
+                    <div className="overflow-x-auto flex-grow custom-scrollbar">
+                        <div className={`min-w-[700px] border-b p-3 grid grid-cols-12 gap-2 text-[9px] font-black uppercase tracking-widest ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                            <div className="col-span-3">Employee Name</div><div className="col-span-2">Incident Type</div><div className="col-span-2">Date</div><div className="col-span-1 text-center">Count</div><div className="col-span-1 text-center">Doc?</div><div className="col-span-2">Notes</div><div className="col-span-1 text-center">Action</div>
+                        </div>
+                        <div className={`min-w-[700px] divide-y ${darkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
+                            {filteredLog.length === 0 ? <div className={`p-10 text-center italic font-bold ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>No records found.</div> : filteredLog.map((log, i) => (
+                                <div key={i} className={`grid grid-cols-12 gap-2 p-3 items-center transition-colors text-xs ${darkMode ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-blue-50 text-slate-700'}`}>
+                                    <div className={`col-span-3 font-bold ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>{log.employeeName}</div>
+                                    <div className="col-span-2 font-medium">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-black ${log.type==='Sick'?'bg-orange-500/20 text-orange-500':log.type==='FMLA'?'bg-blue-500/20 text-blue-500':'bg-red-500/20 text-red-500'}`}>{log.type}</span>
+                                    </div>
+                                    <div className="col-span-2 font-mono">{log.date}</div>
+                                    <div className="col-span-1 text-center font-black">{log.count}</div>
+                                    <div className="col-span-1 text-center">{log.docReceived ? '✅' : '❌'}</div>
+                                    <div className="col-span-2 truncate italic opacity-70">{log.notes || '-'}</div>
+                                    <div className="col-span-1 text-center"><button onClick={() => handleDeleteIncident(log.employeeId, log)} className="text-red-500 hover:text-red-400 font-bold">🗑️</button></div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -579,7 +772,6 @@ export default function FleetManager() {
     if (activeFilter === 'In Shop') return b.status === 'In Shop';
     return true;
   }).sort((a, b) => {
-    // Correctly sort numbers mathematically rather than alphabetically
     if (sortConfig.key === 'number') {
         const numA = parseInt(a.number) || 0;
         const numB = parseInt(b.number) || 0;
@@ -750,7 +942,6 @@ export default function FleetManager() {
                                     
                                     <div className={`text-sm font-black mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'Location Unavailable'}</div>
                                     
-                                    {/* FULL NOTES */}
                                     <div className={`text-xs font-bold leading-snug mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.notes || 'No active faults recorded.'}</div>
                                     
                                     <div className="mt-auto pt-2">

@@ -7,8 +7,20 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import dynamic from 'next/dynamic';
 
-// Ensure partsData.json is in the same 'app' folder
 import localParts from './partsData.json';
+
+// --- FLEET DATA FROM PDF ---
+const HAMILTON_FLEET = [
+  "1625","1628","1629","1631","1632","1633","1634","1635","1636","1637","1638","1639","1640","1641","1642","1643","1644","1645","1646","1647","1648","1660",
+  "1802","1803","1804","1805","1806","1807","1808","1809","1810","1811","1812","1813","1815","1817","1818","1819","1820","1821","1822","1823","1824","1826","1827","1828","1829","1830","1831","1832","1833","1834","1835","1836","1837","1838","1839","1840","1841","1842","1843","1844","1845","1846","1847","1848","1849","1850","1851","1852","1853","1854","1855","1856","1858","1859","1860","1861","1862","1863","1864","1865","1867","1868","1870","1871","1872","1873","1874","1875","1876","1877","1878","1879","1880","1881","1883","1884","1885","1887","1888","1889","1895",
+  "1909","1912","1913","1921","1922","1923","1924","1925","1926","1927","1928","1929","1930","1931","1932","1933","1935","1951","1958","1959",
+  "7021","7022","7023","7024","7025","7026","7027","7028","7029","7030","7031","7033",
+  "7092","7093","7094","7095","7096","7097","7098","7099",
+  "7102","7103","7104","7105",
+  "1406","1408","1434","1440",
+  "2326","2343",
+  "2593"
+];
 
 // --- DYNAMIC IMPORTS ---
 const BusTracker = dynamic(() => import('./BusTracker'), { 
@@ -27,7 +39,7 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
 const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) => {
     useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
     return (
-        <div className={`fixed bottom-6 right-6 z-[7000] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-10 duration-300 border-l-8 ${type === 'success' ? 'bg-white border-green-500 text-slate-800' : 'bg-white border-red-500 text-slate-800'}`}>
+        <div className={`fixed bottom-6 right-6 z-[5000] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-10 duration-300 border-l-8 ${type === 'success' ? 'bg-white border-green-500 text-slate-800' : 'bg-white border-red-500 text-slate-800'}`}>
             <span className="text-2xl">{type === 'success' ? '✅' : '📋'}</span>
             <div><p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{type === 'success' ? 'Success' : 'Notice'}</p><p className="text-sm font-bold text-slate-800">{message}</p></div>
         </div>
@@ -73,6 +85,17 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClos
     useEffect(() => { if (showHistory) return onSnapshot(query(collection(db, "buses", bus.number, "history"), orderBy("timestamp", "desc")), (snap) => setHistoryLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))); }, [showHistory, bus.number]);
     
     const handleSave = async () => {
+        // Date Logic Check
+        if (editData.oosStartDate) {
+            const oos = new Date(editData.oosStartDate);
+            if (editData.expectedReturnDate && new Date(editData.expectedReturnDate) < oos) {
+                return showToast("Expected Return cannot be earlier than OOS Date", 'error');
+            }
+            if (editData.actualReturnDate && new Date(editData.actualReturnDate) < oos) {
+                return showToast("Actual Return cannot be earlier than OOS Date", 'error');
+            }
+        }
+
         try {
             const busRef = doc(db, "buses", bus.number);
             const currentSnap = await getDoc(busRef);
@@ -102,11 +125,17 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClos
         } catch(err) { showToast("Reset failed", 'error'); }
     };
 
+    const handleDateClick = (e: React.MouseEvent<HTMLInputElement>) => {
+        if ('showPicker' in HTMLInputElement.prototype) {
+            (e.currentTarget as any).showPicker();
+        }
+    };
+
     const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
     const inputClass = darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-black';
 
     if (showHistory) return (<div className={`p-6 rounded-xl shadow-2xl w-full max-w-lg h-[600px] flex flex-col animate-in zoom-in-95 border ${bgClass}`}><div className="flex justify-between items-center mb-4 border-b pb-4 font-black text-[#ef7c00] uppercase"><span>History: #{bus.number}</span><button onClick={()=>setShowHistory(false)} className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Back</button></div><div className="flex-grow overflow-y-auto space-y-3">{historyLogs.map(l => (<div key={l.id} className={`p-3 rounded-lg border relative group ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}><div className={`flex justify-between text-[8px] font-black uppercase mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}><span>{l.action}</span><span>{formatTime(l.timestamp)}</span></div><p className={`text-xs font-bold whitespace-pre-wrap leading-tight ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{l.details}</p><button onClick={() => handleDeleteLog(l.id)} className="absolute top-2 right-2 text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold">DELETE</button></div>))}</div></div>);
-    if (isEditing) return (<div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}><h3 className="text-2xl font-black text-[#ef7c00] mb-6 uppercase italic">Edit Bus #{bus.number}</h3><div className="grid grid-cols-2 gap-4 mb-4"><select className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.status} onChange={e=>setEditData({...editData, status:e.target.value})}><option value="Active">Ready</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select><input className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.location} onChange={e=>setEditData({...editData, location:e.target.value})} placeholder="Location" /></div><textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-4 font-bold ${inputClass}`} value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} placeholder="Maintenance Notes" /><div className={`grid grid-cols-3 gap-4 mb-6 text-[9px] font-black uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}><div>OOS Date<input type="date" className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.oosStartDate} onChange={e=>setEditData({...editData, oosStartDate:e.target.value})} /></div><div>Exp Return<input type="date" className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div><div>Act Return<input type="date" className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div></div><div className="flex gap-4"><button onClick={()=>setIsEditing(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white' : 'bg-slate-100 text-black'}`}>Cancel</button><button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg">Save Changes</button></div></div>);
+    if (isEditing) return (<div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}><h3 className="text-2xl font-black text-[#ef7c00] mb-6 uppercase italic">Edit Bus #{bus.number}</h3><div className="grid grid-cols-2 gap-4 mb-4"><select className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.status} onChange={e=>setEditData({...editData, status:e.target.value})}><option value="Active">Ready</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select><input className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.location} onChange={e=>setEditData({...editData, location:e.target.value})} placeholder="Location" /></div><textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-4 font-bold ${inputClass}`} value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} placeholder="Maintenance Notes" /><div className={`grid grid-cols-3 gap-4 mb-6 text-[9px] font-black uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}><div>OOS Date<input type="date" onClick={handleDateClick} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer ${inputClass}`} value={editData.oosStartDate} onChange={e=>setEditData({...editData, oosStartDate:e.target.value})} /></div><div>Exp Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer ${inputClass}`} value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div><div>Act Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer ${inputClass}`} value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div></div><div className="flex gap-4"><button onClick={()=>setIsEditing(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white' : 'bg-slate-100 text-black'}`}>Cancel</button><button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg">Save Changes</button></div></div>);
     return (
         <div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}>
             <div className="flex justify-between items-start mb-6 border-b border-slate-500/20 pb-4">
@@ -187,7 +216,7 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
             showToast("Incident Deleted", 'success'); if (selectedEmp && selectedEmp.id === empId) setSelectedEmp({ ...selectedEmp, incidents: updatedIncidents, totalOccurrences: newTotal });
         } catch (err) { showToast("Delete Failed", 'error'); }
     };
-    const handleExportWord = () => { /* Logic hidden for brevity - same as previous version */ };
+    const handleExportWord = () => { /* Logic hidden for brevity */ };
 
     const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
     const inputClass = darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-black';
@@ -282,23 +311,36 @@ const ShiftHandover = ({ buses, showToast }: { buses: any[], showToast: (m:strin
     );
 };
 
-// --- DATA ENTRY FORM (WITH ADD NEW BUS MODAL) ---
-const BusInputForm = ({ showToast, darkMode }: { showToast: (m:string, t:'success'|'error')=>void, darkMode: boolean }) => {
+// --- COMPONENT: DATA ENTRY & BUS CREATION ---
+const BusInputForm = ({ showToast, darkMode, buses, isAdmin }: { showToast: (m:string, t:'success'|'error')=>void, darkMode: boolean, buses: any[], isAdmin: boolean }) => {
     const [formData, setFormData] = useState({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
     const [showAddModal, setShowAddModal] = useState(false);
     const [newBusData, setNewBusData] = useState({ number: '', status: 'Active' });
 
     const handleChange = (e: any) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
     
-    // UPDATE EXISTING BUS
+    const handleDateClick = (e: React.MouseEvent<HTMLInputElement>) => {
+        if ('showPicker' in HTMLInputElement.prototype) {
+            (e.currentTarget as any).showPicker();
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault(); 
-        const busRef = doc(db, "buses", formData.number); 
-        const busSnap = await getDoc(busRef);
         
-        if (!busSnap.exists()) {
-            return showToast(`⛔ Bus #${formData.number} does not exist. Use "Add New Bus" first.`, 'error');
+        // Date Validations
+        if (formData.oosStartDate) {
+            const oos = new Date(formData.oosStartDate);
+            if (formData.expectedReturnDate && new Date(formData.expectedReturnDate) < oos) {
+                return showToast("Expected Return cannot be earlier than OOS Date", 'error');
+            }
+            if (formData.actualReturnDate && new Date(formData.actualReturnDate) < oos) {
+                return showToast("Actual Return cannot be earlier than OOS Date", 'error');
+            }
         }
+
+        const busRef = doc(db, "buses", formData.number); const busSnap = await getDoc(busRef);
+        if (!busSnap.exists()) return showToast(`⛔ Bus #${formData.number} not found. Please add it first.`, 'error');
         
         const old = busSnap.data(); let changes = []; 
         if (old.status !== formData.status) changes.push(`STATUS: ${old.status} ➝ ${formData.status}`); 
@@ -307,99 +349,120 @@ const BusInputForm = ({ showToast, darkMode }: { showToast: (m:string, t:'succes
         
         await setDoc(busRef, { ...formData, timestamp: serverTimestamp() }, { merge: true });
         
-        if (changes.length > 0) {
-            await logHistory(formData.number, "UPDATE", changes.join('\n'), auth.currentUser?.email || 'Unknown'); 
-        } else {
-            await logHistory(formData.number, "UPDATE", "Routine Update via Terminal", auth.currentUser?.email || 'Unknown');
-        }
+        if (changes.length > 0) await logHistory(formData.number, "UPDATE", changes.join('\n'), auth.currentUser?.email || 'Unknown'); 
+        else await logHistory(formData.number, "UPDATE", "Routine Update via Terminal", auth.currentUser?.email || 'Unknown');
         
         showToast(`Bus #${formData.number} Updated`, 'success'); 
         setFormData({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
     };
 
-    // ADD NEW BUS
     const handleAddNewBus = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newBusData.number) return showToast("Bus number required", 'error');
-        
+        if(!newBusData.number) return;
         const busRef = doc(db, "buses", newBusData.number);
         const snap = await getDoc(busRef);
-        if (snap.exists()) {
-            return showToast(`⛔ Bus #${newBusData.number} already exists!`, 'error');
-        }
+        if (snap.exists()) return showToast(`⛔ Bus #${newBusData.number} already exists!`, 'error');
 
         try {
-            await setDoc(busRef, {
-                number: newBusData.number,
-                status: newBusData.status,
-                location: '',
-                notes: '',
-                oosStartDate: '',
-                expectedReturnDate: '',
-                actualReturnDate: '',
-                timestamp: serverTimestamp()
-            });
-            await logHistory(newBusData.number, "CREATED", "Bus added to registry.", auth.currentUser?.email || 'Unknown');
+            await setDoc(busRef, { number: newBusData.number, status: newBusData.status, location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', timestamp: serverTimestamp() });
+            await logHistory(newBusData.number, "CREATED", "Bus added to registry via Admin Panel.", auth.currentUser?.email || 'Unknown');
             showToast(`Bus #${newBusData.number} Added`, 'success');
             setShowAddModal(false);
             setNewBusData({ number: '', status: 'Active' });
-        } catch (err) {
-            showToast("Failed to add bus", 'error');
+        } catch (err) { showToast("Failed to add bus", 'error'); }
+    };
+
+    const populateFleet = async () => {
+        if (!confirm(`Are you sure you want to initialize the database with ${HAMILTON_FLEET.length} Hamilton buses?`)) return;
+        
+        let addedCount = 0;
+        const existingBusNumbers = new Set(buses.map(b => b.number));
+        const batch = writeBatch(db);
+
+        for (const busNumber of HAMILTON_FLEET) {
+            if (!existingBusNumbers.has(busNumber)) {
+                const busRef = doc(db, "buses", busNumber);
+                batch.set(busRef, {
+                    number: busNumber,
+                    status: 'Active',
+                    location: '',
+                    notes: '',
+                    oosStartDate: '',
+                    expectedReturnDate: '',
+                    actualReturnDate: '',
+                    timestamp: serverTimestamp()
+                });
+                addedCount++;
+            }
+        }
+
+        if (addedCount > 0) {
+            try {
+                await batch.commit();
+                showToast(`Successfully added ${addedCount} missing buses!`, 'success');
+            } catch (err) {
+                console.error(err);
+                showToast("Failed to populate fleet.", 'error');
+            }
+        } else {
+            showToast("All Hamilton buses are already in the system.", 'success');
         }
     };
 
     const inputClass = darkMode ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-black placeholder:text-gray-400';
     
     return (
-        <>
-            <div className={`max-w-2xl mx-auto mt-4 md:mt-10 p-6 md:p-8 rounded-2xl shadow-xl border-t-8 border-[#ef7c00] animate-in slide-in-from-bottom-4 duration-500 ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
-                <div className="flex justify-between items-center mb-8">
-                    <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Data Entry</h2>
+        <div className={`max-w-2xl mx-auto mt-4 md:mt-10 p-6 md:p-8 rounded-2xl shadow-xl border-t-8 border-[#ef7c00] animate-in slide-in-from-bottom-4 duration-500 ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
+            <div className="flex justify-between items-end mb-8">
+                <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Data Entry</h2>
+                <div className="flex gap-2">
+                    {isAdmin && <button type="button" onClick={populateFleet} className={`px-3 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest border transition-all ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-[#002d72]'}`}>⚙️ Init Fleet</button>}
                     <button type="button" onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-black uppercase text-[10px] tracking-widest shadow-md transition-all">+ Add New Bus</button>
                 </div>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-2 gap-6">
-                        <input type="text" placeholder="Unit # to Update" className={`p-4 border-2 rounded-xl font-black outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.number} onChange={handleChange} name="number" required />
-                        <select className={`p-4 border-2 rounded-xl font-bold outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.status} onChange={handleChange} name="status"><option value="Active">Ready for Service</option><option value="On Hold">Maintenance Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select>
-                    </div>
-                    <input type="text" placeholder="Location" className={`w-full p-4 border-2 rounded-xl outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.location} onChange={handleChange} name="location" />
-                    <textarea placeholder="Maintenance Notes" className={`w-full p-4 border-2 rounded-xl h-24 outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.notes} onChange={handleChange} name="notes" />
-                    <div className="grid grid-cols-3 gap-4">
-                        <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>OOS Date</label><input name="oosStartDate" type="date" className={`w-full p-2 border-2 rounded-lg text-xs font-bold ${inputClass}`} value={formData.oosStartDate} onChange={handleChange} /></div>
-                        <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Exp Return</label><input name="expectedReturnDate" type="date" className={`w-full p-2 border-2 rounded-lg text-xs font-bold ${inputClass}`} value={formData.expectedReturnDate} onChange={handleChange} /></div>
-                        <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Act Return</label><input name="actualReturnDate" type="date" className={`w-full p-2 border-2 rounded-lg text-xs font-bold ${inputClass}`} value={formData.actualReturnDate} onChange={handleChange} /></div>
-                    </div>
-                    <button className="w-full py-4 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase tracking-widest transition-all transform active:scale-95 shadow-lg">Update Record</button>
-                </form>
             </div>
+            
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                    <input type="text" placeholder="Unit # to Update" className={`p-4 border-2 rounded-xl font-black outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.number} onChange={handleChange} name="number" required />
+                    <select className={`p-4 border-2 rounded-xl font-bold outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.status} onChange={handleChange} name="status"><option value="Active">Ready for Service</option><option value="On Hold">Maintenance Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select>
+                </div>
+                <input type="text" placeholder="Location" className={`w-full p-4 border-2 rounded-xl outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.location} onChange={handleChange} name="location" />
+                <textarea placeholder="Maintenance Notes" className={`w-full p-4 border-2 rounded-xl h-24 outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.notes} onChange={handleChange} name="notes" />
+                <div className="grid grid-cols-3 gap-4">
+                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>OOS Date</label><input name="oosStartDate" type="date" onClick={handleDateClick} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer ${inputClass}`} value={formData.oosStartDate} onChange={handleChange} /></div>
+                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Exp Return</label><input name="expectedReturnDate" type="date" onClick={handleDateClick} min={formData.oosStartDate} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer ${inputClass}`} value={formData.expectedReturnDate} onChange={handleChange} /></div>
+                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Act Return</label><input name="actualReturnDate" type="date" onClick={handleDateClick} min={formData.oosStartDate} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer ${inputClass}`} value={formData.actualReturnDate} onChange={handleChange} /></div>
+                </div>
+                <button className="w-full py-4 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase tracking-widest transition-all transform active:scale-95 shadow-lg">Update Record</button>
+            </form>
 
             {/* ADD NEW BUS MODAL */}
             {showAddModal && (
-                <div className="fixed inset-0 z-[8000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in-95">
-                    <div className={`p-8 rounded-xl shadow-2xl w-full max-w-md border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                        <h3 className={`text-2xl font-black mb-6 uppercase italic ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Add New Bus</h3>
+                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className={`p-8 rounded-xl shadow-2xl w-full max-w-md border animate-in zoom-in-95 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                        <h3 className={`text-2xl font-black mb-6 uppercase italic ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Add New Bus</h3>
                         <form onSubmit={handleAddNewBus} className="space-y-4">
                             <div>
-                                <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unit Number *</label>
+                                <label className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unit Number *</label>
                                 <input type="text" className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={newBusData.number} onChange={e => setNewBusData({...newBusData, number: e.target.value})} required placeholder="e.g., 2001" />
                             </div>
                             <div>
-                                <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Initial Status</label>
+                                <label className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Initial Status</label>
                                 <select className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={newBusData.status} onChange={e => setNewBusData({...newBusData, status: e.target.value})}>
                                     <option value="Active">Ready for Service</option>
                                     <option value="On Hold">Maintenance Hold</option>
                                     <option value="In Shop">In Shop</option>
                                 </select>
                             </div>
-                            <div className="flex gap-4 mt-6 pt-4 border-t border-slate-500/20">
-                                <button type="button" onClick={() => setShowAddModal(false)} className={`w-1/2 py-3 rounded-lg font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>Cancel</button>
-                                <button type="submit" className="w-1/2 py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg font-black uppercase text-xs shadow-lg transform active:scale-95 transition-all">Save Bus</button>
+                            <div className="flex gap-4 mt-8">
+                                <button type="button" onClick={() => setShowAddModal(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white' : 'bg-slate-100 text-black'}`}>Cancel</button>
+                                <button type="submit" className="w-1/2 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black uppercase text-xs shadow-lg transform active:scale-95 transition-all">Save Bus</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
-        </>
+        </div>
     );
 };
 
@@ -418,7 +481,6 @@ export default function FleetManager() {
   const [activeFilter, setActiveFilter] = useState('Total Fleet');
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
   
-  // DARK MODE & FULLSCREEN
   const [darkMode, setDarkMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const tvBoardRef = useRef<HTMLDivElement>(null);
@@ -555,7 +617,7 @@ export default function FleetManager() {
 
       <main className="max-w-[1600px] mx-auto p-4 md:p-6 overflow-x-hidden">
         {view === 'tracker' ? <div className={`h-[85vh] rounded-2xl shadow-sm border overflow-hidden relative ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}><BusTracker /></div> :
-         view === 'input' ? <BusInputForm showToast={triggerToast} darkMode={darkMode} /> :
+         view === 'input' ? <BusInputForm showToast={triggerToast} darkMode={darkMode} buses={buses} isAdmin={isAdmin} /> :
          view === 'parts' ? <PartsInventory showToast={triggerToast} darkMode={darkMode} /> :
          view === 'analytics' ? (isAdmin ? <div className="animate-in fade-in duration-500"><StatusCharts buses={buses} /><AnalyticsDashboard buses={buses} showToast={triggerToast} /></div> : <div className="p-20 text-center text-red-500 font-black">ACCESS DENIED</div>) :
          view === 'handover' ? <ShiftHandover buses={buses} showToast={triggerToast} /> :
@@ -663,7 +725,6 @@ export default function FleetManager() {
                                     
                                     <div className={`text-sm font-black mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'Location Unavailable'}</div>
                                     
-                                    {/* FULL NOTES: Removed line-clamp and fixed height */}
                                     <div className={`text-xs font-bold leading-snug mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.notes || 'No active faults recorded.'}</div>
                                     
                                     <div className="mt-auto pt-2">

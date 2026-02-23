@@ -243,6 +243,45 @@ const PartsInventory = ({ showToast, darkMode }: { showToast: (msg: string, type
     );
 };
 
+// --- MODULE 3: FLEET ANALYTICS ---
+const StatusCharts = ({ buses }: { buses: any[] }) => {
+    const statusCounts: {[key: string]: number} = { 'Active': 0, 'In Shop': 0, 'Engine': 0, 'Body Shop': 0, 'Vendor': 0, 'Brakes': 0, 'Safety': 0 };
+    buses.forEach(b => { if (statusCounts[b.status] !== undefined) statusCounts[b.status]++; else statusCounts['Active']++; });
+    const maxCount = Math.max(...Object.values(statusCounts), 1);
+    const trendData = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); const ds = d.toISOString().split('T')[0]; return { label: ds.slice(5), count: buses.filter(b => b.oosStartDate === ds).length }; });
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 className="text-[10px] font-black text-[#002d72] uppercase tracking-widest mb-6">Status Breakdown</h3><div className="flex items-end gap-3 h-40">{Object.entries(statusCounts).map(([s, c]) => (<div key={s} className="flex-1 flex flex-col justify-end items-center group relative"><div className="absolute -top-6 text-[10px] font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">{c}</div><div className={`w-full rounded-t-md transition-all duration-500 ${s==='Active'?'bg-green-500':s==='In Shop'?'bg-[#ef7c00]':'bg-red-500'}`} style={{ height: `${(c/maxCount)*100 || 2}%` }}></div><p className="text-[8px] font-black text-slate-400 uppercase mt-2 -rotate-45 origin-left translate-y-2 whitespace-nowrap">{s}</p></div>))}</div></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 className="text-[10px] font-black text-[#002d72] uppercase tracking-widest mb-6">7-Day Intake Trend</h3><div className="flex items-end gap-2 h-40">{trendData.map((d, i) => (<div key={i} className="flex-1 flex flex-col justify-end items-center group relative"><div className="absolute -top-6 text-[10px] font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">{d.count}</div><div className="w-full bg-blue-100 hover:bg-[#002d72] rounded-t-sm transition-all" style={{ height: `${(d.count/Math.max(...trendData.map(t=>t.count),1))*100 || 2}%` }}></div><p className="text-[8px] font-bold text-slate-400 mt-2">{d.label}</p></div>))}</div></div>
+        </div>
+    );
+};
+
+const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: (msg: string, type: 'success'|'error') => void }) => {
+    const [shopQueens, setShopQueens] = useState<{number: string, count: number}[]>([]);
+    const [isResetting, setIsResetting] = useState(false);
+    useEffect(() => { const fetchRankings = async () => { const rankings: {number: string, count: number}[] = []; const sampleBuses = buses.slice(0, 50); for (const bus of sampleBuses) { const hSnap = await getDocs(query(collection(db, "buses", bus.number, "history"), limit(20))); if (hSnap.size > 0) rankings.push({ number: bus.number, count: hSnap.size }); } setShopQueens(rankings.sort((a,b) => b.count - a.count).slice(0, 5)); }; if(buses.length > 0) fetchRankings(); }, [buses]);
+    const handleResetMetrics = async () => { if(!confirm("⚠️ WARNING: This will WIPE ALL HISTORY logs.")) return; setIsResetting(true); try { for (const bus of buses) { const hSnap = await getDocs(collection(db, "buses", bus.number, "history")); if (!hSnap.empty) { const batch = writeBatch(db); hSnap.docs.forEach(doc => batch.delete(doc.ref)); await batch.commit(); } } showToast(`Reset Complete`, 'success'); setShopQueens([]); } catch (err) { showToast("Reset failed", 'error'); } setIsResetting(false); };
+    const avgOOS = buses.reduce((acc, b) => acc + (b.status !== 'Active' ? 1 : 0), 0);
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fleet Availability</p><p className="text-4xl font-black text-[#002d72] italic">{Math.round(((buses.length - avgOOS) / Math.max(buses.length, 1)) * 100)}%</p></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Down Units</p><p className="text-4xl font-black text-red-500 italic">{avgOOS}</p></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><div className="flex justify-between items-center mb-2"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Analytics Admin</p><button onClick={handleResetMetrics} disabled={isResetting} className="text-[9px] font-black text-red-500 hover:text-red-700 uppercase border border-red-200 rounded px-2 py-1 bg-red-50 disabled:opacity-50">{isResetting ? "..." : "Reset All Logs"}</button></div><div className="space-y-2">{shopQueens.map((queen, i) => (<div key={i} className="flex justify-between items-center text-xs border-b border-slate-100 pb-1"><span className="font-bold text-slate-700">#{queen.number}</span><span className="font-mono text-red-500">{queen.count} logs</span></div>))}</div></div>
+        </div>
+    );
+};
+
+// --- COMPONENT: SHIFT HANDOVER ---
+const ShiftHandover = ({ buses, showToast }: { buses: any[], showToast: (m:string, t:'success'|'error')=>void }) => {
+    const [report, setReport] = useState<any[]>([]);
+    useEffect(() => { const fetchRecent = async () => { const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000); let logs: any[] = []; for (const b of buses.filter(x => x.status !== 'Active' || x.notes).slice(0,30)) { const hSnap = await getDocs(query(collection(db, "buses", b.number, "history"), orderBy("timestamp", "desc"), limit(2))); hSnap.forEach(d => { if((d.data().timestamp?.toMillis() || 0) > twelveHoursAgo) logs.push({ bus: b.number, ...d.data() }); }); } setReport(logs.sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0))); }; if(buses.length > 0) fetchRecent(); }, [buses]);
+    const copy = () => { const txt = report.map(r => `[Unit ${r.bus}] ${r.action}: ${r.details}`).join('\n'); navigator.clipboard.writeText(`SHIFT REPORT - ${new Date().toLocaleDateString()}\n\n${txt}`); showToast("Report copied!", 'success'); };
+    return (
+        <div className="max-w-4xl mx-auto p-8 animate-in fade-in slide-in-from-bottom-4"><div className="flex justify-between items-center mb-8"><h2 className="text-3xl font-black text-[#002d72] uppercase italic">Shift Handover</h2><button onClick={copy} className="px-6 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-[#ef7c00] transition-all transform active:scale-95">Copy Report</button></div><div className="space-y-4">{report.map((l, i) => (<div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex gap-6 items-center"><div className="w-16 h-16 bg-[#002d72]/5 rounded-xl flex items-center justify-center font-black text-[#002d72] text-lg">#{l.bus}</div><div className="flex-grow"><div className="flex justify-between mb-1"><span className="text-[10px] font-black text-[#ef7c00] uppercase">{l.action}</span><span className="text-[10px] font-bold text-slate-500">{formatTime(l.timestamp)}</span></div><p className="text-sm font-bold text-slate-800 whitespace-pre-wrap">{l.details}</p><p className="text-[9px] text-slate-400 mt-2 uppercase tracking-widest">{l.user}</p></div></div>))}</div></div>
+    );
+};
+
 const BusInputForm = ({ showToast, darkMode }: { showToast: (m:string, t:'success'|'error')=>void, darkMode: boolean }) => {
     const [formData, setFormData] = useState({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
     const handleChange = (e: any) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -279,11 +318,10 @@ const BusInputForm = ({ showToast, darkMode }: { showToast: (m:string, t:'succes
 // --- MAIN APPLICATION ENTRY ---
 export default function FleetManager() {
   const [user, setUser] = useState<any>(null);
-  const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'personnel' | 'parts'>('inventory');
   
-  // NEW: Updated inventoryMode to include 'tv'
+  // ADDED 'analytics' and 'handover' explicitly into view state definition to prevent TS errors if they are selected.
+  const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'personnel' | 'parts'>('inventory');
   const [inventoryMode, setInventoryMode] = useState<'list' | 'grid' | 'tv'>('grid');
-  
   const [buses, setBuses] = useState<any[]>([]);
   const [selectedBusDetail, setSelectedBusDetail] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -321,7 +359,7 @@ export default function FleetManager() {
       }
   };
 
-  // Auto-scroll TV Board Marquee
+  // Auto-scroll TV Board Marquee (FASTER SPEED)
   useEffect(() => {
       let animationFrameId: number;
       let isPaused = false;
@@ -330,7 +368,6 @@ export default function FleetManager() {
       const scroll = () => {
           if (inventoryMode === 'tv' && isFullscreen && tvBoardRef.current && !isPaused) {
               const el = tvBoardRef.current;
-              // Only scroll if content is larger than the screen
               if (el.scrollHeight > el.clientHeight) {
                   // Reached the bottom
                   if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) {
@@ -340,10 +377,11 @@ export default function FleetManager() {
                               tvBoardRef.current.scrollTop = 0; 
                               scrollPos = 0;
                           }
-                          setTimeout(() => { isPaused = false; }, 2000); // 2 sec pause at top
-                      }, 4000); // 4 sec pause at bottom
+                          setTimeout(() => { isPaused = false; }, 2000); 
+                      }, 4000); 
                   } else {
-                      scrollPos += 0.4; // Scroll speed
+                      // INCREASED SCROLL SPEED from 0.4 to 0.8
+                      scrollPos += 0.8; 
                       el.scrollTop = scrollPos;
                       // Detect manual scroll
                       if (Math.abs(el.scrollTop - Math.round(scrollPos)) > 2) {
@@ -362,7 +400,7 @@ export default function FleetManager() {
                   scrollPos = 0;
                   animationFrameId = requestAnimationFrame(scroll);
               }
-          }, 1000); // Delay start to let fullscreen layout settle
+          }, 1000); 
       }
 
       return () => {
@@ -422,7 +460,8 @@ export default function FleetManager() {
       <nav className={`backdrop-blur-md border-b sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm overflow-x-auto ${darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
         <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-6 bg-[#ef7c00] rounded-full"></div><span className={`font-black text-lg italic uppercase tracking-tighter ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Fleet Manager</span></div>
         <div className="flex gap-4 items-center flex-nowrap">
-          {['inventory', 'input', 'tracker', 'parts'].concat(isAdmin ? ['personnel'] : []).map(v => (
+          {/* RESTORED ANALYTICS AND HANDOVER TABS HERE */}
+          {['inventory', 'input', 'tracker', 'handover', 'parts'].concat(isAdmin ? ['analytics', 'personnel'] : []).map(v => (
             <button key={v} onClick={() => setView(v as any)} className={`text-[9px] font-black uppercase tracking-widest border-b-2 pb-1 transition-all whitespace-nowrap ${view === v ? 'border-[#ef7c00] text-[#ef7c00]' : (darkMode ? 'border-transparent text-slate-400 hover:text-white' : 'border-transparent text-slate-500 hover:text-[#002d72]')}`}>{v.replace('input', 'Data Entry').replace('parts', 'Parts List').replace('personnel', 'Personnel')}</button>
           ))}
           <button onClick={() => setDarkMode(!darkMode)} className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${darkMode ? 'bg-slate-800 text-yellow-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
@@ -435,6 +474,8 @@ export default function FleetManager() {
         {view === 'tracker' ? <div className={`h-[85vh] rounded-2xl shadow-sm border overflow-hidden relative ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}><BusTracker /></div> :
          view === 'input' ? <BusInputForm showToast={triggerToast} darkMode={darkMode} /> :
          view === 'parts' ? <PartsInventory showToast={triggerToast} darkMode={darkMode} /> :
+         view === 'analytics' ? (isAdmin ? <div className="animate-in fade-in duration-500"><StatusCharts buses={buses} /><AnalyticsDashboard buses={buses} showToast={triggerToast} /></div> : <div className="p-20 text-center text-red-500 font-black">ACCESS DENIED</div>) :
+         view === 'handover' ? <ShiftHandover buses={buses} showToast={triggerToast} /> :
          view === 'personnel' ? (isAdmin ? <PersonnelManager showToast={triggerToast} darkMode={darkMode} /> : <div className="p-20 text-center text-red-500 font-black">ACCESS DENIED</div>) : (
           <>
             {/* STAT CARDS */}
@@ -500,45 +541,45 @@ export default function FleetManager() {
                     </div>
                 )}
 
-                {/* 3. HIGH-VISIBILITY TV BOARD (SCROLLING MARQUEE) */}
+                {/* 3. HIGH-VISIBILITY TV BOARD (SMALLER CARDS, INCREASED COLUMNS) */}
                 {inventoryMode === 'tv' && (
-                    <div ref={tvBoardRef} className={`p-4 sm:p-6 overflow-y-auto custom-scrollbar ${isFullscreen ? (darkMode ? 'bg-slate-900' : 'bg-slate-100') : ''} ${!isFullscreen && darkMode ? 'bg-slate-900' : (!isFullscreen ? 'bg-slate-100' : '')} min-h-[75vh] h-full`}>
+                    <div ref={tvBoardRef} className={`p-3 sm:p-4 overflow-y-auto custom-scrollbar ${isFullscreen ? (darkMode ? 'bg-slate-900' : 'bg-slate-100') : ''} ${!isFullscreen && darkMode ? 'bg-slate-900' : (!isFullscreen ? 'bg-slate-100' : '')} min-h-[75vh] h-full`}>
                         
                         {/* Fullscreen Header */}
                         {isFullscreen && (
-                            <div className={`flex justify-between items-end mb-6 border-b-2 pb-4 ${darkMode ? 'border-slate-800' : 'border-slate-300'}`}>
+                            <div className={`flex justify-between items-end mb-4 border-b-2 pb-3 ${darkMode ? 'border-slate-800' : 'border-slate-300'}`}>
                                 <div>
-                                    <h2 className="text-5xl font-black uppercase tracking-tighter text-[#ef7c00]">Fleet Status Board</h2>
-                                    <p className={`text-xl font-bold mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Total Units: {buses.length} | Down: <span className="text-red-500">{buses.filter(b=>b.status!=='Active').length}</span></p>
+                                    <h2 className="text-4xl font-black uppercase tracking-tighter text-[#ef7c00]">Fleet Status Board</h2>
+                                    <p className={`text-lg font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Total Units: {buses.length} | Down: <span className="text-red-500">{buses.filter(b=>b.status!=='Active').length}</span></p>
                                 </div>
-                                <button onClick={toggleFullScreen} className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl transition-all transform active:scale-95">Exit Fullscreen</button>
+                                <button onClick={toggleFullScreen} className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-2xl transition-all transform active:scale-95">Exit Fullscreen</button>
                             </div>
                         )}
 
                         {/* Launch Button (Visible only when NOT fullscreen) */}
                         {!isFullscreen && (
-                            <div className="mb-6 flex justify-end">
-                                <button onClick={toggleFullScreen} className="px-6 py-3 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase text-xs shadow-lg flex items-center gap-2 transition-all transform active:scale-95">
+                            <div className="mb-4 flex justify-end">
+                                <button onClick={toggleFullScreen} className="px-5 py-2.5 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-lg font-black uppercase text-xs shadow-lg flex items-center gap-2 transition-all transform active:scale-95">
                                     ⛶ Launch Fullscreen TV Mode
                                 </button>
                             </div>
                         )}
 
-                        {/* TV Grid - High Visibility Cards */}
-                        <div className={`grid gap-3 sm:gap-4 pb-20 ${isFullscreen ? 'grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7'}`}>
+                        {/* TV Grid - Smaller Cards, more columns */}
+                        <div className={`grid gap-2 sm:gap-3 pb-20 ${isFullscreen ? 'grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12' : 'grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8'}`}>
                             {sortedBuses.map(b => (
-                                <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`p-4 rounded-2xl flex flex-col justify-between border-4 shadow-lg cursor-pointer hover:scale-105 transition-transform ${
+                                <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`p-3 rounded-xl flex flex-col justify-between border-[3px] shadow-md cursor-pointer hover:scale-105 transition-transform ${
                                     b.status === 'Active' 
                                     ? (darkMode ? 'bg-slate-800 border-green-500' : 'bg-white border-green-500') 
                                     : (darkMode ? 'bg-slate-800 border-red-600' : 'bg-white border-red-600')
                                 }`}>
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className={`text-4xl font-black leading-none tracking-tighter ${b.status==='Active' ? (darkMode?'text-green-400':'text-green-600') : (darkMode?'text-red-500':'text-red-600')}`}>#{b.number}</span>
+                                    <div className="flex justify-between items-start mb-1.5">
+                                        <span className={`text-3xl font-black leading-none tracking-tighter ${b.status==='Active' ? (darkMode?'text-green-400':'text-green-600') : (darkMode?'text-red-500':'text-red-600')}`}>#{b.number}</span>
                                     </div>
-                                    <span className={`w-fit px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider mb-3 shadow-sm ${b.status==='Active'?'bg-green-500 text-white':'bg-red-600 text-white'}`}>{b.status}</span>
-                                    <div className={`text-xs font-black truncate leading-tight mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'Location Unavailable'}</div>
-                                    <div className={`text-xs font-bold line-clamp-2 h-8 leading-tight ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{b.notes || ''}</div>
-                                    {b.status !== 'Active' && <div className="mt-3 text-[11px] font-black text-white bg-red-600 rounded px-2 py-1.5 text-center tracking-widest shadow-inner">DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}
+                                    <span className={`w-fit px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider mb-2 shadow-sm ${b.status==='Active'?'bg-green-500 text-white':'bg-red-600 text-white'}`}>{b.status}</span>
+                                    <div className={`text-[11px] font-black truncate leading-tight mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'Location Unavailable'}</div>
+                                    <div className={`text-[10px] font-bold line-clamp-2 h-7 leading-tight ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{b.notes || ''}</div>
+                                    {b.status !== 'Active' && <div className="mt-2 text-[10px] font-black text-white bg-red-600 rounded px-1.5 py-1 text-center tracking-widest shadow-inner">DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}
                                 </div>
                             ))}
                         </div>

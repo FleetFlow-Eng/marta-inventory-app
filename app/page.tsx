@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db, auth } from './firebaseConfig'; 
 import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc, addDoc, deleteDoc, getDoc, getDocs, limit, writeBatch, updateDoc, arrayUnion, increment } from "firebase/firestore";
-// ADDED createUserWithEmailAndPassword
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -22,6 +21,9 @@ const HAMILTON_FLEET = [
   "2326","2343",
   "2593"
 ];
+
+// --- MASTER ADMIN EMAILS ---
+const ADMIN_EMAILS = ['anetowestfield@gmail.com', 'admin@fleetflow.services'];
 
 // --- DYNAMIC IMPORTS ---
 const BusTracker = dynamic(() => import('./BusTracker'), { 
@@ -46,6 +48,36 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
         </div>
     );
 };
+
+const LegalModal = ({ type, onClose, darkMode }: { type: 'privacy'|'about', onClose: ()=>void, darkMode: boolean }) => {
+    const title = type === 'privacy' ? 'Privacy Policy' : 'About Us';
+    const content = type === 'privacy' 
+        ? "LLC Fleetflow Transit Solutions values your privacy. We collect minimal data necessary for internal fleet management, diagnostic tracking, and attendance coordination. We do not sell or share your data with unauthorized third parties. All data is securely handled via industry-standard encrypted databases."
+        : "LLC Fleetflow Transit Solutions is dedicated to modernizing fleet operations. Our management systems provide real-time tracking, inventory analytics, and seamless personnel coordination to keep your transit systems moving safely and efficiently. Built for reliability and high visibility on the shop floor.";
+    
+    return (
+        <div className="fixed inset-0 z-[9000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in-95">
+            <div className={`p-8 rounded-2xl w-full max-w-lg shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+                <div className="flex justify-between items-center mb-6 border-b pb-4 border-slate-500/20">
+                    <h3 className={`text-2xl font-black uppercase italic ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>{title}</h3>
+                    <button onClick={onClose} className="text-2xl font-bold hover:text-red-500 transition-colors">✕</button>
+                </div>
+                <p className="font-medium leading-relaxed text-sm opacity-90">{content}</p>
+                <button onClick={onClose} className="mt-8 w-full py-3 bg-[#002d72] text-white rounded-xl font-black uppercase tracking-widest hover:bg-[#ef7c00] transition-colors shadow-lg">Acknowledge & Close</button>
+            </div>
+        </div>
+    );
+};
+
+const Footer = ({ onShowLegal, darkMode }: { onShowLegal: (type: 'privacy'|'about')=>void, darkMode?: boolean }) => (
+    <div className={`w-full py-6 text-center text-[10px] font-bold tracking-widest uppercase mt-auto border-t ${darkMode ? 'border-slate-800 text-slate-500 bg-slate-900' : 'border-slate-200 text-slate-400 bg-slate-100'}`}>
+        <p>© {new Date().getFullYear()} LLC Fleetflow Transit Solutions.</p>
+        <div className="flex justify-center gap-6 mt-3">
+            <button onClick={() => onShowLegal('privacy')} className={`transition-colors ${darkMode ? 'hover:text-white' : 'hover:text-[#002d72]'}`}>Privacy Policy</button>
+            <button onClick={() => onShowLegal('about')} className={`transition-colors ${darkMode ? 'hover:text-white' : 'hover:text-[#002d72]'}`}>About Us</button>
+        </div>
+    </div>
+);
 
 // --- UTILITY FUNCTIONS ---
 const formatTime = (timestamp: any) => {
@@ -150,6 +182,72 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClos
             <div className={`p-4 rounded-xl mb-6 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-50'}`}><p className={`text-[10px] font-black uppercase mb-2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Fault Details</p><p className={`text-lg font-medium ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{bus.notes || "No active faults."}</p></div>
             <div className="grid grid-cols-3 gap-4 mb-6"><div><p className={`text-[9px] font-black uppercase ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>OOS Date</p><p className="text-xl font-black text-[#002d72]">{bus.oosStartDate || '--'}</p></div><div><p className={`text-[9px] font-black uppercase ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Exp Return</p><p className="text-xl font-black text-[#ef7c00]">{bus.expectedReturnDate || '--'}</p></div><div><p className={`text-[9px] font-black uppercase ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Act Return</p><p className="text-xl font-black text-green-500">{bus.actualReturnDate || '--'}</p></div></div>
             <div className="flex justify-between pt-6 border-t border-slate-500/20"><button onClick={()=>setShowHistory(true)} className={`px-5 py-3 rounded-lg text-[10px] font-black uppercase ${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>📜 History</button><div className="flex gap-3"><button onClick={()=>setIsEditing(true)} className={`px-8 py-3 rounded-lg text-[10px] font-black uppercase ${darkMode ? 'bg-slate-700 text-[#ef7c00]' : 'bg-slate-100 text-[#002d72]'}`}>Edit</button><button onClick={onClose} className="px-8 py-3 bg-[#002d72] text-white rounded-lg text-[10px] font-black uppercase">Close</button></div></div>
+        </div>
+    );
+};
+
+// --- DEDICATED ADMIN PANEL FOR USER APPROVALS ---
+const AccessManager = ({ showToast, darkMode }: { showToast: any, darkMode: boolean }) => {
+    const [usersList, setUsersList] = useState<any[]>([]);
+    
+    useEffect(() => {
+        return onSnapshot(collection(db, "users"), snap => {
+            setUsersList(snap.docs.map(d => ({id: d.id, ...d.data()})));
+        });
+    }, []);
+
+    const toggleApproval = async (uid: string, current: string) => {
+        const newStatus = current === 'approved' ? 'pending' : 'approved';
+        try {
+            await updateDoc(doc(db, "users", uid), { status: newStatus });
+            showToast(`User status updated to ${newStatus}`, 'success');
+        } catch(err) {
+            showToast("Failed to update status", 'error');
+        }
+    };
+
+    const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
+    
+    return (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col max-w-4xl mx-auto">
+            <div className="flex justify-between items-end mb-6 flex-wrap gap-2">
+                <div>
+                    <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Admin Panel</h2>
+                    <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Manage Registration Access</p>
+                </div>
+            </div>
+            
+            <div className={`rounded-2xl shadow-sm border overflow-hidden ${bgClass}`}>
+                <table className="w-full text-left text-sm">
+                    <thead className={`font-black uppercase tracking-widest text-[10px] border-b ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                        <tr>
+                            <th className="p-4">User Email</th>
+                            <th className="p-4 text-center">Current Status</th>
+                            <th className="p-4 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
+                        {usersList.length === 0 ? <tr><td colSpan={3} className="p-10 text-center italic text-slate-500">No users found.</td></tr> : usersList.map(u => (
+                            <tr key={u.id} className={darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}>
+                                <td className="p-4 font-bold">{u.email}</td>
+                                <td className="p-4 text-center">
+                                    <span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${u.status === 'approved' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
+                                        {u.status}
+                                    </span>
+                                </td>
+                                <td className="p-4 text-center">
+                                    <button 
+                                        onClick={()=>toggleApproval(u.id, u.status)} 
+                                        className={`px-4 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all active:scale-95 shadow-md ${u.status === 'approved' ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-green-500 text-white hover:bg-green-600'}`}
+                                    >
+                                        {u.status === 'approved' ? 'Revoke Access' : 'Approve Access'}
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 };
@@ -612,6 +710,7 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin }: { showToast: (m:s
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault(); 
         
+        // Date Validations
         if (formData.oosStartDate) {
             const oos = new Date(formData.oosStartDate);
             if (formData.expectedReturnDate && new Date(formData.expectedReturnDate) < oos) {
@@ -767,10 +866,11 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin }: { showToast: (m:s
 export default function FleetManager() {
   const [user, setUser] = useState<any>(null);
   
-  // NEW: State for Auth Toggle
+  // NEW: State for Auth Toggle & Access Approval
   const [isSignUp, setIsSignUp] = useState(false);
+  const [userStatus, setUserStatus] = useState<'loading' | 'approved' | 'pending' | 'rejected'>('loading');
 
-  const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'personnel' | 'parts'>('inventory');
+  const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'personnel' | 'parts' | 'admin'>('inventory');
   const [inventoryMode, setInventoryMode] = useState<'list' | 'grid' | 'tv'>('grid');
   const [buses, setBuses] = useState<any[]>([]);
   const [selectedBusDetail, setSelectedBusDetail] = useState<any>(null);
@@ -780,19 +880,56 @@ export default function FleetManager() {
   const [sortConfig, setSortConfig] = useState({ key: 'number', direction: 'asc' });
   const [activeFilter, setActiveFilter] = useState('Total Fleet');
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
+  const [legalType, setLegalType] = useState<'privacy'|'about'|null>(null);
   
+  // DARK MODE & FULLSCREEN
   const [darkMode, setDarkMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const tvBoardRef = useRef<HTMLDivElement>(null);
 
   const holdStatuses = ['On Hold', 'Engine', 'Body Shop', 'Vendor', 'Brakes', 'Safety'];
   
-  const isAdmin = user && (user.email === 'anetowestfield@gmail.com' || user.email === 'supervisor@fleet.com' || user.email === 'admin@admin.com');
+  const isAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '');
   const triggerToast = (msg: string, type: 'success' | 'error') => { setToast({ msg, type }); };
 
+  // AUTHENTICATION STATE & ACCESS CONTROL
   useEffect(() => { onAuthStateChanged(auth, u => setUser(u)); }, []);
-  useEffect(() => { if (!user) return; return onSnapshot(query(collection(db, "buses"), orderBy("number", "asc")), s => setBuses(s.docs.map(d => ({...d.data(), docId: d.id})))); }, [user]);
 
+  useEffect(() => {
+      if (!user) {
+          setUserStatus('loading');
+          return;
+      }
+
+      // Hardcoded admins automatically get approved
+      if (ADMIN_EMAILS.includes(user.email?.toLowerCase() || '')) {
+          setUserStatus('approved');
+          return;
+      }
+
+      // Check access status for standard users
+      const unsubscribe = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
+          if (docSnap.exists()) {
+              setUserStatus(docSnap.data().status);
+          } else {
+              // Create a pending doc if one somehow doesn't exist for a logged-in user
+              setDoc(doc(db, "users", user.uid), {
+                  email: user.email?.toLowerCase() || '',
+                  status: 'pending',
+                  createdAt: serverTimestamp()
+              });
+              setUserStatus('pending');
+          }
+      });
+      return () => unsubscribe();
+  }, [user]);
+
+  useEffect(() => { 
+      if (!user || userStatus !== 'approved') return; 
+      return onSnapshot(query(collection(db, "buses"), orderBy("number", "asc")), s => setBuses(s.docs.map(d => ({...d.data(), docId: d.id})))); 
+  }, [user, userStatus]);
+
+  // Fullscreen Listener
   useEffect(() => {
       const handleFsChange = () => { setIsFullscreen(!!document.fullscreenElement); };
       document.addEventListener('fullscreenchange', handleFsChange);
@@ -807,6 +944,7 @@ export default function FleetManager() {
       }
   };
 
+  // Auto-scroll TV Board Marquee
   useEffect(() => {
       let animationFrameId: number;
       let isPaused = false;
@@ -888,13 +1026,19 @@ export default function FleetManager() {
     triggerToast("Excel Downloaded", 'success');
   };
 
-  // --- UPDATED AUTHENTICATION HANDLER ---
+  // --- AUTHENTICATION HANDLER ---
   const handleAuth = async (e: React.FormEvent) => {
       e.preventDefault();
       try {
           if (isSignUp) {
-              await createUserWithEmailAndPassword(auth, email, password);
-              triggerToast("Account created successfully!", 'success');
+              const cred = await createUserWithEmailAndPassword(auth, email, password);
+              // Store user safely in firestore with 'pending' status
+              await setDoc(doc(db, "users", cred.user.uid), {
+                  email: email.toLowerCase(),
+                  status: 'pending',
+                  createdAt: serverTimestamp()
+              });
+              triggerToast("Account created successfully! Pending admin approval.", 'success');
           } else {
               await signInWithEmailAndPassword(auth, email, password);
           }
@@ -904,43 +1048,76 @@ export default function FleetManager() {
   };
 
   if (!user) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 relative overflow-hidden font-sans">
-      {/* Toast provider specifically for the login screen */}
+    <div className="min-h-screen flex flex-col bg-slate-900 font-sans">
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       
-      <form onSubmit={handleAuth} className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-[#ef7c00] relative z-10 animate-in fade-in zoom-in">
-        <h2 className="text-4xl font-black text-white italic mb-8 text-center leading-none uppercase">
-            {isSignUp ? 'REGISTER' : 'FLEET OPS'}
-        </h2>
-        <div className="space-y-4">
-          <input className="w-full p-4 bg-slate-900 border-2 border-slate-700 rounded-xl font-bold text-white placeholder:text-gray-500 outline-none focus:border-[#ef7c00]" placeholder="supervisor@fleet.com" value={email} onChange={e=>setEmail(e.target.value)} required />
-          <input className="w-full p-4 bg-slate-900 border-2 border-slate-700 rounded-xl font-bold text-white placeholder:text-gray-500 outline-none focus:border-[#ef7c00]" placeholder="password123" type="password" value={password} onChange={e=>setPassword(e.target.value)} required />
-          <button type="submit" className="w-full bg-[#ef7c00] text-white py-5 rounded-xl font-black uppercase tracking-widest hover:bg-orange-600 transition-all transform active:scale-95 shadow-xl">
-              {isSignUp ? 'Create Account' : 'Authorized Login'}
-          </button>
-        </div>
-        
-        {/* SIGN UP TOGGLE */}
-        <div className="mt-8 text-center">
-            <button type="button" onClick={() => setIsSignUp(!isSignUp)} className="text-slate-400 hover:text-white text-xs font-bold transition-colors">
-                {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-            </button>
-        </div>
-      </form>
+      <div className="flex-grow flex items-center justify-center p-4 relative overflow-hidden">
+          <form onSubmit={handleAuth} className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-[#ef7c00] relative z-10 animate-in fade-in zoom-in">
+            <h2 className="text-4xl font-black text-white italic mb-8 text-center leading-none uppercase">
+                {isSignUp ? 'REGISTER' : 'FLEET OPS'}
+            </h2>
+            <div className="space-y-4">
+              <input className="w-full p-4 bg-slate-900 border-2 border-slate-700 rounded-xl font-bold text-white placeholder:text-gray-500 outline-none focus:border-[#ef7c00]" placeholder="Email Address" value={email} onChange={e=>setEmail(e.target.value)} required />
+              <input className="w-full p-4 bg-slate-900 border-2 border-slate-700 rounded-xl font-bold text-white placeholder:text-gray-500 outline-none focus:border-[#ef7c00]" placeholder="Password" type="password" value={password} onChange={e=>setPassword(e.target.value)} required />
+              <button type="submit" className="w-full bg-[#ef7c00] text-white py-5 rounded-xl font-black uppercase tracking-widest hover:bg-orange-600 transition-all transform active:scale-95 shadow-xl">
+                  {isSignUp ? 'Create Account' : 'Authorized Login'}
+              </button>
+            </div>
+            
+            <div className="mt-8 text-center">
+                <button type="button" onClick={() => setIsSignUp(!isSignUp)} className="text-slate-400 hover:text-white text-xs font-bold transition-colors">
+                    {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                </button>
+            </div>
+          </form>
+      </div>
+
+      <Footer onShowLegal={setLegalType} darkMode={true} />
+      {legalType && <LegalModal type={legalType} onClose={()=>setLegalType(null)} darkMode={true} />}
     </div>
   );
 
+  // --- ACCESS BLOCKERS ---
+  if (userStatus === 'loading') return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+          <div className="w-16 h-16 border-4 border-[#ef7c00] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+  );
+
+  if (userStatus === 'pending' || userStatus === 'rejected') return (
+      <div className="min-h-screen flex flex-col bg-slate-900 font-sans">
+          <div className="flex-grow flex items-center justify-center p-4">
+              <div className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-red-500 text-center animate-in zoom-in-95">
+                  <h2 className="text-3xl font-black text-white italic mb-4 uppercase">Access Restricted</h2>
+                  <p className="text-slate-400 font-bold mb-8">
+                      {userStatus === 'pending' 
+                          ? "Your account has been created but is waiting for an administrator to grant access. Please check back later." 
+                          : "Your access has been revoked by an administrator."}
+                  </p>
+                  <button onClick={() => signOut(auth)} className="w-full bg-[#002d72] text-white py-4 rounded-xl font-black uppercase tracking-widest hover:bg-blue-800 transition-all shadow-xl">Sign Out</button>
+              </div>
+          </div>
+          <Footer onShowLegal={setLegalType} darkMode={true} />
+          {legalType && <LegalModal type={legalType} onClose={()=>setLegalType(null)} darkMode={true} />}
+      </div>
+  );
+
   return (
-    <div className={`min-h-screen font-sans selection:bg-[#ef7c00] selection:text-white transition-colors duration-300 ${darkMode ? 'bg-slate-900 text-slate-100' : 'bg-slate-100 text-slate-900'}`}>
+    <div className={`flex flex-col min-h-screen font-sans selection:bg-[#ef7c00] selection:text-white transition-colors duration-300 ${darkMode ? 'bg-slate-900 text-slate-100' : 'bg-slate-100 text-slate-900'}`}>
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       {selectedBusDetail && (<div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"><BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} showToast={triggerToast} darkMode={darkMode} /></div>)}
+      {legalType && <LegalModal type={legalType} onClose={()=>setLegalType(null)} darkMode={darkMode} />}
 
       {/* TOP NAV BAR */}
       <nav className={`backdrop-blur-md border-b sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm overflow-x-auto ${darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
         <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-6 bg-[#ef7c00] rounded-full"></div><span className={`font-black text-lg italic uppercase tracking-tighter ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Fleet Manager</span></div>
         <div className="flex gap-4 items-center flex-nowrap">
-          {['inventory', 'input', 'tracker', 'handover', 'parts'].concat(isAdmin ? ['analytics', 'personnel'] : []).map(v => (
-            <button key={v} onClick={() => setView(v as any)} className={`text-[9px] font-black uppercase tracking-widest border-b-2 pb-1 transition-all whitespace-nowrap ${view === v ? 'border-[#ef7c00] text-[#ef7c00]' : (darkMode ? 'border-transparent text-slate-400 hover:text-white' : 'border-transparent text-slate-500 hover:text-[#002d72]')}`}>{v.replace('input', 'Data Entry').replace('parts', 'Parts List').replace('personnel', 'Personnel')}</button>
+          {['inventory', 'input', 'tracker', 'handover', 'parts']
+            .concat(isAdmin ? ['analytics', 'personnel', 'admin'] : [])
+            .map(v => (
+            <button key={v} onClick={() => setView(v as any)} className={`text-[9px] font-black uppercase tracking-widest border-b-2 pb-1 transition-all whitespace-nowrap ${view === v ? 'border-[#ef7c00] text-[#ef7c00]' : (darkMode ? 'border-transparent text-slate-400 hover:text-white' : 'border-transparent text-slate-500 hover:text-[#002d72]')}`}>
+                {v.replace('input', 'Data Entry').replace('parts', 'Parts List').replace('personnel', 'Personnel').replace('admin', 'Admin Panel')}
+            </button>
           ))}
           <button onClick={() => setDarkMode(!darkMode)} className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${darkMode ? 'bg-slate-800 text-yellow-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
           <button onClick={exportExcel} className={`text-[10px] font-black uppercase whitespace-nowrap ${darkMode ? 'text-green-400 hover:text-green-300' : 'text-[#002d72] hover:text-[#ef7c00]'}`}>Excel</button>
@@ -948,13 +1125,14 @@ export default function FleetManager() {
         </div>
       </nav>
 
-      <main className="max-w-[1600px] mx-auto p-4 md:p-6 overflow-x-hidden">
+      <main className="flex-grow max-w-[1600px] w-full mx-auto p-4 md:p-6 overflow-x-hidden">
         {view === 'tracker' ? <div className={`h-[85vh] rounded-2xl shadow-sm border overflow-hidden relative ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}><BusTracker /></div> :
          view === 'input' ? <BusInputForm showToast={triggerToast} darkMode={darkMode} buses={buses} isAdmin={isAdmin} /> :
          view === 'parts' ? <PartsInventory showToast={triggerToast} darkMode={darkMode} /> :
          view === 'analytics' ? (isAdmin ? <div className="animate-in fade-in duration-500"><StatusCharts buses={buses} /><AnalyticsDashboard buses={buses} showToast={triggerToast} /></div> : <div className="p-20 text-center text-red-500 font-black">ACCESS DENIED</div>) :
          view === 'handover' ? <ShiftHandover buses={buses} showToast={triggerToast} /> :
-         view === 'personnel' ? (isAdmin ? <PersonnelManager showToast={triggerToast} darkMode={darkMode} /> : <div className="p-20 text-center text-red-500 font-black">ACCESS DENIED</div>) : (
+         view === 'personnel' ? (isAdmin ? <PersonnelManager showToast={triggerToast} darkMode={darkMode} /> : <div className="p-20 text-center text-red-500 font-black">ACCESS DENIED</div>) : 
+         view === 'admin' ? (isAdmin ? <AccessManager showToast={triggerToast} darkMode={darkMode} /> : <div className="p-20 text-center text-red-500 font-black">ACCESS DENIED</div>) : (
           <>
             {/* STAT CARDS */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -1074,6 +1252,8 @@ export default function FleetManager() {
           </>
         )}
       </main>
+
+      <Footer onShowLegal={setLegalType} darkMode={darkMode} />
     </div>
   );
 }

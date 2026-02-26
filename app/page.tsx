@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db, auth } from './firebaseConfig'; 
 import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc, addDoc, deleteDoc, getDoc, getDocs, limit, writeBatch, updateDoc, arrayUnion, increment } from "firebase/firestore";
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
+// ADDED createUserWithEmailAndPassword
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import dynamic from 'next/dynamic';
@@ -85,7 +86,6 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClos
     useEffect(() => { if (showHistory) return onSnapshot(query(collection(db, "buses", bus.number, "history"), orderBy("timestamp", "desc")), (snap) => setHistoryLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))); }, [showHistory, bus.number]);
     
     const handleSave = async () => {
-        // Date Logic Check
         if (editData.oosStartDate) {
             const oos = new Date(editData.oosStartDate);
             if (editData.expectedReturnDate && new Date(editData.expectedReturnDate) < oos) {
@@ -154,7 +154,7 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClos
     );
 };
 
-// --- COMPLETED PERSONNEL MANAGER ---
+// --- PERSONNEL MANAGER ---
 const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, type: 'success'|'error') => void, darkMode: boolean }) => {
     const [personnel, setPersonnel] = useState<any[]>([]);
     const [viewMode, setViewMode] = useState<'dashboard' | 'log'>('dashboard');
@@ -303,7 +303,6 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
-            {/* Header and Controls */}
             <div className="flex justify-between items-end mb-6 flex-wrap gap-2">
                 <div>
                     <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Attendance Tracker</h2>
@@ -319,7 +318,6 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                 </div>
             </div>
 
-            {/* Individual Employee Modal */}
             {selectedEmp && (
                 <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
                     <div className={`rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ${darkMode ? 'bg-slate-800 text-white border border-slate-700' : 'bg-white text-black'}`}>
@@ -373,7 +371,6 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                 </div>
             )}
 
-            {/* Add Employee Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
                     <div className={`p-6 rounded-2xl w-full max-w-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -387,18 +384,15 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                 </div>
             )}
 
-            {/* Log Global Incident Modal */}
             {showIncidentModal && (
                 <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
                     <div className={`p-8 rounded-2xl w-full max-w-md shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                         <h3 className="text-2xl font-black text-[#ef7c00] mb-6 uppercase">Log Attendance</h3>
-                        
                         <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Employee</label>
                         <select className={`w-full p-3 border-2 rounded-lg font-bold mb-4 outline-none focus:border-[#ef7c00] ${inputClass}`} value={selectedEmpId} onChange={e=>setSelectedEmpId(e.target.value)}>
                             <option value="">-- Select Employee --</option>
                             {personnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
-                        
                         <div className="grid grid-cols-2 gap-4 mb-4">
                             <div>
                                 <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Type</label>
@@ -411,17 +405,13 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                                 <input type="number" className={`w-full p-3 border-2 rounded-lg font-bold text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} />
                             </div>
                         </div>
-                        
                         <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Date</label>
                         <input type="date" onClick={handleDateClick} className={`w-full p-3 border-2 rounded-lg font-bold mb-4 text-sm outline-none focus:border-[#ef7c00] cursor-pointer ${inputClass}`} value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} />
-                        
                         <div className={`flex items-center gap-3 mb-4 p-3 rounded-lg border cursor-pointer ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-blue-50 border-blue-100'}`} onClick={()=>setIncData({...incData, docReceived:!incData.docReceived})}>
                             <div className={`w-5 h-5 rounded border flex items-center justify-center ${incData.docReceived ? 'bg-[#ef7c00] border-[#ef7c00] text-white' : (darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-300')}`}>{incData.docReceived && '✓'}</div>
                             <span className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-blue-800'}`}>Documentation Received?</span>
                         </div>
-                        
                         <textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-6 font-medium text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Additional notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} />
-                        
                         <div className="flex gap-4">
                             <button onClick={()=>setShowIncidentModal(false)} className={`w-1/3 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'}`}>Cancel</button>
                             <button onClick={handleLogIncident} className="w-2/3 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-[#ef7c00] transition-colors">Save Record</button>
@@ -430,7 +420,6 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                 </div>
             )}
 
-            {/* Dashboard View */}
             {viewMode === 'dashboard' && (
                 <div className="space-y-6 overflow-y-auto pb-10">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -454,7 +443,6 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                         </div>
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* RESTORED MONTHLY INCIDENT TABLE */}
                         <div className={`rounded-2xl shadow-sm border overflow-hidden ${bgClass}`}>
                             <div className={`p-4 border-b ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                 <h3 className={`text-xs font-black uppercase tracking-widest ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Monthly Incident Summary</h3>
@@ -508,7 +496,6 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                 </div>
             )}
 
-            {/* RESTORED MASTER LOG TAB */}
             {viewMode === 'log' && (
                 <div className={`rounded-2xl shadow-lg border flex-grow overflow-hidden flex flex-col ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                     <div className={`p-4 border-b flex gap-4 flex-wrap ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
@@ -523,7 +510,15 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                         <div className={`min-w-[700px] divide-y ${darkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
                             {filteredLog.length === 0 ? <div className={`p-10 text-center italic font-bold ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>No records found.</div> : filteredLog.map((log, i) => (
                                 <div key={i} className={`grid grid-cols-12 gap-2 p-3 items-center transition-colors text-xs ${darkMode ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-blue-50 text-slate-700'}`}>
-                                    <div className={`col-span-3 font-bold ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>{log.employeeName}</div>
+                                    <div 
+                                        className={`col-span-3 font-bold cursor-pointer hover:underline ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}
+                                        onClick={() => {
+                                            const emp = personnel.find(p => p.id === log.employeeId);
+                                            if (emp) setSelectedEmp(emp);
+                                        }}
+                                    >
+                                        {log.employeeName}
+                                    </div>
                                     <div className="col-span-2 font-medium">
                                         <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-black ${log.type==='Sick'?'bg-orange-500/20 text-orange-500':log.type==='FMLA'?'bg-blue-500/20 text-blue-500':'bg-red-500/20 text-red-500'}`}>{log.type}</span>
                                     </div>
@@ -617,7 +612,6 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin }: { showToast: (m:s
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault(); 
         
-        // Date Validations
         if (formData.oosStartDate) {
             const oos = new Date(formData.oosStartDate);
             if (formData.expectedReturnDate && new Date(formData.expectedReturnDate) < oos) {
@@ -773,6 +767,9 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin }: { showToast: (m:s
 export default function FleetManager() {
   const [user, setUser] = useState<any>(null);
   
+  // NEW: State for Auth Toggle
+  const [isSignUp, setIsSignUp] = useState(false);
+
   const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'personnel' | 'parts'>('inventory');
   const [inventoryMode, setInventoryMode] = useState<'list' | 'grid' | 'tv'>('grid');
   const [buses, setBuses] = useState<any[]>([]);
@@ -784,7 +781,6 @@ export default function FleetManager() {
   const [activeFilter, setActiveFilter] = useState('Total Fleet');
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
   
-  // DARK MODE & FULLSCREEN
   const [darkMode, setDarkMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const tvBoardRef = useRef<HTMLDivElement>(null);
@@ -797,7 +793,6 @@ export default function FleetManager() {
   useEffect(() => { onAuthStateChanged(auth, u => setUser(u)); }, []);
   useEffect(() => { if (!user) return; return onSnapshot(query(collection(db, "buses"), orderBy("number", "asc")), s => setBuses(s.docs.map(d => ({...d.data(), docId: d.id})))); }, [user]);
 
-  // Fullscreen Listener
   useEffect(() => {
       const handleFsChange = () => { setIsFullscreen(!!document.fullscreenElement); };
       document.addEventListener('fullscreenchange', handleFsChange);
@@ -812,7 +807,6 @@ export default function FleetManager() {
       }
   };
 
-  // Auto-scroll TV Board Marquee
   useEffect(() => {
       let animationFrameId: number;
       let isPaused = false;
@@ -894,14 +888,43 @@ export default function FleetManager() {
     triggerToast("Excel Downloaded", 'success');
   };
 
+  // --- UPDATED AUTHENTICATION HANDLER ---
+  const handleAuth = async (e: React.FormEvent) => {
+      e.preventDefault();
+      try {
+          if (isSignUp) {
+              await createUserWithEmailAndPassword(auth, email, password);
+              triggerToast("Account created successfully!", 'success');
+          } else {
+              await signInWithEmailAndPassword(auth, email, password);
+          }
+      } catch (error: any) {
+          triggerToast(error.message.replace('Firebase: ', ''), 'error');
+      }
+  };
+
   if (!user) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 relative overflow-hidden">
-      <form onSubmit={async e => { e.preventDefault(); try { await signInWithEmailAndPassword(auth, email, password); } catch(e){} }} className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-[#ef7c00] relative z-10 animate-in fade-in zoom-in">
-        <h2 className="text-4xl font-black text-white italic mb-8 text-center leading-none uppercase">FLEET OPS</h2>
+    <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 relative overflow-hidden font-sans">
+      {/* Toast provider specifically for the login screen */}
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      
+      <form onSubmit={handleAuth} className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-[#ef7c00] relative z-10 animate-in fade-in zoom-in">
+        <h2 className="text-4xl font-black text-white italic mb-8 text-center leading-none uppercase">
+            {isSignUp ? 'REGISTER' : 'FLEET OPS'}
+        </h2>
         <div className="space-y-4">
-          <input className="w-full p-4 bg-slate-900 border-2 border-slate-700 rounded-xl font-bold text-white placeholder:text-gray-500" placeholder="supervisor@fleet.com" value={email} onChange={e=>setEmail(e.target.value)} required />
-          <input className="w-full p-4 bg-slate-900 border-2 border-slate-700 rounded-xl font-bold text-white placeholder:text-gray-500" placeholder="password123" type="password" value={password} onChange={e=>setPassword(e.target.value)} required />
-          <button className="w-full bg-[#ef7c00] text-white py-5 rounded-xl font-black uppercase tracking-widest hover:bg-orange-600 transition-all transform active:scale-95 shadow-xl">Authorized Login</button>
+          <input className="w-full p-4 bg-slate-900 border-2 border-slate-700 rounded-xl font-bold text-white placeholder:text-gray-500 outline-none focus:border-[#ef7c00]" placeholder="supervisor@fleet.com" value={email} onChange={e=>setEmail(e.target.value)} required />
+          <input className="w-full p-4 bg-slate-900 border-2 border-slate-700 rounded-xl font-bold text-white placeholder:text-gray-500 outline-none focus:border-[#ef7c00]" placeholder="password123" type="password" value={password} onChange={e=>setPassword(e.target.value)} required />
+          <button type="submit" className="w-full bg-[#ef7c00] text-white py-5 rounded-xl font-black uppercase tracking-widest hover:bg-orange-600 transition-all transform active:scale-95 shadow-xl">
+              {isSignUp ? 'Create Account' : 'Authorized Login'}
+          </button>
+        </div>
+        
+        {/* SIGN UP TOGGLE */}
+        <div className="mt-8 text-center">
+            <button type="button" onClick={() => setIsSignUp(!isSignUp)} className="text-slate-400 hover:text-white text-xs font-bold transition-colors">
+                {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+            </button>
         </div>
       </form>
     </div>
@@ -964,10 +987,10 @@ export default function FleetManager() {
                         </div>
                         <div className={`divide-y min-w-[800px] ${darkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
                             {sortedBuses.map(b => (
-                                <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`grid grid-cols-10 gap-4 p-5 items-center cursor-pointer transition-all border-l-4 ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} ${b.status==='Active'?'border-green-500':(b.status==='In Shop'?'border-orange-500':'border-red-500')}`}>
+                                <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`grid grid-cols-10 gap-4 p-5 items-center cursor-pointer transition-all border-l-4 ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} ${b.status==='Active' ? 'border-green-500' : (b.status === 'In Shop' ? 'border-orange-500' : 'border-red-500')}`}>
                                     <div className={`text-lg font-black ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>#{b.number}</div>
                                     <div className={`text-[9px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{getBusSpecs(b.number).length}</div>
-                                    <div className={`text-[9px] font-black uppercase px-2 py-1 rounded-full w-fit ${b.status==='Active'?'bg-green-500 text-white':(b.status==='In Shop'?'bg-orange-500 text-white':'bg-red-500 text-white')}`}>{b.status}</div>
+                                    <div className={`text-[9px] font-black uppercase px-2 py-1 rounded-full w-fit ${b.status==='Active' ? 'bg-green-500 text-white' : (b.status === 'In Shop' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white')}`}>{b.status}</div>
                                     <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.location || 'Location Unavailable'}</div>
                                     <div className={`col-span-2 text-xs font-medium truncate italic ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{b.notes||'No faults.'}</div>
                                     <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{b.expectedReturnDate||'—'}</div>

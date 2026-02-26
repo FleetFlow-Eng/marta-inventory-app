@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db, auth } from './firebaseConfig'; 
-import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc, addDoc, deleteDoc, getDoc, getDocs, limit, writeBatch, updateDoc, arrayUnion, increment } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc, addDoc, deleteDoc, getDoc, getDocs, limit, where, writeBatch, updateDoc, arrayUnion, increment } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -42,7 +42,7 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
 const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) => {
     useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
     return (
-        <div className={`fixed bottom-6 right-6 z-[8000] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-10 duration-300 border-l-8 ${type === 'success' ? 'bg-white border-green-500 text-slate-800' : 'bg-white border-red-500 text-slate-800'}`}>
+        <div className={`fixed bottom-6 right-6 z-[9999] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-10 duration-300 border-l-8 ${type === 'success' ? 'bg-white border-green-500 text-slate-800' : 'bg-white border-red-500 text-slate-800'}`}>
             <span className="text-2xl">{type === 'success' ? '✅' : '📋'}</span>
             <div><p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{type === 'success' ? 'Success' : 'Notice'}</p><p className="text-sm font-bold text-slate-800">{message}</p></div>
         </div>
@@ -79,16 +79,37 @@ const Footer = ({ onShowLegal, darkMode }: { onShowLegal: (type: 'privacy'|'abou
     </div>
 );
 
+// --- GLOBAL ACTIVITY AUDIT SYSTEM ---
+const logActivity = async (userEmail: string, category: string, target: string, action: string, details: string) => {
+    if (!userEmail) return;
+    try {
+        await addDoc(collection(db, "activity_logs"), {
+            user: userEmail,
+            category, // e.g., 'BUS', 'PERSONNEL', 'SYSTEM'
+            target,   // e.g., 'Bus #2001', 'John Doe'
+            action,   // e.g., 'UPDATE', 'CREATED', 'DELETED'
+            details,
+            timestamp: serverTimestamp()
+        });
+    } catch(e) { console.error("Audit log failed", e); }
+};
+
+const logHistory = async (busNumber: string, action: string, details: string, userEmail: string) => {
+    if (!busNumber) return;
+    try { 
+        // Log to local bus history
+        await addDoc(collection(db, "buses", busNumber, "history"), { action, details, user: userEmail, timestamp: serverTimestamp() }); 
+        // Log to global audit system
+        await logActivity(userEmail, 'BUS', `Bus #${busNumber}`, action, details);
+    } catch (err) { console.error("History log failed", err); }
+};
+
+
 // --- UTILITY FUNCTIONS ---
 const formatTime = (timestamp: any) => {
     if (!timestamp) return 'Just now';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-};
-
-const logHistory = async (busNumber: string, action: string, details: string, userEmail: string) => {
-    if (!busNumber) return;
-    try { await addDoc(collection(db, "buses", busNumber, "history"), { action, details, user: userEmail, timestamp: serverTimestamp() }); } catch (err) { console.error("History log failed", err); }
 };
 
 const getBusSpecs = (num: string) => {
@@ -118,6 +139,7 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClos
     useEffect(() => { if (showHistory) return onSnapshot(query(collection(db, "buses", bus.number, "history"), orderBy("timestamp", "desc")), (snap) => setHistoryLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))); }, [showHistory, bus.number]);
     
     const handleSave = async () => {
+        // Date Logic Check
         if (editData.oosStartDate) {
             const oos = new Date(editData.oosStartDate);
             if (editData.expectedReturnDate && new Date(editData.expectedReturnDate) < oos) {
@@ -144,7 +166,11 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClos
 
     const handleDeleteLog = async (logId: string) => {
         if(!confirm("Delete log?")) return;
-        try { await deleteDoc(doc(db, "buses", bus.number, "history", logId)); showToast("Log deleted", 'success'); } catch(err) { showToast("Failed to delete", 'error'); }
+        try { 
+            await deleteDoc(doc(db, "buses", bus.number, "history", logId)); 
+            await logActivity(auth.currentUser?.email || 'Unknown', 'BUS', `Bus #${bus.number}`, 'DELETED', 'Deleted a history log entry');
+            showToast("Log deleted", 'success'); 
+        } catch(err) { showToast("Failed to delete", 'error'); }
     };
 
     const handleResetBus = async () => {
@@ -186,9 +212,12 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClos
     );
 };
 
-// --- DEDICATED ADMIN PANEL FOR USER APPROVALS ---
+// --- DEDICATED ADMIN PANEL FOR USER APPROVALS & LOGS ---
 const AccessManager = ({ showToast, darkMode }: { showToast: any, darkMode: boolean }) => {
     const [usersList, setUsersList] = useState<any[]>([]);
+    const [selectedUserHistory, setSelectedUserHistory] = useState<string | null>(null);
+    const [userLogs, setUserLogs] = useState<any[]>([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
     
     useEffect(() => {
         return onSnapshot(collection(db, "users"), snap => {
@@ -201,19 +230,48 @@ const AccessManager = ({ showToast, darkMode }: { showToast: any, darkMode: bool
         try {
             await updateDoc(doc(db, "users", uid), { status: newStatus });
             showToast(`User status updated to ${newStatus}`, 'success');
-        } catch(err) {
-            showToast("Failed to update status", 'error');
+        } catch(err) { showToast("Failed to update status", 'error'); }
+    };
+
+    const toggleRole = async (uid: string, currentRole: string) => {
+        const newRole = currentRole === 'admin' ? 'user' : 'admin';
+        try { 
+            await updateDoc(doc(db, "users", uid), { role: newRole }); 
+            showToast(`User role updated to ${newRole}`, 'success'); 
+        } catch(e) { showToast("Failed to update role", 'error'); }
+    };
+
+    const deleteUser = async (uid: string, email: string) => {
+        if(ADMIN_EMAILS.includes(email.toLowerCase())) {
+            return showToast("Cannot delete a Master Admin!", "error");
         }
+        if(!confirm(`PERMANENTLY DELETE user ${email}? They will lose all access.`)) return;
+        try { 
+            await deleteDoc(doc(db, "users", uid)); 
+            showToast("User deleted permanently", 'success'); 
+        } catch(e) { showToast("Failed to delete user", 'error'); }
+    };
+
+    const fetchUserHistory = async (email: string) => {
+        setSelectedUserHistory(email);
+        setLoadingLogs(true);
+        try {
+            const q = query(collection(db, "activity_logs"), where("user", "==", email));
+            const snap = await getDocs(q);
+            const logs = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a:any, b:any) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
+            setUserLogs(logs);
+        } catch(e) { showToast("Failed to load history", "error"); }
+        setLoadingLogs(false);
     };
 
     const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
     
     return (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col max-w-4xl mx-auto">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col max-w-6xl mx-auto">
             <div className="flex justify-between items-end mb-6 flex-wrap gap-2">
                 <div>
                     <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Admin Panel</h2>
-                    <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Manage Registration Access</p>
+                    <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Manage Access & Activity</p>
                 </div>
             </div>
             
@@ -221,33 +279,84 @@ const AccessManager = ({ showToast, darkMode }: { showToast: any, darkMode: bool
                 <table className="w-full text-left text-sm">
                     <thead className={`font-black uppercase tracking-widest text-[10px] border-b ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                         <tr>
-                            <th className="p-4">User Email</th>
-                            <th className="p-4 text-center">Current Status</th>
-                            <th className="p-4 text-center">Action</th>
+                            <th className="p-4">User Email (Click for Log)</th>
+                            <th className="p-4 text-center">System Role</th>
+                            <th className="p-4 text-center">App Access</th>
+                            <th className="p-4 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                        {usersList.length === 0 ? <tr><td colSpan={3} className="p-10 text-center italic text-slate-500">No users found.</td></tr> : usersList.map(u => (
-                            <tr key={u.id} className={darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}>
-                                <td className="p-4 font-bold">{u.email}</td>
-                                <td className="p-4 text-center">
-                                    <span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${u.status === 'approved' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
-                                        {u.status}
-                                    </span>
-                                </td>
-                                <td className="p-4 text-center">
-                                    <button 
-                                        onClick={()=>toggleApproval(u.id, u.status)} 
-                                        className={`px-4 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all active:scale-95 shadow-md ${u.status === 'approved' ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-green-500 text-white hover:bg-green-600'}`}
-                                    >
-                                        {u.status === 'approved' ? 'Revoke Access' : 'Approve Access'}
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
+                        {usersList.length === 0 ? <tr><td colSpan={4} className="p-10 text-center italic text-slate-500">No users found.</td></tr> : usersList.map(u => {
+                            const isMaster = ADMIN_EMAILS.includes(u.email?.toLowerCase());
+                            return (
+                                <tr key={u.id} className={`transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}`}>
+                                    <td className="p-4 font-bold cursor-pointer hover:underline text-[#ef7c00]" onClick={() => fetchUserHistory(u.email)}>
+                                        {u.email} {isMaster && <span className="text-[8px] bg-purple-500 text-white px-1 py-0.5 rounded ml-2">MASTER</span>}
+                                    </td>
+                                    <td className="p-4 text-center">
+                                        <span className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest ${u.role === 'admin' || isMaster ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                                            {u.role === 'admin' || isMaster ? 'Admin (OP)' : 'Standard'}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-center">
+                                        <span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${u.status === 'approved' || isMaster ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
+                                            {u.status === 'approved' || isMaster ? 'Approved' : 'Pending'}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-center flex justify-center gap-2">
+                                        {!isMaster && (
+                                            <>
+                                                <button onClick={()=>toggleApproval(u.id, u.status)} className={`px-3 py-1.5 rounded font-black text-[9px] uppercase tracking-widest transition-all active:scale-95 shadow-sm ${u.status === 'approved' ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-green-500 text-white hover:bg-green-600'}`}>
+                                                    {u.status === 'approved' ? 'Revoke' : 'Approve'}
+                                                </button>
+                                                <button onClick={()=>toggleRole(u.id, u.role)} className={`px-3 py-1.5 rounded font-black text-[9px] uppercase tracking-widest transition-all active:scale-95 shadow-sm ${u.role === 'admin' ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-purple-600 text-white hover:bg-purple-700'}`}>
+                                                    {u.role === 'admin' ? 'De-OP' : 'OP'}
+                                                </button>
+                                                <button onClick={()=>deleteUser(u.id, u.email)} className="px-3 py-1.5 rounded font-black text-[9px] uppercase tracking-widest transition-all active:scale-95 shadow-sm bg-red-600 text-white hover:bg-red-700">
+                                                    Delete
+                                                </button>
+                                            </>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
+
+            {/* AUDIT LOG MODAL */}
+            {selectedUserHistory && (
+                <div className="fixed inset-0 z-[7000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
+                    <div className={`p-6 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+                        <div className="flex justify-between items-center mb-4 border-b pb-4 border-slate-500/20">
+                            <div>
+                                <h3 className={`text-2xl font-black uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Audit Log</h3>
+                                <p className={`text-[10px] font-bold mt-1 tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{selectedUserHistory}</p>
+                            </div>
+                            <button onClick={() => setSelectedUserHistory(null)} className="text-2xl text-slate-400 hover:text-red-500 transition-colors">✕</button>
+                        </div>
+                        <div className="overflow-y-auto flex-grow custom-scrollbar space-y-3">
+                            {loadingLogs ? (
+                                <div className="text-center p-10 text-slate-400 font-bold animate-pulse">Loading activity...</div>
+                            ) : userLogs.length === 0 ? (
+                                <div className="text-center p-10 text-slate-400 italic">No activity recorded for this user yet.</div>
+                            ) : userLogs.map(log => (
+                                <div key={log.id} className={`p-3 rounded-lg border ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{log.category} • {log.target}</span>
+                                        <span className={`text-[9px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{formatTime(log.timestamp)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${log.action === 'CREATED' ? 'bg-green-500/20 text-green-600' : log.action === 'UPDATE' ? 'bg-blue-500/20 text-blue-500' : log.action === 'DELETED' ? 'bg-red-500/20 text-red-500' : 'bg-orange-500/20 text-orange-500'}`}>{log.action}</span>
+                                        <span className={`text-xs font-bold whitespace-pre-wrap ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{log.details}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -333,6 +442,7 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
         if(!newEmpName) return; 
         try { 
             await addDoc(collection(db, "personnel"), { name: newEmpName, totalOccurrences: 0, incidents: [], timestamp: serverTimestamp() }); 
+            await logActivity(auth.currentUser?.email || 'Unknown', 'PERSONNEL', newEmpName, 'CREATED', `Added new employee record`);
             showToast(`Added ${newEmpName}`, 'success'); 
             setNewEmpName(''); 
             setShowAddModal(false); 
@@ -343,8 +453,10 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
         const targetId = selectedEmp ? selectedEmp.id : selectedEmpId; 
         if(!targetId) return showToast("Select an employee", 'error');
         try {
+            const empName = personnel.find(p => p.id === targetId)?.name || 'Unknown Emp';
             const newLog = { type: incData.type, date: incData.date || new Date().toISOString().split('T')[0], count: Number(incData.count), docReceived: incData.docReceived, supervisorReviewDate: incData.supervisorReviewDate, notes: incData.notes, loggedAt: new Date().toISOString() };
             await updateDoc(doc(db, "personnel", targetId), { totalOccurrences: increment(Number(incData.count)), incidents: arrayUnion(newLog) });
+            await logActivity(auth.currentUser?.email || 'Unknown', 'PERSONNEL', empName, 'INCIDENT', `Logged ${incData.type} (${incData.count} pts) on ${incData.date}. Notes: ${incData.notes}`);
             showToast("Incident Saved", 'success'); 
             setShowIncidentModal(false); 
             setIncData({ type: 'Sick', date: '', count: 1, docReceived: false, supervisorReviewDate: '', notes: '' });
@@ -356,9 +468,11 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
         try {
             const empSnap = await getDoc(doc(db, "personnel", empId)); 
             if (!empSnap.exists()) return;
+            const empName = empSnap.data().name;
             const updatedIncidents = (empSnap.data().incidents || []).filter((i: any) => i.loggedAt !== incident.loggedAt);
             const newTotal = updatedIncidents.reduce((sum: number, i: any) => sum + (Number(i.count) || 0), 0);
             await updateDoc(doc(db, "personnel", empId), { incidents: updatedIncidents, totalOccurrences: newTotal });
+            await logActivity(auth.currentUser?.email || 'Unknown', 'PERSONNEL', empName, 'DELETED', `Deleted ${incident.type} record from ${incident.date}`);
             showToast("Incident Deleted", 'success'); 
             if (selectedEmp && selectedEmp.id === empId) setSelectedEmp({ ...selectedEmp, incidents: updatedIncidents, totalOccurrences: newTotal });
         } catch (err) { showToast("Delete Failed", 'error'); }
@@ -608,6 +722,7 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                         <div className={`min-w-[700px] divide-y ${darkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
                             {filteredLog.length === 0 ? <div className={`p-10 text-center italic font-bold ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>No records found.</div> : filteredLog.map((log, i) => (
                                 <div key={i} className={`grid grid-cols-12 gap-2 p-3 items-center transition-colors text-xs ${darkMode ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-blue-50 text-slate-700'}`}>
+                                    {/* CLICKABLE USERNAME TO OPEN PROFILE */}
                                     <div 
                                         className={`col-span-3 font-bold cursor-pointer hover:underline ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}
                                         onClick={() => {
@@ -866,9 +981,10 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin }: { showToast: (m:s
 export default function FleetManager() {
   const [user, setUser] = useState<any>(null);
   
-  // NEW: State for Auth Toggle & Access Approval
+  // Auth Toggle & Access Approval State
   const [isSignUp, setIsSignUp] = useState(false);
   const [userStatus, setUserStatus] = useState<'loading' | 'approved' | 'pending' | 'rejected'>('loading');
+  const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
 
   const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'personnel' | 'parts' | 'admin'>('inventory');
   const [inventoryMode, setInventoryMode] = useState<'list' | 'grid' | 'tv'>('grid');
@@ -889,10 +1005,12 @@ export default function FleetManager() {
 
   const holdStatuses = ['On Hold', 'Engine', 'Body Shop', 'Vendor', 'Brakes', 'Safety'];
   
-  const isAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '');
+  const isMasterAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '');
+  const isAdmin = isMasterAdmin || userRole === 'admin';
+
   const triggerToast = (msg: string, type: 'success' | 'error') => { setToast({ msg, type }); };
 
-  // AUTHENTICATION STATE & ACCESS CONTROL
+  // AUTHENTICATION & ACCESS CONTROL
   useEffect(() => { onAuthStateChanged(auth, u => setUser(u)); }, []);
 
   useEffect(() => {
@@ -901,24 +1019,27 @@ export default function FleetManager() {
           return;
       }
 
-      // Hardcoded admins automatically get approved
+      // Hardcoded master admins automatically bypass checks
       if (ADMIN_EMAILS.includes(user.email?.toLowerCase() || '')) {
           setUserStatus('approved');
+          setUserRole('admin');
           return;
       }
 
-      // Check access status for standard users
       const unsubscribe = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
           if (docSnap.exists()) {
-              setUserStatus(docSnap.data().status);
+              const data = docSnap.data();
+              setUserStatus(data.status || 'pending');
+              setUserRole(data.role || 'user');
           } else {
-              // Create a pending doc if one somehow doesn't exist for a logged-in user
               setDoc(doc(db, "users", user.uid), {
                   email: user.email?.toLowerCase() || '',
                   status: 'pending',
+                  role: 'user',
                   createdAt: serverTimestamp()
               });
               setUserStatus('pending');
+              setUserRole('user');
           }
       });
       return () => unsubscribe();
@@ -1032,10 +1153,10 @@ export default function FleetManager() {
       try {
           if (isSignUp) {
               const cred = await createUserWithEmailAndPassword(auth, email, password);
-              // Store user safely in firestore with 'pending' status
               await setDoc(doc(db, "users", cred.user.uid), {
                   email: email.toLowerCase(),
                   status: 'pending',
+                  role: 'user',
                   createdAt: serverTimestamp()
               });
               triggerToast("Account created successfully! Pending admin approval.", 'success');

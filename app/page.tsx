@@ -40,7 +40,7 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
 
 // --- HELPER COMPONENTS ---
 const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) => {
-    useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
+    useEffect(() => { const timer = setTimeout(onClose, 4000); return () => clearTimeout(timer); }, [onClose]);
     return (
         <div className={`fixed bottom-6 right-6 z-[9999] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-10 duration-300 border-l-8 ${type === 'success' ? 'bg-white border-green-500 text-slate-800' : 'bg-white border-red-500 text-slate-800'}`}>
             <span className="text-2xl">{type === 'success' ? '✅' : '📋'}</span>
@@ -579,7 +579,6 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                 </div>
             )}
 
-            {/* Add Employee Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
                     <div className={`p-6 rounded-2xl w-full max-w-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -593,7 +592,6 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                 </div>
             )}
 
-            {/* Log Global Incident Modal */}
             {showIncidentModal && (
                 <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
                     <div className={`p-8 rounded-2xl w-full max-w-md shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -636,7 +634,6 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                 </div>
             )}
 
-            {/* Dashboard View */}
             {viewMode === 'dashboard' && (
                 <div className="space-y-6 overflow-y-auto pb-10">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -792,12 +789,12 @@ const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: (ms
     useEffect(() => { const fetchRankings = async () => { const rankings: {number: string, count: number}[] = []; const sampleBuses = buses.slice(0, 50); for (const bus of sampleBuses) { const hSnap = await getDocs(query(collection(db, "buses", bus.number, "history"), limit(20))); if (hSnap.size > 0) rankings.push({ number: bus.number, count: hSnap.size }); } setShopQueens(rankings.sort((a,b) => b.count - a.count).slice(0, 5)); }; if(buses.length > 0) fetchRankings(); }, [buses]);
     
     const handleResetMetrics = async () => { 
-        if(!confirm("⚠️ WARNING: This will permanently wipe ALL bus history AND global audit logs. Proceed?")) return; 
+        if(!confirm("⚠️ WARNING: This will permanently wipe ALL bus history, personnel incidents, and global audit logs. Proceed?")) return; 
         setIsResetting(true); 
         try { 
             let allDeletes: any[] = [];
             for (const bus of buses) { 
-                const hSnap = await getDocs(collection(db, "buses", bus.docId, "history")); 
+                const hSnap = await getDocs(collection(db, "buses", bus.number, "history")); 
                 hSnap.docs.forEach(doc => allDeletes.push(doc.ref)); 
             } 
             const aSnap = await getDocs(collection(db, "activity_logs"));
@@ -809,11 +806,22 @@ const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: (ms
                 chunk.forEach(ref => batch.delete(ref));
                 await batch.commit();
             }
-            showToast(`All logs wiped successfully.`, 'success'); 
+
+            const pSnap = await getDocs(collection(db, "personnel"));
+            for (let i = 0; i < pSnap.docs.length; i += 400) {
+                const pBatch = writeBatch(db);
+                const pChunk = pSnap.docs.slice(i, i + 400);
+                pChunk.forEach(docSnap => {
+                    pBatch.update(docSnap.ref, { incidents: [], totalOccurrences: 0 });
+                });
+                await pBatch.commit();
+            }
+
+            showToast(`All databases wiped successfully.`, 'success'); 
             setShopQueens([]); 
-        } catch (err) { 
+        } catch (err: any) { 
             console.error(err);
-            showToast("Failed to wipe logs.", 'error'); 
+            showToast(`Failed: ${err.message || "Unknown error"}`, 'error'); 
         } 
         setIsResetting(false); 
     };
@@ -828,6 +836,7 @@ const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: (ms
     );
 };
 
+// --- COMPONENT: SHIFT HANDOVER ---
 const ShiftHandover = ({ buses, showToast }: { buses: any[], showToast: (m:string, t:'success'|'error')=>void }) => {
     const [report, setReport] = useState<any[]>([]);
     useEffect(() => { const fetchRecent = async () => { const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000); let logs: any[] = []; for (const b of buses.filter(x => x.status !== 'Active' || x.notes).slice(0,30)) { const hSnap = await getDocs(query(collection(db, "buses", b.number, "history"), orderBy("timestamp", "desc"), limit(2))); hSnap.forEach(d => { if((d.data().timestamp?.toMillis() || 0) > twelveHoursAgo) logs.push({ bus: b.number, ...d.data() }); }); } setReport(logs.sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0))); }; if(buses.length > 0) fetchRecent(); }, [buses]);
@@ -837,7 +846,7 @@ const ShiftHandover = ({ buses, showToast }: { buses: any[], showToast: (m:strin
     );
 };
 
-// --- DATA ENTRY & BUS CREATION ---
+// --- COMPONENT: DATA ENTRY & BUS CREATION ---
 const BusInputForm = ({ showToast, darkMode, buses, isAdmin }: { showToast: (m:string, t:'success'|'error')=>void, darkMode: boolean, buses: any[], isAdmin: boolean }) => {
     const [formData, setFormData] = useState({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
     const [showAddModal, setShowAddModal] = useState(false);
@@ -854,6 +863,7 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin }: { showToast: (m:s
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault(); 
         
+        // Date Validations
         if (formData.oosStartDate) {
             const oos = new Date(formData.oosStartDate);
             if (formData.expectedReturnDate && new Date(formData.expectedReturnDate) < oos) {
@@ -972,9 +982,9 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin }: { showToast: (m:s
             }
             await logActivity(auth.currentUser?.email || 'Unknown', 'SYSTEM', 'Entire Fleet', 'UPDATE', 'Master Reset triggered. All buses set to Active.');
             showToast("Fleet successfully reset to Active.", 'success');
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            showToast("Failed to reset fleet.", 'error');
+            showToast(`Failed: ${err.message}`, 'error');
         }
     };
 
@@ -1040,6 +1050,7 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin }: { showToast: (m:s
 export default function FleetManager() {
   const [user, setUser] = useState<any>(null);
   
+  // Auth Toggle & Access Approval State
   const [isSignUp, setIsSignUp] = useState(false);
   const [userStatus, setUserStatus] = useState<'loading' | 'approved' | 'pending' | 'rejected'>('loading');
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
@@ -1056,6 +1067,7 @@ export default function FleetManager() {
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
   const [legalType, setLegalType] = useState<'privacy'|'about'|null>(null);
   
+  // DARK MODE & FULLSCREEN
   const [darkMode, setDarkMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const tvBoardRef = useRef<HTMLDivElement>(null);

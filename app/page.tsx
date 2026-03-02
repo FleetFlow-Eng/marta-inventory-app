@@ -127,7 +127,7 @@ const calculateDaysOOS = (start: string) => {
 
 // --- COMPONENT DEFINITIONS ---
 
-const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClose: () => void; showToast: (m:string, t:'success'|'error')=>void, darkMode: boolean }) => {
+const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin }: { bus: any; onClose: () => void; showToast: (m:string, t:'success'|'error')=>void, darkMode: boolean, isAdmin: boolean }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [historyLogs, setHistoryLogs] = useState<any[]>([]); 
@@ -166,7 +166,7 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClos
             await deleteDoc(doc(db, "buses", bus.number, "history", logId)); 
             await logActivity(auth.currentUser?.email || 'Unknown', 'BUS', `Bus #${bus.number}`, 'DELETED', 'Deleted a history log entry');
             showToast("Log deleted", 'success'); 
-        } catch(err) { showToast("Failed to delete", 'error'); }
+        } catch(err) { showToast("Failed to delete. Ensure you have Admin privileges.", 'error'); }
     };
 
     const handleResetBus = async () => {
@@ -190,7 +190,7 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode }: { bus: any; onClos
     const statusColorText = bus.status === 'Active' ? 'text-green-600' : bus.status === 'In Shop' ? 'text-orange-500' : 'text-red-600';
     const statusColorBadge = bus.status === 'Active' ? 'bg-green-500' : bus.status === 'In Shop' ? 'bg-orange-500' : 'bg-red-500';
 
-    if (showHistory) return (<div className={`p-6 rounded-xl shadow-2xl w-full max-w-lg h-[600px] flex flex-col animate-in zoom-in-95 border ${bgClass}`}><div className={`flex justify-between items-center mb-4 border-b pb-4 font-black uppercase ${statusColorText}`}><span>History: #{bus.number}</span><button onClick={()=>setShowHistory(false)} className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Back</button></div><div className="flex-grow overflow-y-auto space-y-3">{historyLogs.map(l => (<div key={l.id} className={`p-3 rounded-lg border relative group ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}><div className={`flex justify-between text-[8px] font-black uppercase mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}><span>{l.action}</span><span>{formatTime(l.timestamp)}</span></div><p className={`text-xs font-bold whitespace-pre-wrap leading-tight ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{l.details}</p><button onClick={() => handleDeleteLog(l.id)} className="absolute top-2 right-2 text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold">DELETE</button></div>))}</div></div>);
+    if (showHistory) return (<div className={`p-6 rounded-xl shadow-2xl w-full max-w-lg h-[600px] flex flex-col animate-in zoom-in-95 border ${bgClass}`}><div className={`flex justify-between items-center mb-4 border-b pb-4 font-black uppercase ${statusColorText}`}><span>History: #{bus.number}</span><button onClick={()=>setShowHistory(false)} className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Back</button></div><div className="flex-grow overflow-y-auto space-y-3">{historyLogs.map(l => (<div key={l.id} className={`p-3 rounded-lg border relative group ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}><div className={`flex justify-between text-[8px] font-black uppercase mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}><span>{l.action}</span><span>{formatTime(l.timestamp)}</span></div><p className={`text-xs font-bold whitespace-pre-wrap leading-tight ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{l.details}</p>{isAdmin && <button onClick={() => handleDeleteLog(l.id)} className="absolute top-2 right-2 text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold">DELETE</button>}</div>))}</div></div>);
     if (isEditing) return (<div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}><h3 className={`text-2xl font-black mb-6 uppercase italic ${statusColorText}`}>Edit Bus #{bus.number}</h3><div className="grid grid-cols-2 gap-4 mb-4"><select className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.status} onChange={e=>setEditData({...editData, status:e.target.value})}><option value="Active">Ready</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option></select><input className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.location} onChange={e=>setEditData({...editData, location:e.target.value})} placeholder="Location" /></div><textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-4 font-bold ${inputClass}`} value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} placeholder="Maintenance Notes" /><div className={`grid grid-cols-3 gap-4 mb-6 text-[9px] font-black uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}><div>OOS Date<input type="date" onClick={handleDateClick} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer ${inputClass}`} value={editData.oosStartDate} onChange={e=>setEditData({...editData, oosStartDate:e.target.value})} /></div><div>Exp Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer ${inputClass}`} value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div><div>Act Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer ${inputClass}`} value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div></div><div className="flex gap-4"><button onClick={()=>setIsEditing(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white' : 'bg-slate-100 text-black'}`}>Cancel</button><button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg">Save Changes</button></div></div>);
     return (
         <div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}>
@@ -634,6 +634,7 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                 </div>
             )}
 
+            {/* Dashboard View */}
             {viewMode === 'dashboard' && (
                 <div className="space-y-6 overflow-y-auto pb-10">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -793,13 +794,21 @@ const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: (ms
         setIsResetting(true); 
         try { 
             let allDeletes: any[] = [];
-            for (const bus of buses) { 
-                const hSnap = await getDocs(collection(db, "buses", bus.number, "history")); 
-                hSnap.docs.forEach(doc => allDeletes.push(doc.ref)); 
-            } 
+            
+            // 1. Wipe Activity Logs
             const aSnap = await getDocs(collection(db, "activity_logs"));
-            aSnap.docs.forEach(doc => allDeletes.push(doc.ref));
+            aSnap.docs.forEach(docSnap => allDeletes.push(docSnap.ref));
+            
+            // 2. Wipe Bus History concurrently in chunks
+            for (let i = 0; i < buses.length; i += 20) {
+                const batchPromises = buses.slice(i, i + 20).map(bus => getDocs(collection(db, "buses", bus.docId, "history")));
+                const batchSnaps = await Promise.all(batchPromises);
+                batchSnaps.forEach(snap => {
+                    snap.docs.forEach(docSnap => allDeletes.push(docSnap.ref));
+                });
+            }
 
+            // Execute deletes safely in batches of 400
             for (let i = 0; i < allDeletes.length; i += 400) {
                 const batch = writeBatch(db);
                 const chunk = allDeletes.slice(i, i + 400);
@@ -807,6 +816,7 @@ const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: (ms
                 await batch.commit();
             }
 
+            // 3. Reset Personnel Incidents
             const pSnap = await getDocs(collection(db, "personnel"));
             for (let i = 0; i < pSnap.docs.length; i += 400) {
                 const pBatch = writeBatch(db);
@@ -1292,7 +1302,7 @@ export default function FleetManager() {
   return (
     <div className={`flex flex-col min-h-screen font-sans selection:bg-[#ef7c00] selection:text-white transition-colors duration-300 ${darkMode ? 'bg-slate-900 text-slate-100' : 'bg-slate-100 text-slate-900'}`}>
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-      {selectedBusDetail && (<div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"><BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} showToast={triggerToast} darkMode={darkMode} /></div>)}
+      {selectedBusDetail && (<div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"><BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} showToast={triggerToast} darkMode={darkMode} isAdmin={isAdmin} /></div>)}
       {legalType && <LegalModal type={legalType} onClose={()=>setLegalType(null)} darkMode={darkMode} />}
 
       {/* TOP NAV BAR */}

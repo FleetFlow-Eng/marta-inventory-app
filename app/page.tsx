@@ -316,16 +316,16 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
             <div className="flex justify-between items-end mb-6 flex-wrap gap-2">
                 <div><h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Attendance Tracker</h2><p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Incident Dashboard & Logs</p></div>
                 <div className="flex gap-2 flex-wrap">
-                    <div className={`border rounded-lg p-1 flex ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}><button onClick={()=>setViewMode('dashboard')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all ${viewMode==='dashboard'?'bg-[#002d72] text-white shadow':(darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]')}`}>Dashboard</button><button onClick={()=>setViewMode('log')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all ${viewMode==='log'?'bg-[#002d72] text-white shadow':(darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]')}`}>Master Log</button></div>
-                    <button onClick={() => setShowIncidentModal(true)} className="px-6 py-2 bg-[#ef7c00] text-white rounded-lg font-black uppercase text-[10px] shadow-lg hover:bg-orange-600 transition-all">+ Log Incident</button>
-                    <button onClick={() => setShowAddModal(true)} className={`px-4 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg transition-all ${darkMode ? 'bg-slate-700 text-slate-200 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>+ Emp</button>
+                    <div className={`border rounded-lg p-1 flex ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}><button onClick={()=>setViewMode('dashboard')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded ${viewMode==='dashboard'?'bg-[#002d72] text-white shadow':(darkMode ? 'text-slate-400' : 'text-slate-500')}`}>Dashboard</button><button onClick={()=>setViewMode('log')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded ${viewMode==='log'?'bg-[#002d72] text-white shadow':(darkMode ? 'text-slate-400' : 'text-slate-500')}`}>Master Log</button></div>
+                    <button onClick={() => setShowIncidentModal(true)} className="px-6 py-2 bg-[#ef7c00] text-white rounded-lg font-black uppercase text-[10px] shadow-lg">+ Log Incident</button>
+                    <button onClick={() => setShowAddModal(true)} className={`px-4 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg ${darkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-700'}`}>+ Emp</button>
                 </div>
             </div>
 
             {selectedEmp && (
                 <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
                     <div className={`rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ${darkMode ? 'bg-slate-800 text-white border border-slate-700' : 'bg-white text-black'}`}>
-                        <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}><div><h3 className={`text-2xl font-black uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>{selectedEmp.name}</h3><p className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Occurrences: <span className="text-red-500">{selectedEmp.totalOccurrences || 0}</span></p></div><div className="flex gap-2"><button onClick={handleExportWord} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-black text-[10px] uppercase shadow hover:bg-blue-700 transition-colors">📄 Export Notice</button><button onClick={()=>setSelectedEmp(null)} className="text-2xl text-slate-400 hover:text-red-500 transition-colors">✕</button></div></div>
+                        <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}><div><h3 className={`text-2xl font-black uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>{selectedEmp.name}</h3><p className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Occurrences: <span className="text-red-500">{selectedEmp.totalOccurrences || 0}</span></p></div><div className="flex gap-2"><button onClick={handleExportWord} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-black text-[10px] uppercase shadow hover:bg-blue-700 transition-colors">📄 Export Notice</button><button onClick={()=>setSelectedEmp(null)} className="text-2xl text-slate-400 hover:text-red-500">✕</button></div></div>
                         <div className="p-6 overflow-y-auto custom-scrollbar">
                             <div className={`p-4 rounded-xl border mb-6 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-blue-50/50 border-blue-100'}`}>
                                 <h4 className={`text-[10px] font-black uppercase tracking-widest mb-3 ${darkMode ? 'text-[#ef7c00]' : 'text-blue-800'}`}>Log New Incident</h4>
@@ -337,12 +337,11 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
                             <h4 className={`text-[10px] font-black uppercase tracking-widest mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Incident History</h4>
                             <div className={`border rounded-xl overflow-hidden overflow-x-auto ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
                                 <table className="w-full text-left text-xs min-w-[400px]">
-                                    <thead className={`font-black ${darkMode ? 'bg-slate-900 text-slate-400 border-b border-slate-700' : 'bg-slate-50 text-slate-500 border-b border-slate-200'}`}><tr><th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3 text-center">Pts</th><th className="p-3">Notes</th><th className="p-3 text-center">Action</th></tr></thead>
-                                    <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                                        {selectedEmp.incidents && selectedEmp.incidents.length > 0 ? selectedEmp.incidents.map((inc: any, i: number) => {
+                                    <thead className={`font-black ${darkMode ? 'bg-slate-900 text-slate-400 border-b border-slate-700' : 'bg-slate-50 text-slate-500 border-b border-slate-200'}`}><tr><th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3 text-center">Pts</th><th className="p-3">Notes</th><th className="p-3 text-center">Action</th></tr></thead><tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
+                                        {selectedEmp.incidents?.map((inc: any, i: number) => {
                                             const isOld = (new Date().getTime() - new Date(inc.date).getTime()) / (1000 * 60 * 60 * 24) > 365;
-                                            return (<tr key={i} className={isOld ? (darkMode ? "bg-red-900/20 text-red-400 font-medium" : "bg-red-50 text-red-600 font-medium") : ""}><td className="p-3 font-mono">{inc.date} {isOld && <span className="text-[8px] font-black uppercase ml-1">(>1yr)</span>}</td><td className="p-3 font-bold">{inc.type}</td><td className="p-3 text-center font-black">{inc.count}</td><td className={`p-3 italic truncate max-w-[150px] ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{inc.notes}</td><td className="p-3 text-center"><button onClick={() => handleDeleteIncident(selectedEmp.id, inc)} className="text-red-500 hover:text-red-400 font-bold">🗑️</button></td></tr>);
-                                        }) : <tr><td colSpan={5} className={`p-4 text-center italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>No history found.</td></tr>}
+                                            return (<tr key={i} className={isOld ? (darkMode ? "bg-red-900/20 text-red-400 font-medium" : "bg-red-50 text-red-600 font-medium") : ""}><td className="p-3 font-mono">{inc.date} {isOld && <span className="text-[8px] font-black uppercase ml-1">(>1yr)</span>}</td><td className="p-3 font-bold">{inc.type}</td><td className="p-3 text-center font-black">{inc.count}</td><td className={`p-3 italic truncate max-w-[150px] ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{inc.notes}</td><td className="p-3 text-center"><button onClick={() => handleDeleteIncident(selectedEmp.id, inc)} className="text-red-500 font-bold">🗑️</button></td></tr>);
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -351,95 +350,37 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
                 </div>
             )}
 
-            {showAddModal && (
-                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
-                    <div className={`p-6 rounded-2xl w-full max-w-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                        <h3 className={`text-xl font-black mb-4 uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Add Employee</h3>
-                        <input className={`w-full p-3 border-2 rounded-lg mb-4 font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Full Name (e.g. John Doe)" value={newEmpName} onChange={e=>setNewEmpName(e.target.value)} />
-                        <div className="flex gap-2"><button onClick={()=>setShowAddModal(false)} className={`flex-1 py-3 rounded-lg font-bold text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'}`}>Cancel</button><button onClick={handleAddEmployee} className="flex-1 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-lg font-bold text-xs transition-colors">Add Employee</button></div>
-                    </div>
-                </div>
-            )}
-
-            {showIncidentModal && (
-                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
-                    <div className={`p-8 rounded-2xl w-full max-w-md shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                        <h3 className="text-2xl font-black text-[#ef7c00] mb-6 uppercase">Log Attendance</h3>
-                        <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Employee</label>
-                        <select className={`w-full p-3 border-2 rounded-lg font-bold mb-4 outline-none focus:border-[#ef7c00] ${inputClass}`} value={selectedEmpId} onChange={e=>setSelectedEmpId(e.target.value)}><option value="">-- Select Employee --</option>{personnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div><label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Type</label><select className={`w-full p-3 border-2 rounded-lg font-bold text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.type} onChange={e=>setIncData({...incData, type:e.target.value})}><option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option></select></div>
-                            <div><label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Occurrences</label><input type="number" className={`w-full p-3 border-2 rounded-lg font-bold text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} /></div>
-                        </div>
-                        <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Date</label>
-                        <input type="date" onClick={handleDateClick} className={`w-full p-3 border-2 rounded-lg font-bold mb-4 text-sm outline-none focus:border-[#ef7c00] cursor-pointer ${inputClass}`} value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} />
-                        <div className={`flex items-center gap-3 mb-4 p-3 rounded-lg border cursor-pointer ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-blue-50 border-blue-100'}`} onClick={()=>setIncData({...incData, docReceived:!incData.docReceived})}><div className={`w-5 h-5 rounded border flex items-center justify-center ${incData.docReceived ? 'bg-[#ef7c00] border-[#ef7c00] text-white' : (darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-300')}`}>{incData.docReceived && '✓'}</div><span className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-blue-800'}`}>Documentation Received?</span></div>
-                        <textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-6 font-medium text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Additional notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} />
-                        <div className="flex gap-4"><button onClick={()=>setShowIncidentModal(false)} className={`w-1/3 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'}`}>Cancel</button><button onClick={handleLogIncident} className="w-2/3 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-[#ef7c00] transition-colors">Save Record</button></div>
-                    </div>
-                </div>
-            )}
-
             {viewMode === 'dashboard' && (
                 <div className="space-y-6 overflow-y-auto pb-10">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div onClick={()=>jumpToLog('All')} className={`p-6 rounded-2xl shadow-sm border cursor-pointer transition-all ${darkMode ? 'bg-slate-800 border-slate-700 hover:border-[#ef7c00]' : 'bg-white border-slate-200 hover:border-[#002d72] hover:bg-blue-50'}`}><p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Occurrences</p><p className={`text-4xl font-black ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>{stats.totalOccurrences}</p></div>
-                        <div onClick={()=>jumpToLog('All')} className={`p-6 rounded-2xl shadow-sm border cursor-pointer transition-all ${darkMode ? 'bg-slate-800 border-slate-700 hover:border-[#ef7c00]' : 'bg-white border-slate-200 hover:border-[#002d72] hover:bg-blue-50'}`}><p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Employees Tracked</p><p className={`text-4xl font-black ${darkMode ? 'text-white' : 'text-slate-700'}`}>{personnel.length}</p></div>
-                        <div className={`p-6 rounded-2xl shadow-sm border ${bgClass}`}><p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Incidents by Type</p><div className="space-y-1">{Object.entries(stats.typeCounts).slice(0,3).map(([k,v]) => (<div key={k} onClick={()=>jumpToLog(k)} className={`flex justify-between text-xs font-bold cursor-pointer transition-colors ${darkMode ? 'text-slate-300 hover:text-[#ef7c00]' : 'text-slate-600 hover:text-[#ef7c00]'}`}><span>{k}</span><span>{v as React.ReactNode}</span></div>))}</div></div>
+                        <div className={`p-6 rounded-2xl shadow-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}><p className="text-[10px] font-black uppercase tracking-widest mb-1">Total Occurrences</p><p className="text-4xl font-black text-[#ef7c00]">{stats.totalOccurrences}</p></div>
+                        <div className={`p-6 rounded-2xl shadow-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}><p className="text-[10px] font-black uppercase tracking-widest mb-1">Employees Tracked</p><p className="text-4xl font-black">{personnel.length}</p></div>
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className={`rounded-2xl shadow-sm border overflow-hidden ${bgClass}`}>
-                            <div className={`p-4 border-b ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}><h3 className={`text-xs font-black uppercase tracking-widest ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Monthly Incident Summary</h3></div>
-                            <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className={`font-black uppercase border-b ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-white text-slate-400 border-slate-200'}`}><tr><th className="p-3">Month</th><th className="p-3 text-right">Sick</th><th className="p-3 text-right">FMLA</th><th className="p-3 text-right">No Show</th><th className="p-3 text-right">Total</th></tr></thead><tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-50'}`}>
-                                {stats.monthNames.map(month => { 
-                                    const data = stats.monthlyCounts[month] || {}; if (!data.Total) return null; 
-                                    return (<tr key={month} className={darkMode ? 'text-slate-300' : 'text-slate-700'}><td className="p-3 font-bold">{month}</td><td className="p-3 text-right font-mono text-orange-500">{data['Sick'] || 0}</td><td className="p-3 text-right font-mono text-blue-500">{data['FMLA'] || 0}</td><td className="p-3 text-right font-mono text-red-500">{(data['No Call/No Show'] || 0) + (data['Failure to Report'] || 0)}</td><td className="p-3 text-right font-black">{data.Total || 0}</td></tr>); 
-                                })}
-                            </tbody></table></div>
-                        </div>
                         <div className={`rounded-2xl shadow-sm border overflow-hidden flex flex-col h-[400px] ${bgClass}`}>
-                            <div className={`p-4 border-b flex justify-between items-center ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}><h3 className={`text-xs font-black uppercase tracking-widest ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Employee Roster</h3><input type="text" placeholder="Search Name..." className={`text-xs p-1 border rounded w-32 font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={rosterSearch} onChange={e=>setRosterSearch(e.target.value)} /></div>
-                            <div className="overflow-y-auto flex-grow custom-scrollbar"><table className="w-full text-left text-xs"><thead className={`font-black uppercase border-b sticky top-0 z-10 ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}><tr><th className="p-3">Employee Name</th><th className="p-3 text-right">Count</th></tr></thead><tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                                {filteredRoster.map(emp => (<tr key={emp.id} onClick={() => setSelectedEmp(emp)} className={`cursor-pointer transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}`}><td className="p-3 font-bold">{emp.name}</td><td className={`p-3 text-right font-black ${emp.totalOccurrences > 5 ? 'text-red-500' : ''}`}>{emp.totalOccurrences}</td></tr>))}
-                            </tbody></table></div>
+                            <div className="p-4 border-b flex justify-between items-center"><h3 className="text-xs font-black uppercase tracking-widest text-[#ef7c00]">Employee Roster</h3></div>
+                            <div className="overflow-y-auto flex-grow custom-scrollbar"><table className="w-full text-left text-xs"><thead className="font-black uppercase border-b sticky top-0 z-10"><tr><th className="p-3">Employee Name</th><th className="p-3 text-right">Count</th></tr></thead><tbody className="divide-y">{filteredRoster.map(emp => (<tr key={emp.id} onClick={() => setSelectedEmp(emp)} className="cursor-pointer"><td className="p-3 font-bold">{emp.name}</td><td className="p-3 text-right font-black">{emp.totalOccurrences}</td></tr>))}</tbody></table></div>
                         </div>
                     </div>
                 </div>
             )}
-
             {viewMode === 'log' && (
                 <div className={`rounded-2xl shadow-lg border flex-grow overflow-hidden flex flex-col ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-                    <div className={`p-4 border-b flex gap-4 flex-wrap ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                        <input className={`p-2 border rounded font-bold text-xs flex-grow min-w-[150px] outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Search Employee..." value={logFilter.search} onChange={e=>setLogFilter({...logFilter, search:e.target.value})} />
-                        <select className={`p-2 border rounded font-bold text-xs outline-none focus:border-[#ef7c00] ${inputClass}`} value={logFilter.type} onChange={e=>setLogFilter({...logFilter, type:e.target.value})}><option value="All">All Types</option><option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option></select>
-                        <select className={`p-2 border rounded font-bold text-xs outline-none focus:border-[#ef7c00] ${inputClass}`} value={logFilter.sort} onChange={e=>setLogFilter({...logFilter, sort:e.target.value})}><option value="desc">Newest First</option><option value="asc">Oldest First</option></select>
-                    </div>
-                    <div className="overflow-x-auto flex-grow custom-scrollbar">
-                        <div className={`min-w-[700px] border-b p-3 grid grid-cols-12 gap-2 text-[9px] font-black uppercase tracking-widest ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}><div className="col-span-3">Employee Name</div><div className="col-span-2">Incident Type</div><div className="col-span-2">Date</div><div className="col-span-1 text-center">Count</div><div className="col-span-1 text-center">Doc?</div><div className="col-span-2">Notes</div><div className="col-span-1 text-center">Action</div></div>
-                        <div className={`min-w-[700px] divide-y ${darkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                            {filteredLog.length === 0 ? <div className={`p-10 text-center italic font-bold ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>No records found.</div> : filteredLog.map((log, i) => (
-                                <div key={i} className={`grid grid-cols-12 gap-2 p-3 items-center transition-colors text-xs ${darkMode ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-blue-50 text-slate-700'}`}>
-                                    <div className={`col-span-3 font-bold cursor-pointer hover:underline ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`} onClick={() => setSelectedEmp(personnel.find(p => p.id === log.employeeId))}>{log.employeeName}</div>
-                                    <div className="col-span-2 font-medium"><span className={`px-2 py-0.5 rounded text-[10px] uppercase font-black ${log.type==='Sick'?'bg-orange-500/20 text-orange-500':log.type==='FMLA'?'bg-blue-500/20 text-blue-500':'bg-red-500/20 text-red-500'}`}>{log.type}</span></div>
-                                    <div className="col-span-2 font-mono">{log.date}</div><div className="col-span-1 text-center font-black">{log.count}</div><div className="col-span-1 text-center">{log.docReceived ? '✅' : '❌'}</div><div className="col-span-2 truncate italic opacity-70">{log.notes || '-'}</div><div className="col-span-1 text-center"><button onClick={() => handleDeleteIncident(log.employeeId, log)} className="text-red-500 hover:text-red-400 font-bold">🗑️</button></div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <div className="overflow-x-auto flex-grow custom-scrollbar"><div className="min-w-[700px] border-b p-3 grid grid-cols-12 gap-2 text-[9px] font-black uppercase tracking-widest"><div className="col-span-3">Employee Name</div><div className="col-span-2">Incident Type</div><div className="col-span-2">Date</div><div className="col-span-1 text-center">Count</div><div className="col-span-1 text-center">Doc?</div><div className="col-span-2">Notes</div><div className="col-span-1 text-center">Action</div></div><div className="min-w-[700px] divide-y">{filteredLog.map((log, i) => (<div key={i} className="grid grid-cols-12 gap-2 p-3 items-center text-xs"><div className="col-span-3 font-bold cursor-pointer hover:underline text-[#ef7c00]" onClick={() => setSelectedEmp(personnel.find(p => p.id === log.employeeId))}>{log.employeeName}</div><div className="col-span-2 font-medium">{log.type}</div><div className="col-span-2 font-mono">{log.date}</div><div className="col-span-1 text-center font-black">{log.count}</div><div className="col-span-1 text-center">{log.docReceived ? '✅' : '❌'}</div><div className="col-span-2 truncate italic opacity-70">{log.notes || '-'}</div><div className="col-span-1 text-center"><button onClick={() => handleDeleteIncident(log.employeeId, log)} className="text-red-500 font-bold">🗑️</button></div></div>))}</div></div>
                 </div>
             )}
         </div>
     );
 };
 
-const PartsInventory = ({ showToast, darkMode }: { showToast: (msg: string, type: 'success'|'error') => void, darkMode: boolean }) => {
+const PartsInventory = ({ showToast, darkMode }: { showToast: any, darkMode: boolean }) => {
     const [searchTerm, setSearchTerm] = useState(''); const [displayLimit, setDisplayLimit] = useState(100); const [isLargeText, setIsLargeText] = useState(false);
     const filteredParts = useMemo(() => { let r = localParts; if (searchTerm) r = r.filter((p: any) => (p.partNumber && String(p.partNumber).toLowerCase().includes(searchTerm.toLowerCase())) || (p.name && String(p.name).toLowerCase().includes(searchTerm.toLowerCase()))); return r.slice(0, displayLimit); }, [searchTerm, displayLimit]);
     const inputClass = darkMode ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-black placeholder:text-gray-400';
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col relative">
             <div className="flex justify-between items-end mb-6 px-2 flex-wrap gap-4">
-                <div><h2 className={`text-3xl font-black italic uppercase tracking-tighter leading-none ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Parts Registry</h2><p className={`text-[10px] font-black uppercase tracking-widest mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Local Reference</p></div>
+                <div><h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Parts Registry</h2><p className={`text-[10px] font-black uppercase tracking-widest mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Local Reference</p></div>
                 <div className="flex items-center gap-3 w-full max-w-lg"><button onClick={() => setIsLargeText(!isLargeText)} className={`h-12 w-12 flex items-center justify-center rounded-2xl border-2 font-black transition-all ${isLargeText ? 'bg-[#002d72] border-[#002d72] text-white' : inputClass}`}>Aa</button><input type="text" placeholder="Search Part #..." className={`w-full p-4 rounded-2xl font-bold border-2 outline-none focus:border-[#ef7c00] transition-all shadow-sm ${inputClass}`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
             </div>
             <div className={`rounded-3xl shadow-xl border flex-grow overflow-hidden flex flex-col relative ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
@@ -463,31 +404,22 @@ const StatusCharts = ({ buses }: { buses: any[] }) => {
     );
 };
 
-const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: (msg: string, type: 'success'|'error') => void }) => {
+const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: any }) => {
     const [shopQueens, setShopQueens] = useState<{number: string, count: number}[]>([]);
     const [isResetting, setIsResetting] = useState(false);
     useEffect(() => { const fetchRankings = async () => { const rankings: {number: string, count: number}[] = []; const sampleBuses = buses.slice(0, 50); for (const bus of sampleBuses) { const hSnap = await getDocs(query(collection(db, "buses", bus.number, "history"), limit(20))); if (hSnap.size > 0) rankings.push({ number: bus.number, count: hSnap.size }); } setShopQueens(rankings.sort((a,b) => b.count - a.count).slice(0, 5)); }; if(buses.length > 0) fetchRankings(); }, [buses]);
     
     const handleResetMetrics = async () => { 
         if(!confirm("⚠️ WARNING: This will permanently wipe ALL bus history, personnel incidents, and global audit logs. Proceed?")) return; 
-        setIsResetting(true); 
-        let errorCount = 0;
+        setIsResetting(true); let errorCount = 0;
         try { 
             showToast("Wiping databases... please wait.", "success");
             const aSnap = await getDocs(collection(db, "activity_logs"));
             for (let i = 0; i < aSnap.docs.length; i += 250) await Promise.all(aSnap.docs.slice(i, i + 250).map(d => deleteDoc(d.ref).catch(e => { console.error(e); errorCount++; })));
-            
-            for (const bus of buses) { 
-                const hSnap = await getDocs(collection(db, "buses", bus.number, "history")); 
-                for (let i = 0; i < hSnap.docs.length; i += 250) await Promise.all(hSnap.docs.slice(i, i + 250).map(d => deleteDoc(d.ref).catch(e => { console.error(e); errorCount++; })));
-            } 
-
+            for (const bus of buses) { const hSnap = await getDocs(collection(db, "buses", bus.number, "history")); for (let i = 0; i < hSnap.docs.length; i += 250) await Promise.all(hSnap.docs.slice(i, i + 250).map(d => deleteDoc(d.ref).catch(e => { console.error(e); errorCount++; }))); } 
             const pSnap = await getDocs(collection(db, "personnel"));
             for (let i = 0; i < pSnap.docs.length; i += 250) await Promise.all(pSnap.docs.slice(i, i + 250).map(d => updateDoc(d.ref, { incidents: [], totalOccurrences: 0 }).catch(e => { console.error(e); errorCount++; })));
-
-            if (errorCount > 0) showToast(`Wiped, but ${errorCount} items failed. (Check console)`, 'error'); 
-            else showToast(`All databases wiped successfully.`, 'success'); 
-            setShopQueens([]); 
+            if (errorCount > 0) showToast(`Wiped, but ${errorCount} items failed. (Check console)`, 'error'); else showToast(`All databases wiped successfully.`, 'success'); setShopQueens([]); 
         } catch (err: any) { showToast(`Failed: ${err.message}`, 'error'); } 
         setIsResetting(false); 
     };
@@ -502,7 +434,7 @@ const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: (ms
     );
 };
 
-const ShiftHandover = ({ buses, showToast }: { buses: any[], showToast: (m:string, t:'success'|'error')=>void }) => {
+const ShiftHandover = ({ buses, showToast }: { buses: any[], showToast: any }) => {
     const [report, setReport] = useState<any[]>([]);
     useEffect(() => { const fetchRecent = async () => { const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000); let logs: any[] = []; for (const b of buses.filter(x => x.status !== 'Active' || x.notes).slice(0,30)) { const hSnap = await getDocs(query(collection(db, "buses", b.number, "history"), orderBy("timestamp", "desc"), limit(2))); hSnap.forEach(d => { if((d.data().timestamp?.toMillis() || 0) > twelveHoursAgo) logs.push({ bus: b.number, ...d.data() }); }); } setReport(logs.sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0))); }; if(buses.length > 0) fetchRecent(); }, [buses]);
     const copy = () => { const txt = report.map(r => `[Unit ${r.bus}] ${r.action}: ${r.details}`).join('\n'); navigator.clipboard.writeText(`SHIFT REPORT - ${new Date().toLocaleDateString()}\n\n${txt}`); showToast("Report copied!", 'success'); };
@@ -522,15 +454,24 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault(); 
         const today = new Date(); today.setHours(23,59,59,999);
-        if (formData.oosStartDate && new Date(formData.oosStartDate) > today) return showToast("OOS Date cannot be in the future", "error");
+        if (formData.oosStartDate) {
+            const oos = new Date(formData.oosStartDate);
+            if (oos > today) return showToast("Out of Service date cannot be a future date", 'error');
+            if (formData.expectedReturnDate && new Date(formData.expectedReturnDate) < oos) return showToast("Expected Return cannot be earlier than OOS Date", 'error');
+            if (formData.actualReturnDate && new Date(formData.actualReturnDate) < oos) return showToast("Actual Return cannot be earlier than OOS Date", 'error');
+        }
 
-        const busRef = doc(db, "buses", formData.number);
-        const snap = await getDoc(busRef);
-        if (!snap.exists()) return showToast("Bus not found. Add it first.", "error");
-
+        const busRef = doc(db, "buses", formData.number); const busSnap = await getDoc(busRef);
+        if (!busSnap.exists()) return showToast(`⛔ Bus #${formData.number} not found. Please add it first.`, 'error');
+        
+        const old = busSnap.data(); let changes = []; 
+        if (old.status !== formData.status) changes.push(`STATUS: ${old.status} ➝ ${formData.status}`); 
+        if (old.notes !== formData.notes) changes.push(`NOTES: "${old.notes || ''}" ➝ "${formData.notes}"`); 
+        if (old.oosStartDate !== formData.oosStartDate) changes.push(`OOS: ${old.oosStartDate || '—'} ➝ ${formData.oosStartDate}`);
+        
         await setDoc(busRef, { ...formData, timestamp: serverTimestamp() }, { merge: true });
-        await logHistory(formData.number, "UPDATE", `Status changed to ${formData.status}`, auth.currentUser?.email || 'Unknown');
-        showToast(`Unit #${formData.number} Updated`, 'success');
+        await logHistory(formData.number, "UPDATE", changes.length > 0 ? changes.join('\n') : "Routine Update via Terminal", auth.currentUser?.email || 'Unknown');
+        showToast(`Bus #${formData.number} Updated`, 'success'); 
         setFormData({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
     };
 
@@ -586,7 +527,6 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
                     <button type="button" onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-black uppercase text-[10px] shadow-md">+ Add Bus</button>
                 </div>
             </div>
-            
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-2 gap-6">
                     <input type="text" placeholder="Unit # to Update" className={`p-4 border-2 rounded-xl font-black outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.number} onChange={handleChange} name="number" required />
@@ -604,7 +544,6 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
                 </div>
                 <button className="w-full py-4 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase tracking-widest shadow-lg">Update Record</button>
             </form>
-
             {showAddModal && (
                 <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className={`p-8 rounded-xl shadow-2xl w-full max-w-md border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -621,50 +560,53 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
     );
 };
 
-// --- MAIN APP ---
 export default function FleetManager() {
     const [user, setUser] = useState<any>(null);
-    const [userStatus, setUserStatus] = useState('loading');
-    const [isAdmin, setIsAdmin] = useState(false);
-    const [view, setView] = useState('inventory');
-    const [inventoryMode, setInventoryMode] = useState('grid');
+    const [userStatus, setUserStatus] = useState<'loading' | 'approved' | 'pending' | 'rejected'>('loading');
+    const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
+    const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'personnel' | 'parts' | 'admin'>('inventory');
+    const [inventoryMode, setInventoryMode] = useState<'list' | 'grid' | 'tv'>('grid');
     const [buses, setBuses] = useState<any[]>([]);
+    const [selectedBusDetail, setSelectedBusDetail] = useState<any>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [sortConfig, setSortConfig] = useState({ key: 'number', direction: 'asc' });
+    const [activeFilter, setActiveFilter] = useState('Total Fleet');
+    const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
+    const [legalType, setLegalType] = useState<'privacy'|'about'|null>(null);
     const [statusOptions, setStatusOptions] = useState<any[]>([]);
     const [darkMode, setDarkMode] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [legalType, setLegalType] = useState<'privacy'|'about'|null>(null);
-    const [toast, setToast] = useState<any>(null);
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [isSignUp, setIsSignUp] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [activeFilter, setActiveFilter] = useState('Total Fleet');
-    const [sortConfig, setSortConfig] = useState({ key: 'number', direction: 'asc' });
     const tvBoardRef = useRef<HTMLDivElement>(null);
 
-    const showToast = (msg: string, type: 'success'|'error') => setToast({ message: msg, type });
+    const isMasterAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '');
+    const isAdmin = isMasterAdmin || userRole === 'admin';
+    const showToast = (msg: string, type: 'success' | 'error') => { setToast({ msg, type }); };
 
-    useEffect(() => onAuthStateChanged(auth, u => setUser(u)), []);
+    useEffect(() => { onAuthStateChanged(auth, u => setUser(u)); }, []);
 
     useEffect(() => {
         if (!user) { setUserStatus('loading'); return; }
-        const master = ADMIN_EMAILS.includes(user.email?.toLowerCase());
-        if (master) setIsAdmin(true);
-        return onSnapshot(doc(db, "users", user.uid), s => {
-            if (s.exists()) {
-                setUserStatus(s.data().status);
-                if (s.data().role === 'admin' || master) setIsAdmin(true); else setIsAdmin(false);
+        if (ADMIN_EMAILS.includes(user.email?.toLowerCase() || '')) {
+            setUserStatus('approved'); setUserRole('admin'); return;
+        }
+        return onSnapshot(doc(db, "users", user.uid), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                setUserStatus(data.status || 'pending');
+                setUserRole(data.role || 'user');
             } else {
-                setDoc(doc(db, "users", user.uid), { email: user.email.toLowerCase(), status: 'pending', role: 'user', createdAt: serverTimestamp() });
-                setUserStatus('pending');
+                setDoc(doc(db, "users", user.uid), { email: user.email?.toLowerCase() || '', status: 'pending', role: 'user', createdAt: serverTimestamp() });
+                setUserStatus('pending'); setUserRole('user');
             }
         });
     }, [user]);
 
-    useEffect(() => {
-        if (!user || userStatus !== 'approved') return;
-        const uBuses = onSnapshot(query(collection(db, "buses"), orderBy("number", "asc")), s => setBuses(s.docs.map(d => ({...d.data(), docId: d.id}))));
-        const uOpts = onSnapshot(doc(db, "settings", "status_options"), s => { if(s.exists()) setStatusOptions(s.data().list || []); });
+    useEffect(() => { 
+        if (!user || userStatus !== 'approved') return; 
+        const uBuses = onSnapshot(query(collection(db, "buses"), orderBy("number", "asc")), s => setBuses(s.docs.map(d => ({...d.data(), docId: d.id})))); 
+        const uOpts = onSnapshot(doc(db, "settings", "status_options"), s => { if (s.exists()) setStatusOptions(s.data().list || []); });
         return () => { uBuses(); uOpts(); };
     }, [user, userStatus]);
 
@@ -741,18 +683,20 @@ export default function FleetManager() {
             } else {
                 await signInWithEmailAndPassword(auth, email, password);
             }
-        } catch(e: any) { showToast(e.message, "error"); }
+        } catch(e: any) { showToast(e.message.replace('Firebase: ', ''), "error"); }
     };
 
+    const [isSignUp, setIsSignUp] = useState(false);
+
     if (!user) return (
-        <div className="min-h-screen flex flex-col bg-slate-900">
-            {toast && <Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)} />}
+        <div className="min-h-screen flex flex-col bg-slate-900 font-sans">
+            {toast && <Toast message={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}
             <div className="flex-grow flex items-center justify-center p-4">
-                <form onSubmit={handleAuth} className="bg-slate-800 p-10 rounded-2xl w-full max-w-md border-t-[12px] border-[#ef7c00]">
+                <form onSubmit={handleAuth} className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-[#ef7c00]">
                     <h2 className="text-3xl font-black text-white italic mb-8 uppercase text-center">{isSignUp ? 'Join Fleetflow' : 'Fleet Operations'}</h2>
                     <input className="w-full p-4 mb-4 rounded-xl bg-slate-900 border-2 border-slate-700 text-white outline-none focus:border-[#ef7c00]" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
                     <input className="w-full p-4 mb-6 rounded-xl bg-slate-900 border-2 border-slate-700 text-white outline-none focus:border-[#ef7c00]" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} />
-                    <button className="w-full py-5 bg-[#ef7c00] text-white font-black uppercase rounded-xl shadow-lg">{isSignUp ? 'Register' : 'Login'}</button>
+                    <button className="w-full py-5 bg-[#ef7c00] text-white font-black uppercase rounded-xl shadow-lg hover:bg-orange-600 transition-colors">{isSignUp ? 'Register' : 'Login'}</button>
                     <button type="button" onClick={()=>setIsSignUp(!isSignUp)} className="w-full mt-6 text-slate-400 text-xs font-bold hover:text-white transition-colors">{isSignUp ? 'Back to Login' : "Don't have an account? Sign Up"}</button>
                 </form>
             </div>
@@ -770,16 +714,16 @@ export default function FleetManager() {
     );
 
     return (
-        <div className={`flex flex-col min-h-screen transition-colors ${darkMode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-900'}`}>
-            {toast && <Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)} />}
+        <div className={`flex flex-col min-h-screen font-sans selection:bg-[#ef7c00] selection:text-white transition-colors duration-300 ${darkMode ? 'bg-slate-900 text-slate-100' : 'bg-slate-100 text-slate-900'}`}>
+            {toast && <Toast message={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}
             {selectedBusDetail && (<div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"><BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} statusOptions={statusOptions} /></div>)}
             {legalType && <LegalModal type={legalType} onClose={()=>setLegalType(null)} darkMode={darkMode} />}
 
-            <nav className={`backdrop-blur-md border-b sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center ${darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
+            <nav className={`backdrop-blur-md border-b sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm ${darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
                 <div className="flex items-center gap-2"><div className="w-2 h-6 bg-[#ef7c00] rounded-full"></div><span className="font-black italic uppercase">Fleet Manager</span></div>
                 <div className="flex gap-4 items-center">
                     {['inventory', 'input', 'tracker', 'handover', 'parts'].concat(isAdmin ? ['analytics', 'personnel', 'admin'] : []).map(v => (
-                        <button key={v} onClick={()=>setView(v)} className={`text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${view === v ? 'border-[#ef7c00] text-[#ef7c00]' : 'border-transparent text-slate-400'}`}>{v.replace('admin','panel')}</button>
+                        <button key={v} onClick={()=>setView(v as any)} className={`text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${view === v ? 'border-[#ef7c00] text-[#ef7c00]' : 'border-transparent text-slate-400 hover:text-[#ef7c00]'}`}>{v.replace('admin','panel')}</button>
                     ))}
                     <button onClick={()=>setDarkMode(!darkMode)} className="px-3 py-1 rounded-full border text-[10px]">{darkMode ? '☀️' : '🌙'}</button>
                     <button onClick={()=>signOut(auth)} className="text-red-500 font-black text-[10px] uppercase">Logout</button>
@@ -805,17 +749,17 @@ export default function FleetManager() {
                                     return false;
                                 }).length;
                                 return (
-                                    <div key={l} onClick={()=>setActiveFilter(l==='Total'?'Total Fleet':l)} className={`cursor-pointer p-6 rounded-2xl border shadow-sm ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                                        <p className="text-[8px] font-black uppercase mb-1 opacity-50">{l}</p>
+                                    <div key={l} onClick={()=>setActiveFilter(l==='Total'?'Total Fleet':l)} className={`cursor-pointer p-6 rounded-2xl border shadow-sm ${activeFilter === (l==='Total'?'Total Fleet':l) ? (darkMode ? 'border-[#ef7c00] bg-slate-800' : 'border-[#002d72] bg-blue-50') : (darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white')}`}>
+                                        <p className="text-[10px] font-black uppercase opacity-50 mb-1">{l}</p>
                                         <p className={`text-4xl font-black ${l==='Ready'?'text-green-500':l==='In Shop'?'text-orange-500':l==='Hold'?'text-red-500':''}`}>{count}</p>
                                     </div>
                                 );
                             })}
                         </div>
                         <div className="flex justify-between items-center mb-6">
-                            <input className={`w-full max-w-md p-4 rounded-xl border-2 font-bold outline-none focus:border-[#ef7c00] ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`} placeholder="Filter Unit #..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+                            <input className={`w-full max-w-md p-4 rounded-xl border-2 font-bold outline-none focus:border-[#ef7c00] ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-black'}`} placeholder="Filter Unit #..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
                             <div className="flex gap-2 p-1 border rounded-xl bg-black/5">
-                                {['list', 'grid', 'tv'].map(m => <button key={m} onClick={()=>setInventoryMode(m)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${inventoryMode === m ? 'bg-[#ef7c00] text-white shadow' : 'text-slate-400'}`}>{m}</button>)}
+                                {['list', 'grid', 'tv'].map(m => <button key={m} onClick={()=>setInventoryMode(m as any)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${inventoryMode === m ? 'bg-[#ef7c00] text-white shadow' : 'text-slate-400 hover:text-white'}`}>{m}</button>)}
                             </div>
                         </div>
                         

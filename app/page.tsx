@@ -319,7 +319,6 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
     const [incData, setIncData] = useState({ type: 'Sick', date: '', count: 1, docReceived: false, notes: '' });
     const [rosterSearch, setRosterSearch] = useState('');
     
-    // NEW: Refined sort configuration
     const [logFilter, setLogFilter] = useState({ search: '', type: 'All' });
     const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
 
@@ -348,7 +347,6 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
         return { totalOccurrences, typeCounts, topOffenders, monthlyCounts, monthNames };
     }, [allIncidents, personnel]);
 
-    // NEW: Sorting logic mapping to headers
     const filteredLog = useMemo(() => {
         let logs = [...allIncidents];
         if (logFilter.search) logs = logs.filter(l => l.employeeName.toLowerCase().includes(logFilter.search.toLowerCase()));
@@ -357,17 +355,9 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
         return logs.sort((a, b) => {
             let aVal = a[sortConfig.key];
             let bVal = b[sortConfig.key];
-
-            if (sortConfig.key === 'date') {
-                aVal = new Date(aVal).getTime();
-                bVal = new Date(bVal).getTime();
-            } else if (sortConfig.key === 'count') {
-                aVal = Number(aVal) || 0;
-                bVal = Number(bVal) || 0;
-            } else if (typeof aVal === 'string') {
-                aVal = aVal.toLowerCase();
-                bVal = bVal.toLowerCase();
-            }
+            if (sortConfig.key === 'date') { aVal = new Date(aVal).getTime(); bVal = new Date(bVal).getTime(); } 
+            else if (sortConfig.key === 'count') { aVal = Number(aVal) || 0; bVal = Number(bVal) || 0; } 
+            else if (typeof aVal === 'string') { aVal = aVal.toLowerCase(); bVal = bVal.toLowerCase(); }
 
             if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
             if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
@@ -376,21 +366,10 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
     }, [allIncidents, logFilter, sortConfig]);
 
     const filteredRoster = useMemo(() => { if (!rosterSearch) return stats.topOffenders; return stats.topOffenders.filter(p => p.name.toLowerCase().includes(rosterSearch.toLowerCase())); }, [stats.topOffenders, rosterSearch]);
-    
     const jumpToLog = (typeFilter: string = 'All') => { setLogFilter(prev => ({ ...prev, type: typeFilter, search: '' })); setViewMode('log'); };
     
-    // Header click trigger
-    const requestSort = (key: string) => {
-        let direction = 'asc';
-        if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-        setSortConfig({ key, direction });
-    };
-
-    // Sort arrow display
-    const SortArrow = ({ columnKey }: { columnKey: string }) => {
-        if (sortConfig.key !== columnKey) return <span className="opacity-30 inline-block ml-1">↕</span>;
-        return <span className="inline-block ml-1 text-[#ef7c00]">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
-    };
+    const requestSort = (key: string) => setSortConfig({ key, direction: sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc' });
+    const SortArrow = ({ columnKey }: { columnKey: string }) => sortConfig.key !== columnKey ? <span className="opacity-30 inline-block ml-1">↕</span> : <span className="inline-block ml-1 text-[#ef7c00]">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
 
     const handleAddEmployee = async (e: React.FormEvent) => { 
         e.preventDefault(); if(!newEmpName) return; 
@@ -399,12 +378,7 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
 
     const handleDeleteEmployee = async (empId: string, empName: string) => {
         if(!confirm(`Are you sure you want to completely delete ${empName}? This action cannot be undone.`)) return;
-        try {
-            await deleteDoc(doc(db, "personnel", empId));
-            await logActivity(auth.currentUser?.email || 'Unknown', 'PERSONNEL', empName, 'DELETED', `Deleted entire employee profile.`);
-            showToast(`${empName} deleted.`, 'success');
-            setSelectedEmp(null);
-        } catch(err) { showToast("Failed to delete employee", 'error'); }
+        try { await deleteDoc(doc(db, "personnel", empId)); await logActivity(auth.currentUser?.email || 'Unknown', 'PERSONNEL', empName, 'DELETED', `Deleted entire employee profile.`); showToast(`${empName} deleted.`, 'success'); setSelectedEmp(null); } catch(err) { showToast("Failed to delete employee", 'error'); }
     };
 
     const handleLogIncident = async () => {
@@ -520,7 +494,7 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
 
             {showAddModal && (
                 <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
-                    <div className={`p-6 rounded-2xl w-full max-w-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                    <div className={`p-6 rounded-2xl w-full max-w-sm shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                         <h3 className={`text-xl font-black mb-4 uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Add Employee</h3>
                         <input className={`w-full p-3 border-2 rounded-lg mb-4 font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Full Name (e.g. John Doe)" value={newEmpName} onChange={e=>setNewEmpName(e.target.value)} />
                         <div className="flex gap-2">
@@ -604,7 +578,7 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
                         <div className={`rounded-2xl shadow-sm border overflow-hidden flex flex-col h-[400px] ${bgClass}`}>
                             <div className={`p-4 border-b flex justify-between items-center ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                 <h3 className={`text-xs font-black uppercase tracking-widest ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Employee Roster</h3>
-                                <input type="text" placeholder="Search Name..." className={`text-xs p-1 border rounded w-32 font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={rosterSearch} onChange={e=>setRosterSearch(e.target.value)} />
+                                <input type="text" placeholder="Search Name..." className={`text-xs p-2 border rounded w-32 font-bold outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={rosterSearch} onChange={e=>setRosterSearch(e.target.value)} />
                             </div>
                             <div className="overflow-y-auto flex-grow custom-scrollbar">
                                 <table className="w-full text-left text-xs">
@@ -670,17 +644,185 @@ const PartsInventory = ({ showToast, darkMode }: { showToast: (msg: string, type
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col relative">
             <div className="flex justify-between items-end mb-6 px-2 flex-wrap gap-4">
                 <div><h2 className={`text-3xl font-black italic uppercase tracking-tighter leading-none ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Parts Registry</h2><p className={`text-[10px] font-black uppercase tracking-widest mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Local Reference</p></div>
-                <div className="flex items-center gap-3 w-full max-w-lg"><button onClick={() => setIsLargeText(!isLargeText)} className={`h-12 w-12 flex items-center justify-center rounded-2xl border-2 font-black transition-all ${isLargeText ? 'bg-[#002d72] border-[#002d72] text-white' : inputClass}`}>Aa</button><input type="text" placeholder="Search Part #..." className={`w-full p-4 rounded-2xl font-bold border-2 outline-none focus:border-[#ef7c00] transition-all shadow-sm ${inputClass}`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
+                <div className="flex items-center gap-3 w-full max-w-lg"><button onClick={() => setIsLargeText(!isLargeText)} className={`h-12 w-12 flex items-center justify-center rounded-2xl border-2 font-black transition-all ${isLargeText ? 'bg-[#002d72] border-[#002d72] text-white' : inputClass}`}>Aa</button><input type="text" placeholder="Search Part #..." className={`w-full p-4 rounded-2xl font-bold border-2 outline-none focus:border-[#ef7c00] transition-colors shadow-sm ${inputClass}`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
             </div>
             <div className={`rounded-3xl shadow-xl border flex-grow overflow-hidden flex flex-col relative ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
                 <div className="bg-[#002d72] grid grid-cols-12 gap-4 p-5 text-[10px] font-black uppercase text-white tracking-widest select-none"><div className="col-span-3">Part Number</div><div className="col-span-8">Description</div><div className="col-span-1 text-center">View</div></div>
-                <div className="overflow-y-auto flex-grow custom-scrollbar"><div className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>{filteredParts.map((p: any, i: number) => (<div key={i} className={`grid grid-cols-12 gap-4 p-4 transition-all items-center ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}><div onClick={() => { navigator.clipboard.writeText(p.partNumber); showToast(`Copied!`, 'success'); }} className={`col-span-3 font-mono font-black rounded-lg cursor-pointer transition-all shadow-sm ${darkMode ? 'bg-slate-900 text-[#ef7c00]' : 'bg-blue-50 text-[#002d72]'} ${isLargeText ? 'text-xl px-4 py-2' : 'text-sm px-3 py-1'}`}>{p.partNumber}</div><div className={`col-span-8 font-bold uppercase flex items-center ${darkMode ? 'text-slate-200' : 'text-slate-700'} ${isLargeText ? 'text-lg leading-normal' : 'text-[11px] leading-tight'}`}>{p.name}</div><div className="col-span-1 flex justify-center"><a href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(p.name + " " + p.partNumber + " bus part")}`} target="_blank" rel="noopener noreferrer" className={`text-[#ef7c00] hover:scale-125 transition-transform ${isLargeText ? 'text-2xl' : 'text-lg'}`}>👁️</a></div></div>))}</div></div>
+                <div className="overflow-y-auto flex-grow custom-scrollbar"><div className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>{filteredParts.map((p: any, i: number) => (<div key={i} className={`grid grid-cols-12 gap-4 p-4 transition-colors items-center ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}><div onClick={() => { navigator.clipboard.writeText(p.partNumber); showToast(`Copied!`, 'success'); }} className={`col-span-3 font-mono font-black rounded-lg cursor-pointer transition-all shadow-sm ${darkMode ? 'bg-slate-900 text-[#ef7c00]' : 'bg-blue-50 text-[#002d72]'} ${isLargeText ? 'text-xl px-4 py-2' : 'text-sm px-3 py-1'}`}>{p.partNumber}</div><div className={`col-span-8 font-bold uppercase flex items-center ${darkMode ? 'text-slate-200' : 'text-slate-700'} ${isLargeText ? 'text-lg leading-normal' : 'text-[11px] leading-tight'}`}>{p.name}</div><div className="col-span-1 flex justify-center"><a href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(p.name + " " + p.partNumber + " bus part")}`} target="_blank" rel="noopener noreferrer" className={`text-[#ef7c00] hover:scale-125 transition-transform ${isLargeText ? 'text-2xl' : 'text-lg'}`}>👁️</a></div></div>))}</div></div>
             </div>
         </div>
     );
 };
 
-// --- MAIN APPLICATION ENTRY ---
+const StatusCharts = ({ buses }: { buses: any[] }) => {
+    const statusCounts: {[key: string]: number} = { 'Active': 0, 'In Shop': 0, 'On Hold': 0, 'Engine': 0, 'Body Shop': 0, 'Vendor': 0, 'Brakes': 0, 'Safety': 0 };
+    buses.forEach(b => { if (statusCounts[b.status] !== undefined) statusCounts[b.status]++; else statusCounts['Active']++; });
+    const maxCount = Math.max(...Object.values(statusCounts), 1);
+    const trendData = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); const ds = d.toISOString().split('T')[0]; return { label: ds.slice(5), count: buses.filter(b => b.oosStartDate === ds).length }; });
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 className="text-[10px] font-black text-[#002d72] uppercase tracking-widest mb-6">Status Breakdown</h3><div className="flex items-end gap-3 h-40">{Object.entries(statusCounts).map(([s, c]) => (<div key={s} className="flex-1 flex flex-col justify-end items-center group relative"><div className="absolute -top-6 text-[10px] font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">{c}</div><div className={`w-full rounded-t-md transition-all duration-500 ${s==='Active'?'bg-green-500':s==='In Shop'?'bg-orange-500':'bg-red-500'}`} style={{ height: `${(c/maxCount)*100 || 2}%` }}></div><p className="text-[8px] font-black text-slate-400 uppercase mt-2 -rotate-45 origin-left translate-y-2 whitespace-nowrap">{s}</p></div>))}</div></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 className="text-[10px] font-black text-[#002d72] uppercase tracking-widest mb-6">7-Day Intake Trend</h3><div className="flex items-end gap-2 h-40">{trendData.map((d, i) => (<div key={i} className="flex-1 flex flex-col justify-end items-center group relative"><div className="absolute -top-6 text-[10px] font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">{d.count}</div><div className="w-full bg-blue-100 hover:bg-[#002d72] rounded-t-sm transition-all" style={{ height: `${(d.count/Math.max(...trendData.map(t=>t.count),1))*100 || 2}%` }}></div><p className="text-[8px] font-bold text-slate-400 mt-2">{d.label}</p></div>))}</div></div>
+        </div>
+    );
+};
+
+const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: any }) => {
+    const [shopQueens, setShopQueens] = useState<{number: string, count: number}[]>([]);
+    const [isResetting, setIsResetting] = useState(false);
+    useEffect(() => { const fetchRankings = async () => { const rankings: {number: string, count: number}[] = []; const sampleBuses = buses.slice(0, 50); for (const bus of sampleBuses) { const hSnap = await getDocs(query(collection(db, "buses", bus.number, "history"), limit(20))); if (hSnap.size > 0) rankings.push({ number: bus.number, count: hSnap.size }); } setShopQueens(rankings.sort((a,b) => b.count - a.count).slice(0, 5)); }; if(buses.length > 0) fetchRankings(); }, [buses]);
+    
+    const handleResetMetrics = async () => { 
+        if(!confirm("⚠️ WARNING: This will permanently wipe ALL bus history, personnel incidents, and global audit logs. Proceed?")) return; 
+        setIsResetting(true); let errorCount = 0;
+        try { 
+            showToast("Wiping databases... please wait.", "success");
+            const aSnap = await getDocs(collection(db, "activity_logs"));
+            for (let i = 0; i < aSnap.docs.length; i += 250) await Promise.all(aSnap.docs.slice(i, i + 250).map(d => deleteDoc(d.ref).catch(e => { console.error(e); errorCount++; })));
+            for (const bus of buses) { const hSnap = await getDocs(collection(db, "buses", bus.number, "history")); for (let i = 0; i < hSnap.docs.length; i += 250) await Promise.all(hSnap.docs.slice(i, i + 250).map(d => deleteDoc(d.ref).catch(e => { console.error(e); errorCount++; }))); } 
+            const pSnap = await getDocs(collection(db, "personnel"));
+            for (let i = 0; i < pSnap.docs.length; i += 250) await Promise.all(pSnap.docs.slice(i, i + 250).map(d => updateDoc(d.ref, { incidents: [], totalOccurrences: 0 }).catch(e => { console.error(e); errorCount++; })));
+            if (errorCount > 0) showToast(`Wiped, but ${errorCount} items failed. (Check console)`, 'error'); else showToast(`All databases wiped successfully.`, 'success'); setShopQueens([]); 
+        } catch (err: any) { showToast(`Failed: ${err.message}`, 'error'); } 
+        setIsResetting(false); 
+    };
+
+    const avgOOS = buses.reduce((acc, b) => acc + (b.status !== 'Active' ? 1 : 0), 0);
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fleet Availability</p><p className="text-4xl font-black text-[#002d72] italic">{Math.round(((buses.length - avgOOS) / Math.max(buses.length, 1)) * 100)}%</p></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Down Units</p><p className="text-4xl font-black text-red-500 italic">{avgOOS}</p></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><div className="flex justify-between items-center mb-2"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Analytics Admin</p><button onClick={handleResetMetrics} disabled={isResetting} className="text-[9px] font-black text-red-500 hover:text-red-700 uppercase border border-red-200 rounded px-2 py-1 bg-red-50 disabled:opacity-50 transition-colors">{isResetting ? "..." : "Wipe All Databases"}</button></div><div className="space-y-2">{shopQueens.map((queen, i) => (<div key={i} className="flex justify-between items-center text-xs border-b border-slate-100 pb-1"><span className="font-bold text-slate-700">#{queen.number}</span><span className="font-mono text-red-500">{queen.count} logs</span></div>))}</div></div>
+        </div>
+    );
+};
+
+const ShiftHandover = ({ buses, showToast }: { buses: any[], showToast: any }) => {
+    const [report, setReport] = useState<any[]>([]);
+    useEffect(() => { const fetchRecent = async () => { const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000); let logs: any[] = []; for (const b of buses.filter(x => x.status !== 'Active' || x.notes).slice(0,30)) { const hSnap = await getDocs(query(collection(db, "buses", b.number, "history"), orderBy("timestamp", "desc"), limit(2))); hSnap.forEach(d => { if((d.data().timestamp?.toMillis() || 0) > twelveHoursAgo) logs.push({ bus: b.number, ...d.data() }); }); } setReport(logs.sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0))); }; if(buses.length > 0) fetchRecent(); }, [buses]);
+    const copy = () => { const txt = report.map(r => `[Unit ${r.bus}] ${r.action}: ${r.details}`).join('\n'); navigator.clipboard.writeText(`SHIFT REPORT - ${new Date().toLocaleDateString()}\n\n${txt}`); showToast("Report copied!", 'success'); };
+    return (
+        <div className="max-w-4xl mx-auto p-8 animate-in fade-in slide-in-from-bottom-4"><div className="flex justify-between items-center mb-8"><h2 className="text-3xl font-black text-[#002d72] uppercase italic">Shift Handover</h2><button onClick={copy} className="px-6 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-[#ef7c00] transition-all transform active:scale-95">Copy Report</button></div><div className="space-y-4">{report.map((l, i) => (<div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex gap-6 items-center"><div className="w-16 h-16 bg-[#002d72]/5 rounded-xl flex items-center justify-center font-black text-[#002d72] text-lg">#{l.bus}</div><div className="flex-grow"><div className="flex justify-between mb-1"><span className="text-[10px] font-black text-[#ef7c00] uppercase">{l.action}</span><span className="text-[10px] font-bold text-slate-500">{formatTime(l.timestamp)}</span></div><p className="text-sm font-bold text-slate-800 whitespace-pre-wrap">{l.details}</p><p className="text-[9px] text-slate-400 mt-2 uppercase tracking-widest">{l.user}</p></div></div>))}</div></div>
+    );
+};
+
+const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { showToast: any, darkMode: boolean, buses: any[], isAdmin: boolean, statusOptions: any[] }) => {
+    const [formData, setFormData] = useState({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [newBusData, setNewBusData] = useState({ number: '', status: 'Active' });
+
+    const handleChange = (e: any) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const handleDateClick = (e: any) => e.target.showPicker?.();
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault(); 
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (formData.oosStartDate) {
+            if (formData.oosStartDate > todayStr) return showToast("Out of Service date cannot be a future date", 'error');
+            if (formData.expectedReturnDate && formData.expectedReturnDate < formData.oosStartDate) return showToast("Expected Return cannot be earlier than OOS Date", 'error');
+            if (formData.actualReturnDate && formData.actualReturnDate < formData.oosStartDate) return showToast("Actual Return cannot be earlier than OOS Date", 'error');
+        }
+
+        const busRef = doc(db, "buses", formData.number); const busSnap = await getDoc(busRef);
+        if (!busSnap.exists()) return showToast(`⛔ Bus #${formData.number} not found. Please add it first.`, 'error');
+        
+        const old = busSnap.data(); let changes = []; 
+        if (old.status !== formData.status) changes.push(`STATUS: ${old.status} ➝ ${formData.status}`); 
+        if (old.notes !== formData.notes) changes.push(`NOTES: "${old.notes || ''}" ➝ "${formData.notes}"`); 
+        if (old.oosStartDate !== formData.oosStartDate) changes.push(`OOS: ${old.oosStartDate || '—'} ➝ ${formData.oosStartDate}`);
+        
+        await setDoc(busRef, { ...formData, timestamp: serverTimestamp() }, { merge: true });
+        await logHistory(formData.number, "UPDATE", changes.length > 0 ? changes.join('\n') : "Routine Update via Terminal", auth.currentUser?.email || 'Unknown');
+        showToast(`Bus #${formData.number} Updated`, 'success'); 
+        setFormData({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
+    };
+
+    const handleAddNewBus = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newBusData.number) return showToast("Bus number required", 'error');
+        const busRef = doc(db, "buses", newBusData.number);
+        const snap = await getDoc(busRef);
+        if (snap.exists()) return showToast(`⛔ Bus #${newBusData.number} already exists!`, 'error');
+
+        await setDoc(busRef, { number: newBusData.number, status: newBusData.status, location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', timestamp: serverTimestamp() });
+        await logHistory(newBusData.number, "CREATED", "Bus added to registry.", auth.currentUser?.email || 'Unknown');
+        showToast(`Bus #${newBusData.number} Added`, 'success');
+        setShowAddModal(false); setNewBusData({ number: '', status: 'Active' });
+    };
+
+    const populateFleet = async () => {
+        if (!confirm(`Initialize database with ${HAMILTON_FLEET.length} Hamilton buses?`)) return;
+        const existingBusNumbers = new Set(buses.map(b => b.number));
+        const batch = writeBatch(db);
+        let count = 0;
+        for (const b of HAMILTON_FLEET) {
+            if (!existingBusNumbers.has(b)) {
+                batch.set(doc(db, "buses", b), { number: b, status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', timestamp: serverTimestamp() });
+                count++;
+            }
+        }
+        if (count > 0) { await batch.commit(); showToast(`Added ${count} missing buses!`, 'success'); } 
+        else showToast("All Hamilton buses already in system.", 'success');
+    };
+
+    const resetAllFleet = async () => {
+        if (!confirm("⚠️ Master Reset: Set all buses to Active?")) return;
+        showToast("Resetting fleet... please wait.", "success");
+        for (let i = 0; i < buses.length; i += 250) {
+            await Promise.all(buses.slice(i, i + 250).map(bus => 
+                updateDoc(doc(db, "buses", bus.docId), { status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', timestamp: serverTimestamp() }).catch(e => console.error(e))
+            ));
+        }
+        await logActivity(auth.currentUser?.email || 'Unknown', 'SYSTEM', 'Entire Fleet', 'UPDATE', 'Master Reset triggered.');
+        showToast("Fleet successfully reset.", 'success');
+    };
+
+    const inputClass = darkMode ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-black placeholder:text-gray-400';
+    
+    return (
+        <div className={`max-w-2xl mx-auto mt-4 md:mt-10 p-6 md:p-8 rounded-2xl shadow-xl border-t-8 border-[#ef7c00] animate-in slide-in-from-bottom-4 duration-500 ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
+            <div className="flex justify-between items-end mb-8 flex-wrap gap-4">
+                <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Data Entry</h2>
+                <div className="flex gap-2 flex-wrap">
+                    {isAdmin && <button type="button" onClick={resetAllFleet} className="px-3 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all bg-red-600 hover:bg-red-700 text-white shadow-md">🚨 Reset Fleet</button>}
+                    {isAdmin && <button type="button" onClick={populateFleet} className={`px-3 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest border transition-all ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-[#002d72]'}`}>⚙️ Init Fleet</button>}
+                    <button type="button" onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-black uppercase text-[10px] tracking-widest shadow-md transition-all">+ Add Bus</button>
+                </div>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                    <input type="text" placeholder="Unit # to Update" className={`p-4 border-2 rounded-xl font-black outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.number} onChange={handleChange} name="number" required />
+                    <select className={`p-4 border-2 rounded-xl font-bold outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.status} onChange={handleChange} name="status">
+                        <option value="Active">Ready for Service</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option>
+                        {statusOptions.map((opt, i) => <option key={i} value={opt.label}>{opt.label}</option>)}
+                    </select>
+                </div>
+                <input type="text" placeholder="Location" className={`w-full p-4 border-2 rounded-xl outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.location} onChange={handleChange} name="location" />
+                <textarea placeholder="Maintenance Notes" className={`w-full p-4 border-2 rounded-xl h-24 outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.notes} onChange={handleChange} name="notes" />
+                <div className="grid grid-cols-3 gap-4">
+                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>OOS Date</label><input name="oosStartDate" type="date" onClick={handleDateClick} max={new Date().toISOString().split('T')[0]} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.oosStartDate} onChange={handleChange} /></div>
+                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Exp Return</label><input name="expectedReturnDate" type="date" onClick={handleDateClick} min={formData.oosStartDate} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.expectedReturnDate} onChange={handleChange} /></div>
+                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Act Return</label><input name="actualReturnDate" type="date" onClick={handleDateClick} min={formData.oosStartDate} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.actualReturnDate} onChange={handleChange} /></div>
+                </div>
+                <button className="w-full py-4 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase tracking-widest transition-transform active:scale-95 shadow-lg">Update Record</button>
+            </form>
+
+            {showAddModal && (
+                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className={`p-8 rounded-xl shadow-2xl w-full max-w-md border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                        <h3 className={`text-2xl font-black mb-6 uppercase italic ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Add New Bus</h3>
+                        <form onSubmit={handleAddNewBus} className="space-y-4">
+                            <div><label className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unit Number *</label><input type="text" className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={newBusData.number} onChange={e => setNewBusData({...newBusData, number: e.target.value})} required placeholder="e.g., 2001" /></div>
+                            <div><label className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Initial Status</label><select className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={newBusData.status} onChange={e => setNewBusData({...newBusData, status: e.target.value})}><option value="Active">Ready for Service</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option>{statusOptions.map((opt, i) => <option key={i} value={opt.label}>{opt.label}</option>)}</select></div>
+                            <div className="flex gap-4 mt-8"><button type="button" onClick={() => setShowAddModal(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'} transition-colors`}>Cancel</button><button type="submit" className="w-1/2 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black uppercase text-xs shadow-lg transition-transform active:scale-95">Save Bus</button></div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 export default function FleetManager() {
     const [user, setUser] = useState<any>(null);
     const [isSignUp, setIsSignUp] = useState(false);
@@ -710,14 +852,11 @@ export default function FleetManager() {
 
     useEffect(() => {
         if (!user) { setUserStatus('loading'); return; }
-        if (ADMIN_EMAILS.includes(user.email?.toLowerCase() || '')) {
-            setUserStatus('approved'); setUserRole('admin'); return;
-        }
+        if (ADMIN_EMAILS.includes(user.email?.toLowerCase() || '')) { setUserStatus('approved'); setUserRole('admin'); return; }
         return onSnapshot(doc(db, "users", user.uid), (docSnap) => {
             if (docSnap.exists()) {
-                const data = docSnap.data();
-                setUserStatus(data.status || 'pending');
-                setUserRole(data.role || 'user');
+                setUserStatus(docSnap.data().status || 'pending');
+                setUserRole(docSnap.data().role || 'user');
             } else {
                 setDoc(doc(db, "users", user.uid), { email: user.email?.toLowerCase() || '', status: 'pending', role: 'user', createdAt: serverTimestamp() });
                 setUserStatus('pending'); setUserRole('user');
@@ -725,9 +864,9 @@ export default function FleetManager() {
         });
     }, [user]);
 
-    useEffect(() => {
-        if (!user || userStatus !== 'approved') return;
-        const uBuses = onSnapshot(query(collection(db, "buses"), orderBy("number", "asc")), s => setBuses(s.docs.map(d => ({...d.data(), docId: d.id}))));
+    useEffect(() => { 
+        if (!user || userStatus !== 'approved') return; 
+        const uBuses = onSnapshot(query(collection(db, "buses"), orderBy("number", "asc")), s => setBuses(s.docs.map(d => ({...d.data(), docId: d.id})))); 
         const uOpts = onSnapshot(doc(db, "settings", "status_options"), s => { if(s.exists()) setStatusOptions(s.data().list || []); });
         return () => { uBuses(); uOpts(); };
     }, [user, userStatus]);
@@ -814,8 +953,8 @@ export default function FleetManager() {
             <div className="flex-grow flex items-center justify-center p-4">
                 <form onSubmit={handleAuth} className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-[#ef7c00] animate-in fade-in zoom-in">
                     <h2 className="text-3xl font-black text-white italic mb-8 uppercase text-center">{isSignUp ? 'Join Fleetflow' : 'Fleet Operations'}</h2>
-                    <input className="w-full p-4 mb-4 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00] transition-colors" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
-                    <input className="w-full p-4 mb-6 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00] transition-colors" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} />
+                    <input className="w-full p-4 mb-4 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00] transition-colors" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} required />
+                    <input className="w-full p-4 mb-6 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00] transition-colors" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} required />
                     <button className="w-full py-5 bg-[#ef7c00] text-white font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-orange-600 transition-colors">{isSignUp ? 'Register' : 'Login'}</button>
                     <button type="button" onClick={()=>setIsSignUp(!isSignUp)} className="w-full mt-6 text-slate-400 text-xs font-bold hover:text-white transition-colors">{isSignUp ? 'Back to Login' : "Don't have an account? Sign Up"}</button>
                 </form>
@@ -887,7 +1026,7 @@ export default function FleetManager() {
                             </div>
                         </div>
                         
-                        <div className={`rounded-3xl border shadow-sm overflow-hidden min-h-[500px] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                        <div className={`rounded-3xl border shadow-xl overflow-hidden min-h-[500px] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                             {inventoryMode === 'tv' && (
                                 <div ref={tvBoardRef} className={`p-4 sm:p-6 overflow-y-auto custom-scrollbar min-h-[75vh] h-full ${isFullscreen ? (darkMode ? 'bg-slate-900' : 'bg-slate-100') : ''}`}>
                                     {isFullscreen && (
@@ -934,26 +1073,25 @@ export default function FleetManager() {
 
                             {inventoryMode === 'list' && (
                                 <div className="overflow-x-auto">
-                                    <div className={`grid grid-cols-10 gap-4 p-5 border-b text-[9px] font-black uppercase tracking-widest min-w-[800px] ${darkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                        <div onClick={()=>requestSort('number')} className={`cursor-pointer ${darkMode ? 'hover:text-white' : 'hover:text-[#002d72]'}`}>Unit #</div><div>Series</div><div>Status</div><div>Location</div><div className="col-span-2">Fault Preview</div><div>Exp Return</div><div>Act Return</div><div onClick={()=>requestSort('daysOOS')} className={`cursor-pointer ${darkMode ? 'hover:text-white' : 'hover:text-[#002d72]'}`}>Days OOS</div>
-                                    </div>
-                                    <div className={`divide-y min-w-[800px] ${darkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                                        {sortedBuses.map(b => {
-                                            const type = getStatusType(b.status);
-                                            return (
-                                                <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`grid grid-cols-10 gap-4 p-5 items-center cursor-pointer transition-all border-l-4 ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} ${type==='ready'?'border-green-500':type==='shop'?'border-orange-500':'border-red-500'}`}>
-                                                    <div className={`text-lg font-black ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>#{b.number}</div>
-                                                    <div className={`text-[9px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{getBusSpecs(b.number).length}</div>
-                                                    <div className={`text-[9px] font-black uppercase px-2 py-1 rounded-full w-fit text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-500'}`}>{b.status}</div>
-                                                    <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.location || 'Location Unavailable'}</div>
-                                                    <div className={`col-span-2 text-xs font-medium truncate italic ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{b.notes||'No faults.'}</div>
-                                                    <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{b.expectedReturnDate||'—'}</div>
-                                                    <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{b.actualReturnDate||'—'}</div>
-                                                    <div className={`text-xs font-black ${type==='shop'?'text-orange-500':type==='hold'?'text-red-500':''}`}>{b.status!=='Active' ? `${calculateDaysOOS(b.oosStartDate)} days` : '—'}</div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                    <table className="w-full text-left text-sm">
+                                        <thead className={`font-black uppercase text-[10px] tracking-widest border-b ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                            <tr><th className="p-4 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('number')}>Unit #</th><th className="p-4">Status</th><th className="p-4">Location</th><th className="p-4">Notes</th><th className="p-4 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('daysOOS')}>Days OOS</th></tr>
+                                        </thead>
+                                        <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
+                                            {sortedBuses.map(b => {
+                                                const type = getStatusType(b.status);
+                                                return (
+                                                    <tr key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`cursor-pointer transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}`}>
+                                                        <td className="p-4 font-black text-lg">#{b.number}</td>
+                                                        <td className="p-4"><span className={`px-2 py-1 rounded text-[9px] font-black uppercase text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-500'}`}>{b.status}</span></td>
+                                                        <td className="p-4 font-bold text-xs">{b.location || '-'}</td>
+                                                        <td className="p-4 italic text-xs opacity-70">{b.notes || '-'}</td>
+                                                        <td className={`p-4 font-black ${type==='shop'?'text-orange-500':type==='hold'?'text-red-500':''}`}>{b.status !== 'Active' ? calculateDaysOOS(b.oosStartDate) : '-'}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
                                 </div>
                             )}
                         </div>

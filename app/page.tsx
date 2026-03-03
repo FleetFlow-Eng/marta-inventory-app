@@ -111,12 +111,18 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptio
     const handleDateClick = (e: any) => e.currentTarget.showPicker?.();
     const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
     const inputClass = darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-black';
-    const type = statusOptions.find(o=>o.label===bus.status)?.type || (bus.status==='Active'?'ready':(bus.status==='In Shop'?'shop':'hold'));
+    const type = statusOptions.find(o=>o.label===bus.status)?.type || (bus.status==='Active'?'ready':(['In Shop','Engine','Body Shop','Brakes'].includes(bus.status)?'shop':'hold'));
     const statusColorText = type==='ready' ? 'text-green-500' : type==='shop' ? 'text-orange-500' : 'text-red-500';
     const statusColorBadge = type==='ready' ? 'bg-green-500' : type==='shop' ? 'bg-orange-500' : 'bg-red-500';
 
     if (showHistory) return (<div className={`p-6 rounded-xl shadow-2xl w-full max-w-lg h-[600px] flex flex-col animate-in zoom-in-95 border ${bgClass}`}><div className={`flex justify-between items-center mb-4 border-b pb-4 font-black uppercase ${statusColorText}`}><span>History: #{bus.number}</span><button onClick={()=>setShowHistory(false)} className="text-xs">Back</button></div><div className="flex-grow overflow-y-auto space-y-3">{historyLogs.map(l => (<div key={l.id} className={`p-3 rounded-lg border relative group ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}><div className={`flex justify-between text-[8px] font-black uppercase mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}><span>{l.action}</span><span>{formatTime(l.timestamp)}</span></div><p className="text-xs font-bold whitespace-pre-wrap leading-tight">{l.details}</p>{isAdmin && <button onClick={() => handleDeleteLog(l.id)} className="absolute top-2 right-2 text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold">DELETE</button>}</div>))}</div></div>);
-    if (isEditing) return (<div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}><h3 className={`text-2xl font-black mb-6 uppercase italic ${statusColorText}`}>Edit Bus #{bus.number}</h3><div className="grid grid-cols-2 gap-4 mb-4"><select className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.status} onChange={e=>setEditData({...editData, status:e.target.value})}><option value="Active">Active</option>{statusOptions.map((o,i)=><option key={i} value={o.label}>{o.label}</option>)}</select><input className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.location} onChange={e=>setEditData({...editData, location:e.target.value})} placeholder="Location" /></div><textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-4 font-bold ${inputClass}`} value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} placeholder="Maintenance Notes" /><div className="grid grid-cols-3 gap-4 mb-6 text-[9px] font-black uppercase"><div>OOS Date<input type="date" onClick={handleDateClick} max={new Date().toISOString().split('T')[0]} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.oosStartDate} onChange={e=>setEditData({...editData, oosStartDate:e.target.value})} /></div><div>Exp Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div><div>Act Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div></div><div className="flex gap-4"><button onClick={()=>setIsEditing(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>Cancel</button><button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg">Save</button></div></div>);
+    if (isEditing) return (<div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}><h3 className={`text-2xl font-black mb-6 uppercase italic ${statusColorText}`}>Edit Bus #{bus.number}</h3><div className="grid grid-cols-2 gap-4 mb-4">
+        <select className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.status} onChange={e=>setEditData({...editData, status:e.target.value})}>
+            <option value="Active">Ready for Service</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option>
+            {statusOptions.map((o,i)=><option key={i} value={o.label}>{o.label}</option>)}
+        </select>
+        <input className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.location} onChange={e=>setEditData({...editData, location:e.target.value})} placeholder="Location" /></div><textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-4 font-bold ${inputClass}`} value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} placeholder="Maintenance Notes" /><div className="grid grid-cols-3 gap-4 mb-6 text-[9px] font-black uppercase"><div>OOS Date<input type="date" onClick={handleDateClick} max={new Date().toISOString().split('T')[0]} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.oosStartDate} onChange={e=>setEditData({...editData, oosStartDate:e.target.value})} /></div><div>Exp Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div><div>Act Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div></div><div className="flex gap-4"><button onClick={()=>setIsEditing(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>Cancel</button><button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg">Save</button></div></div>);
+    
     return (
         <div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}>
             <div className="flex justify-between items-start mb-6 border-b border-slate-500/20 pb-4">
@@ -180,7 +186,7 @@ const AccessManager = ({ showToast, darkMode }: { showToast: any, darkMode: bool
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <p className="text-[10px] font-black uppercase opacity-50 mb-4">Active Dropdown List</p>
+                        <p className="text-[10px] font-black uppercase opacity-50 mb-4">Active Custom Dropdown List</p>
                         {statusOptions.map((s, i) => (
                             <div key={i} className={`flex justify-between items-center p-3 rounded-lg border ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                 <div className="flex items-center gap-3"><div className={`w-3 h-3 rounded-full ${s.type==='ready'?'bg-green-500':s.type==='shop'?'bg-orange-500':'bg-red-500'}`}></div><span className="font-bold">{s.label}</span></div>
@@ -292,20 +298,19 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
     const handleExportWord = () => {
         if(!selectedEmp) return;
         const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-        const rollingIncidents = (selectedEmp.incidents || []).filter((inc:any) => { const d = new Date(inc.date); return d >= oneYearAgo; }).sort((a:any, b:any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const rollingIncidents = (selectedEmp.incidents || []).filter((inc:any) => new Date(inc.date) >= oneYearAgo).sort((a:any, b:any) => new Date(a.date).getTime() - new Date(b.date).getTime());
         let activePoints = 0; let incidentListHTML = "";
-        rollingIncidents.forEach((inc: any, index: number) => {
-            const points = parseInt(inc.count) || 0; activePoints += points;
+        rollingIncidents.forEach((inc: any, i: number) => {
+            activePoints += parseInt(inc.count) || 0;
             const d = new Date(inc.date);
-            const formattedDate = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
-            incidentListHTML += `<p style="margin:0; margin-left: 60pt; font-family: 'Arial'; font-size: 10pt;">${index + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${formattedDate} - ${inc.type}</p>`;
+            incidentListHTML += `<p style="margin:0; margin-left: 60pt; font-family: 'Arial'; font-size: 10pt;">${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()} - ${inc.type}</p>`;
         });
-        let disciplineLevel = activePoints >= 6 ? "Discharge" : activePoints >= 5 ? "Final Written Warning" : activePoints >= 4 ? "Written Warning" : activePoints >= 3 ? "Verbal Warning" : "None";
-        const nameParts = selectedEmp.name.split(' '); const formalName = nameParts.length > 1 ? `${nameParts[nameParts.length-1]}, ${nameParts[0]}` : selectedEmp.name;
-        const today = new Date(); const reportDate = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
-        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Notice of Discipline</title><style>body { font-family: 'Arial', sans-serif; font-size: 10pt; color: #000000; line-height: 1.1; margin: 0; padding: 0; } p { margin: 0; padding: 0; margin-bottom: 6pt; } .header-center { text-align: center; font-weight: bold; margin-bottom: 12pt; text-transform: uppercase; font-size: 11pt; } .indent-row { margin-left: 60pt; font-family: 'Arial'; font-size: 10pt; }</style></head><body>`;
-        const content = `<br><table style="width:100%; border:none; margin-bottom: 8pt;"><tr><td style="width:60%; font-family: 'Arial'; font-size: 10pt;">TO: ${formalName}</td><td style="width:40%; text-align:right; font-family: 'Arial'; font-size: 10pt;">DATE: ${reportDate}</td></tr></table><div class="header-center"><p>ATTENDANCE PROGRAM<br>NOTICE OF DISCIPLINE</p></div><p>The Attendance Program states that an employee who accumulates excessive occurrences of absence within any twelve month period (rolling year) will be disciplined according to the following:</p><br><p style="margin-left: 30pt;">Number of Occurrences&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Level of Discipline</p><p class="indent-row">1-2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None</p><p class="indent-row">3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Verbal Warning</p><p class="indent-row">4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Written Warning</p><p class="indent-row">5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;* Final Written Warning</p><p class="indent-row">6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Discharge</p><br><p>My records indicate that you have accumulated <strong>${activePoints} occurrences</strong> during the past rolling twelve months. The Occurrences are as follows:</p><p style="margin-left: 60pt; text-decoration: underline;">Occurrences</p>${incidentListHTML || '<p class="indent-row">None recorded.</p>'}<br><p>Therefore, in accordance with the schedule of progressive discipline, this is your <strong>${disciplineLevel}</strong> for excessive absenteeism under the rule.</p><br><p>Please be advised that your rate of absenteeism is not acceptable and YOUR corrective action is required. Additional occurrences will result in the progressive disciplinary action indicated above.</p><br><div style="text-align:center; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:3pt 0; width:50%; margin:auto; font-weight:bold; margin-top:10pt; margin-bottom:10pt;">ACKNOWLEDGEMENT</div><p>I acknowledge receipt of this Notice of Discipline and that I have been informed of the potential for progressive discipline, up to and including discharge.</p><br><table style="width:100%; border:none; margin-top: 15pt;"><tr><td style="width:50%; border-bottom:1px solid #000;">&nbsp;</td><td style="width:10%;">&nbsp;</td><td style="width:40%; border-bottom:1px solid #000;">&nbsp;</td></tr><tr><td style="vertical-align:top; padding-top:2px;">Employee</td><td></td><td style="vertical-align:top; padding-top:2px;">Date</td></tr></table><table style="width:100%; border:none; margin-top: 20pt;"><tr><td style="width:50%; border-bottom:1px solid #000;">&nbsp;</td><td style="width:10%;">&nbsp;</td><td style="width:40%; border-bottom:1px solid #000;">&nbsp;</td></tr><tr><td style="vertical-align:top; padding-top:2px;">Foreman/Supervisor/Superintendent</td><td></td><td style="vertical-align:top; padding-top:2px;">Date</td></tr></table><table style="width:100%; border:none; margin-top: 20pt;"><tr><td style="width:50%; border-bottom:1px solid #000;">&nbsp;</td><td style="width:10%;">&nbsp;</td><td style="width:40%; border-bottom:1px solid #000;">&nbsp;</td></tr><tr><td style="vertical-align:top; padding-top:2px;">General Foreman/Manager/General Superintendent</td><td></td><td style="vertical-align:top; padding-top:2px;">Date</td></tr></table></body></html>`;
-        saveAs(new Blob(['\ufeff', header + content], { type: 'application/msword' }), `${selectedEmp.name.replace(' ','_')}_Notice.doc`); showToast("Notice Generated", 'success');
+        let dL = activePoints >= 6 ? "Discharge" : activePoints >= 5 ? "Final Written Warning" : activePoints >= 4 ? "Written Warning" : activePoints >= 3 ? "Verbal Warning" : "None";
+        const parts = selectedEmp.name.split(' '); const fN = parts.length > 1 ? `${parts[parts.length-1]}, ${parts[0]}` : selectedEmp.name;
+        const t = new Date(); const rD = `${String(t.getMonth() + 1).padStart(2, '0')}/${String(t.getDate()).padStart(2, '0')}/${t.getFullYear()}`;
+        const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Notice of Discipline</title><style>body{font-family:'Arial',sans-serif;font-size:10pt;color:#000;line-height:1.1;margin:0;padding:0}p{margin:0;padding:0;margin-bottom:6pt}.hc{text-align:center;font-weight:bold;margin-bottom:12pt;text-transform:uppercase;font-size:11pt}.ir{margin-left:60pt;font-family:'Arial';font-size:10pt}</style></head><body><br><table style="width:100%;border:none;margin-bottom:8pt;"><tr><td style="width:60%;font-family:'Arial';font-size:10pt;">TO: ${fN}</td><td style="width:40%;text-align:right;font-family:'Arial';font-size:10pt;">DATE: ${rD}</td></tr></table><div class="hc"><p>ATTENDANCE PROGRAM<br>NOTICE OF DISCIPLINE</p></div><p>The Attendance Program states that an employee who accumulates excessive occurrences of absence within any twelve month period (rolling year) will be disciplined according to the following:</p><br><p style="margin-left: 30pt;">Number of Occurrences&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Level of Discipline</p><p class="ir">1-2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None</p><p class="ir">3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Verbal Warning</p><p class="ir">4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Written Warning</p><p class="ir">5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;* Final Written Warning</p><p class="ir">6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Discharge</p><br><p>My records indicate that you have accumulated <strong>${activePoints} occurrences</strong> during the past rolling twelve months. The Occurrences are as follows:</p><p style="margin-left: 60pt; text-decoration: underline;">Occurrences</p>${incidentListHTML || '<p class="ir">None recorded.</p>'}<br><p>Therefore, in accordance with the schedule of progressive discipline, this is your <strong>${dL}</strong> for excessive absenteeism under the rule.</p><br><p>Please be advised that your rate of absenteeism is not acceptable and YOUR corrective action is required. Additional occurrences will result in the progressive disciplinary action indicated above.</p><br><div style="text-align:center;border-top:1px dashed #000;border-bottom:1px dashed #000;padding:3pt 0;width:50%;margin:auto;font-weight:bold;margin-top:10pt;margin-bottom:10pt;">ACKNOWLEDGEMENT</div><p>I acknowledge receipt of this Notice of Discipline and that I have been informed of the potential for progressive discipline, up to and including discharge.</p><br><table style="width:100%;border:none;margin-top:15pt;"><tr><td style="width:50%;border-bottom:1px solid #000;">&nbsp;</td><td style="width:10%;">&nbsp;</td><td style="width:40%;border-bottom:1px solid #000;">&nbsp;</td></tr><tr><td style="vertical-align:top;padding-top:2px;">Employee</td><td></td><td style="vertical-align:top;padding-top:2px;">Date</td></tr></table><table style="width:100%;border:none;margin-top:20pt;"><tr><td style="width:50%;border-bottom:1px solid #000;">&nbsp;</td><td style="width:10%;">&nbsp;</td><td style="width:40%;border-bottom:1px solid #000;">&nbsp;</td></tr><tr><td style="vertical-align:top;padding-top:2px;">Foreman/Supervisor/Superintendent</td><td></td><td style="vertical-align:top;padding-top:2px;">Date</td></tr></table><table style="width:100%;border:none;margin-top:20pt;"><tr><td style="width:50%;border-bottom:1px solid #000;">&nbsp;</td><td style="width:10%;">&nbsp;</td><td style="width:40%;border-bottom:1px solid #000;">&nbsp;</td></tr><tr><td style="vertical-align:top;padding-top:2px;">General Foreman/Manager/General Superintendent</td><td></td><td style="vertical-align:top;padding-top:2px;">Date</td></tr></table></body></html>`;
+        saveAs(new Blob(['\ufeff', html], { type: 'application/msword' }), `${selectedEmp.name.replace(' ','_')}_Notice.doc`);
+        showToast("Notice Generated", 'success');
     };
 
     const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
@@ -316,7 +321,7 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
             <div className="flex justify-between items-end mb-6 flex-wrap gap-2">
                 <div><h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Attendance Tracker</h2><p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Incident Dashboard & Logs</p></div>
                 <div className="flex gap-2 flex-wrap">
-                    <div className={`border rounded-lg p-1 flex ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}><button onClick={()=>setViewMode('dashboard')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded ${viewMode==='dashboard'?'bg-[#002d72] text-white shadow':(darkMode ? 'text-slate-400' : 'text-slate-500')}`}>Dashboard</button><button onClick={()=>setViewMode('log')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded ${viewMode==='log'?'bg-[#002d72] text-white shadow':(darkMode ? 'text-slate-400' : 'text-slate-500')}`}>Master Log</button></div>
+                    <div className={`border rounded-lg p-1 flex ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}><button onClick={()=>setViewMode('dashboard')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all ${viewMode==='dashboard'?'bg-[#002d72] text-white shadow':(darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]')}`}>Dashboard</button><button onClick={()=>setViewMode('log')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all ${viewMode==='log'?'bg-[#002d72] text-white shadow':(darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]')}`}>Master Log</button></div>
                     <button onClick={() => setShowIncidentModal(true)} className="px-6 py-2 bg-[#ef7c00] text-white rounded-lg font-black uppercase text-[10px] shadow-lg">+ Log Incident</button>
                     <button onClick={() => setShowAddModal(true)} className={`px-4 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg ${darkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-700'}`}>+ Emp</button>
                 </div>
@@ -369,6 +374,16 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
                     <div className="overflow-x-auto flex-grow custom-scrollbar"><div className="min-w-[700px] border-b p-3 grid grid-cols-12 gap-2 text-[9px] font-black uppercase tracking-widest"><div className="col-span-3">Employee Name</div><div className="col-span-2">Incident Type</div><div className="col-span-2">Date</div><div className="col-span-1 text-center">Count</div><div className="col-span-1 text-center">Doc?</div><div className="col-span-2">Notes</div><div className="col-span-1 text-center">Action</div></div><div className="min-w-[700px] divide-y">{filteredLog.map((log, i) => (<div key={i} className="grid grid-cols-12 gap-2 p-3 items-center text-xs"><div className="col-span-3 font-bold cursor-pointer hover:underline text-[#ef7c00]" onClick={() => setSelectedEmp(personnel.find(p => p.id === log.employeeId))}>{log.employeeName}</div><div className="col-span-2 font-medium">{log.type}</div><div className="col-span-2 font-mono">{log.date}</div><div className="col-span-1 text-center font-black">{log.count}</div><div className="col-span-1 text-center">{log.docReceived ? '✅' : '❌'}</div><div className="col-span-2 truncate italic opacity-70">{log.notes || '-'}</div><div className="col-span-1 text-center"><button onClick={() => handleDeleteIncident(log.employeeId, log)} className="text-red-500 font-bold">🗑️</button></div></div>))}</div></div>
                 </div>
             )}
+
+            {showAddModal && (
+                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
+                    <div className={`p-6 rounded-2xl w-full max-w-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                        <h3 className={`text-xl font-black mb-4 uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Add Employee</h3>
+                        <input className={`w-full p-3 border-2 rounded-lg mb-4 font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Full Name (e.g. John Doe)" value={newEmpName} onChange={e=>setNewEmpName(e.target.value)} />
+                        <div className="flex gap-2"><button onClick={()=>setShowAddModal(false)} className={`flex-1 py-3 rounded-lg font-bold text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'}`}>Cancel</button><button onClick={handleAddEmployee} className="flex-1 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-lg font-bold text-xs transition-colors">Add Employee</button></div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -380,7 +395,7 @@ const PartsInventory = ({ showToast, darkMode }: { showToast: any, darkMode: boo
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col relative">
             <div className="flex justify-between items-end mb-6 px-2 flex-wrap gap-4">
-                <div><h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Parts Registry</h2><p className={`text-[10px] font-black uppercase tracking-widest mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Local Reference</p></div>
+                <div><h2 className={`text-3xl font-black italic uppercase tracking-tighter leading-none ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Parts Registry</h2><p className={`text-[10px] font-black uppercase tracking-widest mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Local Reference</p></div>
                 <div className="flex items-center gap-3 w-full max-w-lg"><button onClick={() => setIsLargeText(!isLargeText)} className={`h-12 w-12 flex items-center justify-center rounded-2xl border-2 font-black transition-all ${isLargeText ? 'bg-[#002d72] border-[#002d72] text-white' : inputClass}`}>Aa</button><input type="text" placeholder="Search Part #..." className={`w-full p-4 rounded-2xl font-bold border-2 outline-none focus:border-[#ef7c00] transition-all shadow-sm ${inputClass}`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
             </div>
             <div className={`rounded-3xl shadow-xl border flex-grow overflow-hidden flex flex-col relative ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
@@ -531,7 +546,7 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
                 <div className="grid grid-cols-2 gap-6">
                     <input type="text" placeholder="Unit # to Update" className={`p-4 border-2 rounded-xl font-black outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.number} onChange={handleChange} name="number" required />
                     <select className={`p-4 border-2 rounded-xl font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.status} onChange={handleChange} name="status">
-                        <option value="Active">Active</option>
+                        <option value="Active">Ready for Service</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option>
                         {statusOptions.map((opt, i) => <option key={i} value={opt.label}>{opt.label}</option>)}
                     </select>
                 </div>
@@ -544,13 +559,14 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
                 </div>
                 <button className="w-full py-4 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase tracking-widest shadow-lg">Update Record</button>
             </form>
+
             {showAddModal && (
                 <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className={`p-8 rounded-xl shadow-2xl w-full max-w-md border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                         <h3 className={`text-2xl font-black mb-6 uppercase italic ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Add New Bus</h3>
                         <form onSubmit={handleAddNewBus} className="space-y-4">
                             <div><label className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unit Number *</label><input type="text" className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={newBusData.number} onChange={e => setNewBusData({...newBusData, number: e.target.value})} required placeholder="e.g., 2001" /></div>
-                            <div><label className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Initial Status</label><select className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={newBusData.status} onChange={e => setNewBusData({...newBusData, status: e.target.value})}><option value="Active">Active</option>{statusOptions.map((opt, i) => <option key={i} value={opt.label}>{opt.label}</option>)}</select></div>
+                            <div><label className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Initial Status</label><select className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={newBusData.status} onChange={e => setNewBusData({...newBusData, status: e.target.value})}><option value="Active">Ready for Service</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option>{statusOptions.map((opt, i) => <option key={i} value={opt.label}>{opt.label}</option>)}</select></div>
                             <div className="flex gap-4 mt-8"><button type="button" onClick={() => setShowAddModal(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white' : 'bg-slate-100 text-black'}`}>Cancel</button><button type="submit" className="w-1/2 py-3 bg-green-600 text-white rounded-xl font-black uppercase text-xs shadow-lg">Save Bus</button></div>
                         </form>
                     </div>
@@ -562,6 +578,7 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
 
 export default function FleetManager() {
     const [user, setUser] = useState<any>(null);
+    const [isSignUp, setIsSignUp] = useState(false);
     const [userStatus, setUserStatus] = useState<'loading' | 'approved' | 'pending' | 'rejected'>('loading');
     const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
     const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'personnel' | 'parts' | 'admin'>('inventory');
@@ -612,7 +629,7 @@ export default function FleetManager() {
 
     const getStatusType = (label: string) => {
         const opt = statusOptions.find(o => o.label === label);
-        return opt ? opt.type : (label === 'Active' ? 'ready' : (label === 'In Shop' ? 'shop' : 'hold'));
+        return opt ? opt.type : (label === 'Active' ? 'ready' : (['In Shop','Engine','Body Shop','Brakes'].includes(label) ? 'shop' : 'hold'));
     };
 
     useEffect(() => {
@@ -686,17 +703,15 @@ export default function FleetManager() {
         } catch(e: any) { showToast(e.message.replace('Firebase: ', ''), "error"); }
     };
 
-    const [isSignUp, setIsSignUp] = useState(false);
-
     if (!user) return (
         <div className="min-h-screen flex flex-col bg-slate-900 font-sans">
             {toast && <Toast message={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}
             <div className="flex-grow flex items-center justify-center p-4">
-                <form onSubmit={handleAuth} className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-[#ef7c00]">
+                <form onSubmit={handleAuth} className="bg-slate-800 p-10 rounded-2xl w-full max-w-md border-t-[12px] border-[#ef7c00] shadow-2xl animate-in fade-in zoom-in">
                     <h2 className="text-3xl font-black text-white italic mb-8 uppercase text-center">{isSignUp ? 'Join Fleetflow' : 'Fleet Operations'}</h2>
-                    <input className="w-full p-4 mb-4 rounded-xl bg-slate-900 border-2 border-slate-700 text-white outline-none focus:border-[#ef7c00]" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
-                    <input className="w-full p-4 mb-6 rounded-xl bg-slate-900 border-2 border-slate-700 text-white outline-none focus:border-[#ef7c00]" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} />
-                    <button className="w-full py-5 bg-[#ef7c00] text-white font-black uppercase rounded-xl shadow-lg hover:bg-orange-600 transition-colors">{isSignUp ? 'Register' : 'Login'}</button>
+                    <input className="w-full p-4 mb-4 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00]" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
+                    <input className="w-full p-4 mb-6 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00]" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} />
+                    <button className="w-full py-5 bg-[#ef7c00] text-white font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-orange-600 transition-colors">{isSignUp ? 'Register' : 'Login'}</button>
                     <button type="button" onClick={()=>setIsSignUp(!isSignUp)} className="w-full mt-6 text-slate-400 text-xs font-bold hover:text-white transition-colors">{isSignUp ? 'Back to Login' : "Don't have an account? Sign Up"}</button>
                 </form>
             </div>
@@ -705,10 +720,12 @@ export default function FleetManager() {
     );
 
     if (userStatus === 'pending' || userStatus === 'rejected') return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center">
-            <h2 className="text-4xl font-black uppercase italic mb-4">Pending Approval</h2>
-            <p className="opacity-50 font-bold mb-8">Administrators have been notified of your registration.</p>
-            <button onClick={()=>signOut(auth)} className="px-10 py-4 bg-slate-800 rounded-xl font-black uppercase">Sign Out</button>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center font-sans">
+            <div className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-red-500 animate-in zoom-in-95">
+                <h2 className="text-3xl font-black uppercase italic mb-4">Access Restricted</h2>
+                <p className="opacity-50 font-bold mb-8">Account pending administrator approval.</p>
+                <button onClick={()=>signOut(auth)} className="w-full py-4 bg-[#002d72] rounded-xl font-black uppercase tracking-widest shadow-xl">Sign Out</button>
+            </div>
             <div className="absolute bottom-0 w-full"><Footer onShowLegal={setLegalType} darkMode={true} /></div>
         </div>
     );
@@ -716,28 +733,29 @@ export default function FleetManager() {
     return (
         <div className={`flex flex-col min-h-screen font-sans selection:bg-[#ef7c00] selection:text-white transition-colors duration-300 ${darkMode ? 'bg-slate-900 text-slate-100' : 'bg-slate-100 text-slate-900'}`}>
             {toast && <Toast message={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}
-            {selectedBusDetail && (<div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"><BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} statusOptions={statusOptions} /></div>)}
+            {selectedBusDetail && (<div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"><BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} statusOptions={statusOptions} /></div>)}
             {legalType && <LegalModal type={legalType} onClose={()=>setLegalType(null)} darkMode={darkMode} />}
 
-            <nav className={`backdrop-blur-md border-b sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm ${darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
-                <div className="flex items-center gap-2"><div className="w-2 h-6 bg-[#ef7c00] rounded-full"></div><span className="font-black italic uppercase">Fleet Manager</span></div>
-                <div className="flex gap-4 items-center">
+            <nav className={`backdrop-blur-md border-b sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm overflow-x-auto ${darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
+                <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-6 bg-[#ef7c00] rounded-full"></div><span className="font-black text-lg italic uppercase tracking-tighter">Fleet Manager</span></div>
+                <div className="flex gap-4 items-center flex-nowrap">
                     {['inventory', 'input', 'tracker', 'handover', 'parts'].concat(isAdmin ? ['analytics', 'personnel', 'admin'] : []).map(v => (
-                        <button key={v} onClick={()=>setView(v as any)} className={`text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${view === v ? 'border-[#ef7c00] text-[#ef7c00]' : 'border-transparent text-slate-400 hover:text-[#ef7c00]'}`}>{v.replace('admin','panel')}</button>
+                        <button key={v} onClick={()=>setView(v as any)} className={`text-[9px] font-black uppercase tracking-widest border-b-2 pb-1 transition-all whitespace-nowrap ${view === v ? 'border-[#ef7c00] text-[#ef7c00]' : (darkMode ? 'border-transparent text-slate-400 hover:text-white' : 'border-transparent text-slate-500 hover:text-[#002d72]')}`}>{v.replace('admin','panel').replace('input', 'Data Entry').replace('parts', 'Parts List')}</button>
                     ))}
-                    <button onClick={()=>setDarkMode(!darkMode)} className="px-3 py-1 rounded-full border text-[10px]">{darkMode ? '☀️' : '🌙'}</button>
-                    <button onClick={()=>signOut(auth)} className="text-red-500 font-black text-[10px] uppercase">Logout</button>
+                    <button onClick={()=>setDarkMode(!darkMode)} className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${darkMode ? 'bg-slate-800 text-yellow-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
+                    <button onClick={exportExcel} className={`text-[10px] font-black uppercase whitespace-nowrap ${darkMode ? 'text-green-400 hover:text-green-300' : 'text-[#002d72] hover:text-[#ef7c00]'}`}>Excel</button>
+                    <button onClick={()=>signOut(auth)} className="text-red-500 font-black text-[10px] uppercase whitespace-nowrap">Logout</button>
                 </div>
             </nav>
 
-            <main className="flex-grow w-full max-w-[1600px] mx-auto p-4 md:p-6">
+            <main className="flex-grow w-full max-w-[1600px] mx-auto p-4 md:p-6 overflow-x-hidden">
                 {view === 'admin' ? <AccessManager showToast={showToast} darkMode={darkMode} /> :
                  view === 'input' ? <BusInputForm showToast={showToast} darkMode={darkMode} buses={buses} isAdmin={isAdmin} statusOptions={statusOptions} /> :
-                 view === 'analytics' ? <div className="space-y-10"><StatusCharts buses={buses} /><AnalyticsDashboard buses={buses} showToast={showToast} /></div> :
+                 view === 'analytics' ? <div className="space-y-10 animate-in fade-in duration-500"><StatusCharts buses={buses} /><AnalyticsDashboard buses={buses} showToast={showToast} /></div> :
                  view === 'parts' ? <PartsInventory showToast={showToast} darkMode={darkMode} /> :
                  view === 'handover' ? <ShiftHandover buses={buses} showToast={showToast} /> :
                  view === 'personnel' ? <PersonnelManager showToast={showToast} darkMode={darkMode} /> :
-                 view === 'tracker' ? <div className="h-[85vh] rounded-2xl border overflow-hidden relative"><BusTracker /></div> : (
+                 view === 'tracker' ? <div className={`h-[85vh] rounded-2xl border shadow-sm overflow-hidden relative ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}><BusTracker /></div> : (
                     <>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                             {['Total', 'Ready', 'In Shop', 'Hold'].map(l => {
@@ -749,73 +767,99 @@ export default function FleetManager() {
                                     return false;
                                 }).length;
                                 return (
-                                    <div key={l} onClick={()=>setActiveFilter(l==='Total'?'Total Fleet':l)} className={`cursor-pointer p-6 rounded-2xl border shadow-sm ${activeFilter === (l==='Total'?'Total Fleet':l) ? (darkMode ? 'border-[#ef7c00] bg-slate-800' : 'border-[#002d72] bg-blue-50') : (darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white')}`}>
-                                        <p className="text-[10px] font-black uppercase opacity-50 mb-1">{l}</p>
-                                        <p className={`text-4xl font-black ${l==='Ready'?'text-green-500':l==='In Shop'?'text-orange-500':l==='Hold'?'text-red-500':''}`}>{count}</p>
+                                    <div key={l} onClick={()=>setActiveFilter(l==='Total'?'Total Fleet':l)} className={`cursor-pointer p-5 rounded-2xl border shadow-sm transition-all hover:-translate-y-1 ${activeFilter === (l==='Total'?'Total Fleet':l) ? (darkMode ? 'border-[#ef7c00] bg-slate-800' : 'border-[#002d72] bg-blue-50') : (darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white')}`}>
+                                        <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{l}</p>
+                                        <p className={`text-3xl font-black ${l==='Ready'?'text-green-500':l==='In Shop'?'text-orange-500':l==='Hold'?'text-red-500':(darkMode ? 'text-white' : 'text-slate-900')}`}>{count}</p>
                                     </div>
                                 );
                             })}
                         </div>
-                        <div className="flex justify-between items-center mb-6">
-                            <input className={`w-full max-w-md p-4 rounded-xl border-2 font-bold outline-none focus:border-[#ef7c00] ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-black'}`} placeholder="Filter Unit #..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
-                            <div className="flex gap-2 p-1 border rounded-xl bg-black/5">
-                                {['list', 'grid', 'tv'].map(m => <button key={m} onClick={()=>setInventoryMode(m as any)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${inventoryMode === m ? 'bg-[#ef7c00] text-white shadow' : 'text-slate-400 hover:text-white'}`}>{m}</button>)}
+                        <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-6">
+                            <input className={`w-full max-w-md p-3 rounded-lg border-2 font-bold outline-none transition-colors focus:border-[#ef7c00] ${darkMode ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-black placeholder:text-slate-400'}`} placeholder="Search Unit #..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+                            <div className={`flex w-full md:w-auto gap-2 p-1 border rounded-lg ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                                {['list', 'grid', 'tv'].map(m => <button key={m} onClick={()=>setInventoryMode(m as any)} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all ${inventoryMode === m ? 'bg-[#ef7c00] text-white shadow-md' : (darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]')}`}>{m}</button>)}
                             </div>
                         </div>
                         
-                        <div ref={tvBoardRef} className={`rounded-3xl border shadow-xl overflow-hidden min-h-[60vh] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-                            {inventoryMode === 'tv' || inventoryMode === 'grid' ? (
-                                <div className={`p-6 grid gap-6 ${isFullscreen ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5'}`}>
+                        <div className={`rounded-2xl border shadow-sm overflow-hidden min-h-[500px] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                            {inventoryMode === 'tv' && (
+                                <div ref={tvBoardRef} className={`p-4 sm:p-6 overflow-y-auto custom-scrollbar min-h-[75vh] h-full ${isFullscreen ? (darkMode ? 'bg-slate-900' : 'bg-slate-100') : ''}`}>
+                                    {isFullscreen && (
+                                        <div className={`flex justify-between items-end mb-6 border-b-2 pb-4 ${darkMode ? 'border-slate-800' : 'border-slate-300'}`}>
+                                            <div><h2 className="text-5xl font-black uppercase tracking-tighter text-[#ef7c00]">Fleet Status Board</h2><p className={`text-xl font-bold mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Total Units: {buses.length} | Down: <span className="text-red-500">{buses.filter(b=>b.status!=='Active').length}</span></p></div>
+                                            <button onClick={toggleFullScreen} className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl transition-all transform active:scale-95">Exit Fullscreen</button>
+                                        </div>
+                                    )}
+                                    {!isFullscreen && (
+                                        <div className="mb-6 flex justify-end">
+                                            <button onClick={toggleFullScreen} className="px-6 py-3 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase text-xs shadow-lg flex items-center gap-2 transition-all transform active:scale-95">⛶ Launch Fullscreen TV Mode</button>
+                                        </div>
+                                    )}
+                                    <div className={`grid gap-4 sm:gap-6 pb-20 ${isFullscreen ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}`}>
+                                        {sortedBuses.map(b => {
+                                            const type = getStatusType(b.status);
+                                            const color = type==='ready'?'text-green-500':type==='shop'?'text-orange-500':'text-red-500';
+                                            const borderColor = type==='ready'?'border-green-500':type==='shop'?'border-orange-500':'border-red-600';
+                                            return (
+                                                <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`cursor-pointer p-4 rounded-xl flex flex-col justify-between border-[3px] shadow-md transition-transform hover:scale-105 ${borderColor} ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
+                                                    <div className="flex justify-between items-start mb-3"><span className={`text-4xl font-black leading-none tracking-tighter ${color}`}>#{b.number}</span><span className={`w-fit px-2 py-1 rounded text-xs font-black uppercase tracking-wider shadow-sm text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-600'}`}>{b.status}</span></div>
+                                                    <div className={`text-sm font-black mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'Location Unavailable'}</div>
+                                                    <div className={`text-xs font-bold leading-snug mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.notes || 'No active faults recorded.'}</div>
+                                                    <div className="mt-auto pt-2">{b.status !== 'Active' && <div className={`text-xs font-black text-white rounded px-2 py-1.5 text-center tracking-widest shadow-inner ${type==='shop'?'bg-orange-600':'bg-red-600'}`}>DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {inventoryMode === 'grid' && (
+                                <div className={`p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 ${darkMode ? 'bg-slate-900' : 'bg-slate-50/50'}`}>
                                     {sortedBuses.map(b => {
                                         const type = getStatusType(b.status);
-                                        const color = type==='ready'?'text-green-500':type==='shop'?'text-orange-500':'text-red-500';
-                                        const borderColor = type==='ready'?'border-green-500/30':type==='shop'?'border-orange-500/30':'border-red-600/30';
+                                        const borderColor = type==='ready'?(darkMode?'border-green-600/50':'border-green-200'):type==='shop'?(darkMode?'border-orange-600/50':'border-orange-300'):(darkMode?'border-red-600/50':'border-red-200');
+                                        const hoverBorder = type==='ready'?'hover:border-green-400':type==='shop'?'hover:border-orange-400':'hover:border-red-400';
                                         return (
-                                            <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`cursor-pointer p-6 rounded-2xl border-4 flex flex-col shadow-lg transition-transform hover:scale-105 ${borderColor} ${darkMode ? 'bg-white/5' : 'bg-slate-50'}`}>
-                                                <div className="flex justify-between items-start mb-4">
-                                                    <span className={`text-5xl font-black leading-none ${color}`}>#{b.number}</span>
-                                                    <span className={`px-2 py-1 rounded text-[10px] font-black uppercase text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-500'}`}>{b.status}</span>
-                                                </div>
-                                                <div className="text-sm font-black mb-2">📍 {b.location || 'Location Unavailable'}</div>
-                                                <div className="text-xs font-bold opacity-70 mb-4 h-20 overflow-hidden leading-relaxed">{b.notes || 'No faults recorded.'}</div>
-                                                {b.status !== 'Active' && <div className={`mt-auto py-2 text-center text-xs font-black text-white rounded-lg ${type==='shop'?'bg-orange-500':'bg-red-600'}`}>{calculateDaysOOS(b.oosStartDate)} DAYS DOWN</div>}
+                                            <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`cursor-pointer p-4 rounded-2xl border-2 flex flex-col shadow-sm transition-all hover:-translate-y-1 ${borderColor} ${hoverBorder} ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
+                                                <div className="flex justify-between items-start mb-3"><span className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>#{b.number}</span><span className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-500'}`}>{b.status}</span></div>
+                                                <div className={`flex items-center gap-1 text-xs font-bold mb-2 truncate ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>📍 {b.location || 'Location Unavailable'}</div>
+                                                <div className={`text-[10px] italic line-clamp-2 mb-3 h-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>🔧 {b.notes || 'No active faults recorded.'}</div>
+                                                {b.status !== 'Active' && <div className={`mt-auto text-[10px] font-black text-white p-1.5 rounded-lg text-center shadow-inner tracking-widest ${type==='shop'?'bg-orange-500 border border-orange-600':'bg-red-600 border border-red-700'}`}>⏱️ DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}
                                             </div>
                                         );
                                     })}
                                 </div>
-                            ) : (
+                            )}
+
+                            {inventoryMode === 'list' && (
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-left text-sm">
-                                        <thead className={`font-black uppercase text-[10px] tracking-widest border-b ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                            <tr><th className="p-4 cursor-pointer" onClick={()=>requestSort('number')}>Unit #</th><th className="p-4">Status</th><th className="p-4">Location</th><th className="p-4">Notes</th><th className="p-4 cursor-pointer" onClick={()=>requestSort('daysOOS')}>Days OOS</th></tr>
-                                        </thead>
-                                        <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                                            {sortedBuses.map(b => {
-                                                const type = getStatusType(b.status);
-                                                return (
-                                                    <tr key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`cursor-pointer ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}`}>
-                                                        <td className="p-4 font-black text-lg">#{b.number}</td>
-                                                        <td className="p-4"><span className={`px-2 py-1 rounded text-[9px] font-black uppercase text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-500'}`}>{b.status}</span></td>
-                                                        <td className="p-4 font-bold text-xs">{b.location}</td>
-                                                        <td className="p-4 italic text-xs opacity-70">{b.notes}</td>
-                                                        <td className="p-4 font-black">{b.status !== 'Active' ? calculateDaysOOS(b.oosStartDate) : '-'}</td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
+                                    <div className={`grid grid-cols-10 gap-4 p-5 border-b text-[9px] font-black uppercase tracking-widest min-w-[800px] ${darkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                        <div onClick={()=>requestSort('number')} className={`cursor-pointer ${darkMode ? 'hover:text-white' : 'hover:text-[#002d72]'}`}>Unit #</div><div>Series</div><div>Status</div><div>Location</div><div className="col-span-2">Fault Preview</div><div>Exp Return</div><div>Act Return</div><div onClick={()=>requestSort('daysOOS')} className={`cursor-pointer ${darkMode ? 'hover:text-white' : 'hover:text-[#002d72]'}`}>Days OOS</div>
+                                    </div>
+                                    <div className={`divide-y min-w-[800px] ${darkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
+                                        {sortedBuses.map(b => {
+                                            const type = getStatusType(b.status);
+                                            return (
+                                                <tr key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`grid grid-cols-10 gap-4 p-5 items-center cursor-pointer transition-all border-l-4 ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} ${type==='ready'?'border-green-500':type==='shop'?'border-orange-500':'border-red-500'}`}>
+                                                    <div className={`text-lg font-black ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>#{b.number}</div>
+                                                    <div className={`text-[9px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{getBusSpecs(b.number).length}</div>
+                                                    <div className={`text-[9px] font-black uppercase px-2 py-1 rounded-full w-fit text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-500'}`}>{b.status}</div>
+                                                    <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.location || 'Location Unavailable'}</div>
+                                                    <div className={`col-span-2 text-xs font-medium truncate italic ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{b.notes||'No faults.'}</div>
+                                                    <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{b.expectedReturnDate||'—'}</div>
+                                                    <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{b.actualReturnDate||'—'}</div>
+                                                    <div className={`text-xs font-black ${type==='shop'?'text-orange-500':type==='hold'?'text-red-500':''}`}>{b.status!=='Active' ? `${calculateDaysOOS(b.oosStartDate)} days` : '—'}</div>
+                                                </tr>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
                         </div>
-                        {inventoryMode === 'tv' && (
-                             <div className="mt-4 flex justify-end">
-                                 <button onClick={toggleFullScreen} className="px-6 py-3 bg-[#ef7c00] text-white rounded-xl font-black uppercase text-xs shadow-lg">⛶ Fullscreen TV</button>
-                             </div>
-                        )}
                     </>
                  )}
             </main>
-            {view !== 'input' && view !== 'admin' && view !== 'personnel' && view !== 'analytics' && <Footer onShowLegal={setLegalType} darkMode={darkMode} />}
+            <Footer onShowLegal={setLegalType} darkMode={darkMode} />
         </div>
     );
 }

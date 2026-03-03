@@ -67,7 +67,7 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptio
     const [isEditing, setIsEditing] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [historyLogs, setHistoryLogs] = useState<any[]>([]); 
-    const [editData, setEditData] = useState({ status: bus.status || 'Active', location: bus.location || '', notes: bus.notes || '', oosStartDate: bus.oosStartDate || '', expectedReturnDate: bus.expectedReturnDate || '', actualReturnDate: bus.actualReturnDate || '' });
+    const [editData, setEditData] = useState({ status: bus.status || 'Active', location: bus.location || '', notes: bus.notes || '', oosStartDate: bus.oosStartDate || '', expectedReturnDate: bus.expectedReturnDate || '', actualReturnDate: bus.actualReturnDate || '', disposition: bus.disposition || '' });
     
     useEffect(() => { if (showHistory) return onSnapshot(query(collection(db, "buses", bus.number, "history"), orderBy("timestamp", "desc")), (snap) => setHistoryLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))); }, [showHistory, bus.number]);
     
@@ -86,6 +86,8 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptio
             if (old.status !== editData.status) changes.push(`STATUS: ${old.status} ➝ ${editData.status}`);
             if (old.notes !== editData.notes) changes.push(`NOTES: "${old.notes || ''}" ➝ "${editData.notes}"`);
             if (old.location !== editData.location) changes.push(`LOC: ${old.location || '—'} ➝ ${editData.location}`);
+            if (isAdmin && old.disposition !== editData.disposition) changes.push(`DISPOSITION: "${old.disposition || ''}" ➝ "${editData.disposition}"`);
+            
             await setDoc(busRef, { ...editData, timestamp: serverTimestamp() }, { merge: true });
             if (changes.length > 0) await logHistory(bus.number, "EDIT", changes.join('\n'), auth.currentUser?.email || 'Unknown');
             showToast(`Bus #${bus.number} updated`, 'success'); setIsEditing(false);
@@ -142,10 +144,11 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptio
                 <input className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.location} onChange={e=>setEditData({...editData, location:e.target.value})} placeholder="Location" />
             </div>
             <textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-4 font-bold ${inputClass}`} value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} placeholder="Maintenance Notes" />
+            {isAdmin && <input className={`w-full p-3 border-2 rounded-lg mb-4 font-bold ${inputClass}`} value={editData.disposition} onChange={e=>setEditData({...editData, disposition:e.target.value})} placeholder="Disposition / Fleet Status (Admin Only)" />}
             <div className="grid grid-cols-3 gap-4 mb-6 text-[9px] font-black uppercase">
-                <div>OOS Date<input type="date" max={new Date().toISOString().split('T')[0]} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.oosStartDate} onChange={e=>setEditData({...editData, oosStartDate:e.target.value})} /></div>
-                <div>Exp Return<input type="date" min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div>
-                <div>Act Return<input type="date" min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div>
+                <div>OOS Date<input type="date" onClick={handleDateClick} max={new Date().toISOString().split('T')[0]} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.oosStartDate} onChange={e=>setEditData({...editData, oosStartDate:e.target.value})} /></div>
+                <div>Exp Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div>
+                <div>Act Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div>
             </div>
             <div className="flex gap-4">
                 <button onClick={()=>setIsEditing(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>Cancel</button>
@@ -170,10 +173,11 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptio
                 <p className="text-[10px] font-black uppercase mb-2 opacity-50">Fault Details</p>
                 <p className="text-lg font-medium">{bus.notes || "No active faults."}</p>
             </div>
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className={`grid ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-4 mb-6`}>
                 <div><p className="text-[9px] font-black uppercase opacity-50">OOS Date</p><p className="text-xl font-black text-[#002d72]">{bus.oosStartDate || '--'}</p></div>
                 <div><p className="text-[9px] font-black uppercase opacity-50">Exp Return</p><p className="text-xl font-black text-[#ef7c00]">{bus.expectedReturnDate || '--'}</p></div>
                 <div><p className="text-[9px] font-black uppercase opacity-50">Act Return</p><p className="text-xl font-black text-green-500">{bus.actualReturnDate || '--'}</p></div>
+                {isAdmin && <div><p className="text-[9px] font-black uppercase opacity-50">Disposition</p><p className="text-xl font-black text-purple-500">{bus.disposition || '--'}</p></div>}
             </div>
             <div className="flex justify-between pt-6 border-t border-slate-500/20">
                 <button onClick={()=>setShowHistory(true)} className={`px-5 py-3 rounded-lg text-[10px] font-black uppercase ${darkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-100 hover:bg-slate-200'}`}>📜 History</button>
@@ -492,38 +496,6 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
                 </div>
             )}
 
-            {showAddModal && (
-                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
-                    <div className={`p-6 rounded-2xl w-full max-w-sm shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                        <h3 className={`text-xl font-black mb-4 uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Add Employee</h3>
-                        <input className={`w-full p-3 border-2 rounded-lg mb-4 font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Full Name (e.g. John Doe)" value={newEmpName} onChange={e=>setNewEmpName(e.target.value)} />
-                        <div className="flex gap-2">
-                            <button onClick={()=>setShowAddModal(false)} className={`flex-1 py-3 rounded-lg font-bold text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'}`}>Cancel</button>
-                            <button onClick={handleAddEmployee} className="flex-1 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-lg font-bold text-xs transition-colors">Add Employee</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {showIncidentModal && (
-                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
-                    <div className={`p-8 rounded-2xl w-full max-w-md shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                        <h3 className="text-2xl font-black text-[#ef7c00] mb-6 uppercase">Log Attendance</h3>
-                        <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Employee</label>
-                        <select className={`w-full p-3 border-2 rounded-lg font-bold mb-4 outline-none focus:border-[#ef7c00] ${inputClass}`} value={selectedEmpId} onChange={e=>setSelectedEmpId(e.target.value)}><option value="">-- Select Employee --</option>{personnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div><label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Type</label><select className={`w-full p-3 border-2 rounded-lg font-bold text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.type} onChange={e=>setIncData({...incData, type:e.target.value})}><option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option><option>Vacation</option><option>Bereavement</option><option>Other</option></select></div>
-                            <div><label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Occurrences</label><input type="number" className={`w-full p-3 border-2 rounded-lg font-bold text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} /></div>
-                        </div>
-                        <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Date</label>
-                        <input type="date" onClick={handleDateClick} className={`w-full p-3 border-2 rounded-lg font-bold mb-4 text-sm outline-none focus:border-[#ef7c00] cursor-pointer ${inputClass}`} value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} />
-                        <div className={`flex items-center gap-3 mb-4 p-3 rounded-lg border cursor-pointer ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-blue-50 border-blue-100'}`} onClick={()=>setIncData({...incData, docReceived:!incData.docReceived})}><div className={`w-5 h-5 rounded border flex items-center justify-center ${incData.docReceived ? 'bg-[#ef7c00] border-[#ef7c00] text-white' : (darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-300')}`}>{incData.docReceived && '✓'}</div><span className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-blue-800'}`}>Documentation Received?</span></div>
-                        <textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-6 font-medium text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Additional notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} />
-                        <div className="flex gap-4"><button onClick={()=>setShowIncidentModal(false)} className={`w-1/3 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'}`}>Cancel</button><button onClick={handleLogIncident} className="w-2/3 py-3 bg-[#002d72] hover:bg-[#ef7c00] text-white rounded-xl font-black uppercase text-xs shadow-lg transition-colors">Save Record</button></div>
-                    </div>
-                </div>
-            )}
-
             {viewMode === 'dashboard' && (
                 <div className="space-y-6 overflow-y-auto pb-10">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -644,7 +616,7 @@ const PartsInventory = ({ showToast, darkMode }: { showToast: (msg: string, type
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col relative">
             <div className="flex justify-between items-end mb-6 px-2 flex-wrap gap-4">
                 <div><h2 className={`text-3xl font-black italic uppercase tracking-tighter leading-none ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Parts Registry</h2><p className={`text-[10px] font-black uppercase tracking-widest mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Local Reference</p></div>
-                <div className="flex items-center gap-3 w-full max-w-lg"><button onClick={() => setIsLargeText(!isLargeText)} className={`h-12 w-12 flex items-center justify-center rounded-2xl border-2 font-black transition-all ${isLargeText ? 'bg-[#002d72] border-[#002d72] text-white' : inputClass}`}>Aa</button><input type="text" placeholder="Search Part #..." className={`w-full p-4 rounded-2xl font-bold border-2 outline-none focus:border-[#ef7c00] transition-colors shadow-sm ${inputClass}`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
+                <div className="flex items-center gap-3 w-full max-w-lg"><button onClick={() => setIsLargeText(!isLargeText)} className={`h-12 w-12 flex items-center justify-center rounded-2xl border-2 font-black transition-all ${isLargeText ? 'bg-[#002d72] border-[#002d72] text-white' : inputClass}`}>Aa</button><input type="text" placeholder="Search Part #..." className={`w-full p-4 rounded-2xl font-bold border-2 outline-none focus:border-[#ef7c00] transition-all shadow-sm ${inputClass}`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
             </div>
             <div className={`rounded-3xl shadow-xl border flex-grow overflow-hidden flex flex-col relative ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
                 <div className="bg-[#002d72] grid grid-cols-12 gap-4 p-5 text-[10px] font-black uppercase text-white tracking-widest select-none"><div className="col-span-3">Part Number</div><div className="col-span-8">Description</div><div className="col-span-1 text-center">View</div></div>
@@ -654,60 +626,8 @@ const PartsInventory = ({ showToast, darkMode }: { showToast: (msg: string, type
     );
 };
 
-const StatusCharts = ({ buses }: { buses: any[] }) => {
-    const statusCounts: {[key: string]: number} = { 'Active': 0, 'In Shop': 0, 'On Hold': 0, 'Engine': 0, 'Body Shop': 0, 'Vendor': 0, 'Brakes': 0, 'Safety': 0 };
-    buses.forEach(b => { if (statusCounts[b.status] !== undefined) statusCounts[b.status]++; else statusCounts['Active']++; });
-    const maxCount = Math.max(...Object.values(statusCounts), 1);
-    const trendData = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); const ds = d.toISOString().split('T')[0]; return { label: ds.slice(5), count: buses.filter(b => b.oosStartDate === ds).length }; });
-    return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 className="text-[10px] font-black text-[#002d72] uppercase tracking-widest mb-6">Status Breakdown</h3><div className="flex items-end gap-3 h-40">{Object.entries(statusCounts).map(([s, c]) => (<div key={s} className="flex-1 flex flex-col justify-end items-center group relative"><div className="absolute -top-6 text-[10px] font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">{c}</div><div className={`w-full rounded-t-md transition-all duration-500 ${s==='Active'?'bg-green-500':s==='In Shop'?'bg-orange-500':'bg-red-500'}`} style={{ height: `${(c/maxCount)*100 || 2}%` }}></div><p className="text-[8px] font-black text-slate-400 uppercase mt-2 -rotate-45 origin-left translate-y-2 whitespace-nowrap">{s}</p></div>))}</div></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 className="text-[10px] font-black text-[#002d72] uppercase tracking-widest mb-6">7-Day Intake Trend</h3><div className="flex items-end gap-2 h-40">{trendData.map((d, i) => (<div key={i} className="flex-1 flex flex-col justify-end items-center group relative"><div className="absolute -top-6 text-[10px] font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">{d.count}</div><div className="w-full bg-blue-100 hover:bg-[#002d72] rounded-t-sm transition-all" style={{ height: `${(d.count/Math.max(...trendData.map(t=>t.count),1))*100 || 2}%` }}></div><p className="text-[8px] font-bold text-slate-400 mt-2">{d.label}</p></div>))}</div></div>
-        </div>
-    );
-};
-
-const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: any }) => {
-    const [shopQueens, setShopQueens] = useState<{number: string, count: number}[]>([]);
-    const [isResetting, setIsResetting] = useState(false);
-    useEffect(() => { const fetchRankings = async () => { const rankings: {number: string, count: number}[] = []; const sampleBuses = buses.slice(0, 50); for (const bus of sampleBuses) { const hSnap = await getDocs(query(collection(db, "buses", bus.number, "history"), limit(20))); if (hSnap.size > 0) rankings.push({ number: bus.number, count: hSnap.size }); } setShopQueens(rankings.sort((a,b) => b.count - a.count).slice(0, 5)); }; if(buses.length > 0) fetchRankings(); }, [buses]);
-    
-    const handleResetMetrics = async () => { 
-        if(!confirm("⚠️ WARNING: This will permanently wipe ALL bus history, personnel incidents, and global audit logs. Proceed?")) return; 
-        setIsResetting(true); let errorCount = 0;
-        try { 
-            showToast("Wiping databases... please wait.", "success");
-            const aSnap = await getDocs(collection(db, "activity_logs"));
-            for (let i = 0; i < aSnap.docs.length; i += 250) await Promise.all(aSnap.docs.slice(i, i + 250).map(d => deleteDoc(d.ref).catch(e => { console.error(e); errorCount++; })));
-            for (const bus of buses) { const hSnap = await getDocs(collection(db, "buses", bus.number, "history")); for (let i = 0; i < hSnap.docs.length; i += 250) await Promise.all(hSnap.docs.slice(i, i + 250).map(d => deleteDoc(d.ref).catch(e => { console.error(e); errorCount++; }))); } 
-            const pSnap = await getDocs(collection(db, "personnel"));
-            for (let i = 0; i < pSnap.docs.length; i += 250) await Promise.all(pSnap.docs.slice(i, i + 250).map(d => updateDoc(d.ref, { incidents: [], totalOccurrences: 0 }).catch(e => { console.error(e); errorCount++; })));
-            if (errorCount > 0) showToast(`Wiped, but ${errorCount} items failed. (Check console)`, 'error'); else showToast(`All databases wiped successfully.`, 'success'); setShopQueens([]); 
-        } catch (err: any) { showToast(`Failed: ${err.message}`, 'error'); } 
-        setIsResetting(false); 
-    };
-
-    const avgOOS = buses.reduce((acc, b) => acc + (b.status !== 'Active' ? 1 : 0), 0);
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fleet Availability</p><p className="text-4xl font-black text-[#002d72] italic">{Math.round(((buses.length - avgOOS) / Math.max(buses.length, 1)) * 100)}%</p></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Down Units</p><p className="text-4xl font-black text-red-500 italic">{avgOOS}</p></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><div className="flex justify-between items-center mb-2"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Analytics Admin</p><button onClick={handleResetMetrics} disabled={isResetting} className="text-[9px] font-black text-red-500 hover:text-red-700 uppercase border border-red-200 rounded px-2 py-1 bg-red-50 disabled:opacity-50 transition-colors">{isResetting ? "..." : "Wipe All Databases"}</button></div><div className="space-y-2">{shopQueens.map((queen, i) => (<div key={i} className="flex justify-between items-center text-xs border-b border-slate-100 pb-1"><span className="font-bold text-slate-700">#{queen.number}</span><span className="font-mono text-red-500">{queen.count} logs</span></div>))}</div></div>
-        </div>
-    );
-};
-
-const ShiftHandover = ({ buses, showToast }: { buses: any[], showToast: any }) => {
-    const [report, setReport] = useState<any[]>([]);
-    useEffect(() => { const fetchRecent = async () => { const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000); let logs: any[] = []; for (const b of buses.filter(x => x.status !== 'Active' || x.notes).slice(0,30)) { const hSnap = await getDocs(query(collection(db, "buses", b.number, "history"), orderBy("timestamp", "desc"), limit(2))); hSnap.forEach(d => { if((d.data().timestamp?.toMillis() || 0) > twelveHoursAgo) logs.push({ bus: b.number, ...d.data() }); }); } setReport(logs.sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0))); }; if(buses.length > 0) fetchRecent(); }, [buses]);
-    const copy = () => { const txt = report.map(r => `[Unit ${r.bus}] ${r.action}: ${r.details}`).join('\n'); navigator.clipboard.writeText(`SHIFT REPORT - ${new Date().toLocaleDateString()}\n\n${txt}`); showToast("Report copied!", 'success'); };
-    return (
-        <div className="max-w-4xl mx-auto p-8 animate-in fade-in slide-in-from-bottom-4"><div className="flex justify-between items-center mb-8"><h2 className="text-3xl font-black text-[#002d72] uppercase italic">Shift Handover</h2><button onClick={copy} className="px-6 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-[#ef7c00] transition-all transform active:scale-95">Copy Report</button></div><div className="space-y-4">{report.map((l, i) => (<div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex gap-6 items-center"><div className="w-16 h-16 bg-[#002d72]/5 rounded-xl flex items-center justify-center font-black text-[#002d72] text-lg">#{l.bus}</div><div className="flex-grow"><div className="flex justify-between mb-1"><span className="text-[10px] font-black text-[#ef7c00] uppercase">{l.action}</span><span className="text-[10px] font-bold text-slate-500">{formatTime(l.timestamp)}</span></div><p className="text-sm font-bold text-slate-800 whitespace-pre-wrap">{l.details}</p><p className="text-[9px] text-slate-400 mt-2 uppercase tracking-widest">{l.user}</p></div></div>))}</div></div>
-    );
-};
-
 const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { showToast: any, darkMode: boolean, buses: any[], isAdmin: boolean, statusOptions: any[] }) => {
-    const [formData, setFormData] = useState({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
+    const [formData, setFormData] = useState({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', disposition: '' });
     const [showAddModal, setShowAddModal] = useState(false);
     const [newBusData, setNewBusData] = useState({ number: '', status: 'Active' });
 
@@ -730,11 +650,12 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
         if (old.status !== formData.status) changes.push(`STATUS: ${old.status} ➝ ${formData.status}`); 
         if (old.notes !== formData.notes) changes.push(`NOTES: "${old.notes || ''}" ➝ "${formData.notes}"`); 
         if (old.oosStartDate !== formData.oosStartDate) changes.push(`OOS: ${old.oosStartDate || '—'} ➝ ${formData.oosStartDate}`);
+        if (isAdmin && old.disposition !== formData.disposition && formData.disposition !== '') changes.push(`DISP: ${old.disposition || '—'} ➝ ${formData.disposition}`);
         
         await setDoc(busRef, { ...formData, timestamp: serverTimestamp() }, { merge: true });
         await logHistory(formData.number, "UPDATE", changes.length > 0 ? changes.join('\n') : "Routine Update via Terminal", auth.currentUser?.email || 'Unknown');
         showToast(`Bus #${formData.number} Updated`, 'success'); 
-        setFormData({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
+        setFormData({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', disposition: '' });
     };
 
     const handleAddNewBus = async (e: React.FormEvent) => {
@@ -798,6 +719,7 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
                     </select>
                 </div>
                 <input type="text" placeholder="Location" className={`w-full p-4 border-2 rounded-xl outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.location} onChange={handleChange} name="location" />
+                {isAdmin && <input type="text" name="disposition" placeholder="Disposition / Fleet Status (Admin Only)" value={formData.disposition} onChange={handleChange} className={`w-full p-4 border-2 rounded-xl outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} />}
                 <textarea placeholder="Maintenance Notes" className={`w-full p-4 border-2 rounded-xl h-24 outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.notes} onChange={handleChange} name="notes" />
                 <div className="grid grid-cols-3 gap-4">
                     <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>OOS Date</label><input name="oosStartDate" type="date" onClick={handleDateClick} max={new Date().toISOString().split('T')[0]} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.oosStartDate} onChange={handleChange} /></div>
@@ -929,8 +851,10 @@ export default function FleetManager() {
 
     const exportExcel = async () => {
         const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('OOS Detail');
-        ws.columns = [{header:'Bus #',key:'number',width:10},{header:'Status',key:'status',width:15},{header:'Location',key:'location',width:15},{header:'Fault',key:'notes',width:30},{header:'OOS Start',key:'start',width:15}];
-        buses.forEach(b => ws.addRow({number:b.number, status:b.status, location:b.location||'', notes:b.notes||'', start:b.oosStartDate||''}));
+        const cols = [{header:'Bus #',key:'number',width:10},{header:'Status',key:'status',width:15},{header:'Location',key:'location',width:15},{header:'Fault',key:'notes',width:30},{header:'OOS Start',key:'start',width:15}];
+        if (isAdmin) cols.push({header:'Disposition',key:'disposition',width:20});
+        ws.columns = cols;
+        buses.forEach(b => ws.addRow({number:b.number, status:b.status, location:b.location||'', notes:b.notes||'', start:b.oosStartDate||'', disposition: b.disposition||''}));
         const buf = await wb.xlsx.writeBuffer(); saveAs(new Blob([buf]), `Fleet_Status_Report.xlsx`); showToast("Excel Downloaded", 'success');
     };
 
@@ -953,8 +877,8 @@ export default function FleetManager() {
             <div className="flex-grow flex items-center justify-center p-4">
                 <form onSubmit={handleAuth} className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-[#ef7c00] animate-in fade-in zoom-in">
                     <h2 className="text-3xl font-black text-white italic mb-8 uppercase text-center">{isSignUp ? 'Join Fleetflow' : 'Fleet Operations'}</h2>
-                    <input className="w-full p-4 mb-4 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00] transition-colors" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} required />
-                    <input className="w-full p-4 mb-6 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00] transition-colors" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} required />
+                    <input className="w-full p-4 mb-4 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00] transition-colors" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
+                    <input className="w-full p-4 mb-6 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00] transition-colors" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} />
                     <button className="w-full py-5 bg-[#ef7c00] text-white font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-orange-600 transition-colors">{isSignUp ? 'Register' : 'Login'}</button>
                     <button type="button" onClick={()=>setIsSignUp(!isSignUp)} className="w-full mt-6 text-slate-400 text-xs font-bold hover:text-white transition-colors">{isSignUp ? 'Back to Login' : "Don't have an account? Sign Up"}</button>
                 </form>
@@ -1035,6 +959,11 @@ export default function FleetManager() {
                                             <button onClick={toggleFullScreen} className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl transition-all transform active:scale-95">Exit Fullscreen</button>
                                         </div>
                                     )}
+                                    {!isFullscreen && (
+                                        <div className="mb-6 flex justify-end">
+                                            <button onClick={toggleFullScreen} className="px-6 py-3 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase text-xs shadow-lg flex items-center gap-2 transition-all transform active:scale-95">⛶ Launch Fullscreen TV Mode</button>
+                                        </div>
+                                    )}
                                     <div className={`grid gap-4 sm:gap-6 pb-20 ${isFullscreen ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}`}>
                                         {sortedBuses.map(b => {
                                             const type = getStatusType(b.status);
@@ -1042,9 +971,13 @@ export default function FleetManager() {
                                             const borderColor = type==='ready'?'border-green-500':type==='shop'?'border-orange-500':'border-red-600';
                                             return (
                                                 <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`cursor-pointer p-4 rounded-xl flex flex-col justify-between border-[3px] shadow-md transition-transform hover:scale-105 ${borderColor} ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
-                                                    <div className="flex justify-between items-start mb-3"><span className={`text-4xl font-black leading-none tracking-tighter ${color}`}>#{b.number}</span><span className={`w-fit px-2 py-1 rounded text-xs font-black uppercase tracking-wider shadow-sm text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-600'}`}>{b.status}</span></div>
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <span className={`text-4xl font-black leading-none tracking-tighter ${color}`}>#{b.number}</span>
+                                                        <span className={`w-fit px-2 py-1 rounded text-xs font-black uppercase tracking-wider shadow-sm text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-600'}`}>{b.status}</span>
+                                                    </div>
                                                     <div className={`text-sm font-black mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'Location Unavailable'}</div>
                                                     <div className={`text-xs font-bold leading-snug mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.notes || 'No active faults recorded.'}</div>
+                                                    {isAdmin && b.disposition && <div className="text-[10px] font-black uppercase text-purple-500 mb-2 truncate">DISP: {b.disposition}</div>}
                                                     <div className="mt-auto pt-2">{b.status !== 'Active' && <div className={`text-xs font-black text-white rounded px-2 py-1.5 text-center tracking-widest shadow-inner ${type==='shop'?'bg-orange-600':'bg-red-600'}`}>DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}</div>
                                                 </div>
                                             );
@@ -1064,6 +997,7 @@ export default function FleetManager() {
                                                 <div className="flex justify-between items-start mb-3"><span className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>#{b.number}</span><span className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-500'}`}>{b.status}</span></div>
                                                 <div className={`flex items-center gap-1 text-xs font-bold mb-2 truncate ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>📍 {b.location || 'Location Unavailable'}</div>
                                                 <div className={`text-[10px] italic line-clamp-2 mb-3 h-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>🔧 {b.notes || 'No active faults recorded.'}</div>
+                                                {isAdmin && b.disposition && <div className="text-[10px] font-black uppercase text-purple-500 mb-2 truncate">DISP: {b.disposition}</div>}
                                                 {b.status !== 'Active' && <div className={`mt-auto text-[10px] font-black text-white p-1.5 rounded-lg text-center shadow-inner tracking-widest ${type==='shop'?'bg-orange-500 border border-orange-600':'bg-red-600 border border-red-700'}`}>⏱️ DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}
                                             </div>
                                         );
@@ -1073,25 +1007,27 @@ export default function FleetManager() {
 
                             {inventoryMode === 'list' && (
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-left text-sm">
-                                        <thead className={`font-black uppercase text-[10px] tracking-widest border-b ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                            <tr><th className="p-4 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('number')}>Unit #</th><th className="p-4">Status</th><th className="p-4">Location</th><th className="p-4">Notes</th><th className="p-4 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('daysOOS')}>Days OOS</th></tr>
-                                        </thead>
-                                        <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                                            {sortedBuses.map(b => {
-                                                const type = getStatusType(b.status);
-                                                return (
-                                                    <tr key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`cursor-pointer transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}`}>
-                                                        <td className="p-4 font-black text-lg">#{b.number}</td>
-                                                        <td className="p-4"><span className={`px-2 py-1 rounded text-[9px] font-black uppercase text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-500'}`}>{b.status}</span></td>
-                                                        <td className="p-4 font-bold text-xs">{b.location || '-'}</td>
-                                                        <td className="p-4 italic text-xs opacity-70">{b.notes || '-'}</td>
-                                                        <td className={`p-4 font-black ${type==='shop'?'text-orange-500':type==='hold'?'text-red-500':''}`}>{b.status !== 'Active' ? calculateDaysOOS(b.oosStartDate) : '-'}</td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
+                                    <div className={`grid ${isAdmin ? 'grid-cols-11' : 'grid-cols-10'} gap-4 p-5 border-b text-[9px] font-black uppercase tracking-widest min-w-[800px] ${darkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                        <div onClick={()=>requestSort('number')} className={`cursor-pointer ${darkMode ? 'hover:text-white' : 'hover:text-[#002d72]'}`}>Unit #</div><div>Series</div><div>Status</div><div>Location</div><div className="col-span-2">Fault Preview</div><div>Exp Return</div><div>Act Return</div>{isAdmin && <div onClick={()=>requestSort('disposition')} className={`cursor-pointer ${darkMode ? 'hover:text-white' : 'hover:text-[#002d72]'}`}>Disposition</div>}<div onClick={()=>requestSort('daysOOS')} className={`cursor-pointer ${darkMode ? 'hover:text-white' : 'hover:text-[#002d72]'}`}>Days OOS</div>
+                                    </div>
+                                    <div className={`divide-y min-w-[800px] ${darkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
+                                        {sortedBuses.map(b => {
+                                            const type = getStatusType(b.status);
+                                            return (
+                                                <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`grid ${isAdmin ? 'grid-cols-11' : 'grid-cols-10'} gap-4 p-5 items-center cursor-pointer transition-all border-l-4 ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} ${type==='ready'?'border-green-500':type==='shop'?'border-orange-500':'border-red-500'}`}>
+                                                    <div className={`text-lg font-black ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>#{b.number}</div>
+                                                    <div className={`text-[9px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{getBusSpecs(b.number).length}</div>
+                                                    <div className={`text-[9px] font-black uppercase px-2 py-1 rounded-full w-fit text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-500'}`}>{b.status}</div>
+                                                    <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.location || '-'}</div>
+                                                    <div className={`col-span-2 text-xs font-medium truncate italic ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{b.notes||'No faults.'}</div>
+                                                    <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{b.expectedReturnDate||'—'}</div>
+                                                    <div className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{b.actualReturnDate||'—'}</div>
+                                                    {isAdmin && <div className={`text-xs font-bold ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>{b.disposition || '—'}</div>}
+                                                    <div className={`text-xs font-black ${type==='shop'?'text-orange-500':type==='hold'?'text-red-500':''}`}>{b.status!=='Active' ? `${calculateDaysOOS(b.oosStartDate)} days` : '—'}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
                         </div>

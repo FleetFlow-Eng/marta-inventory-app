@@ -8,7 +8,8 @@ import { saveAs } from 'file-saver';
 import dynamic from 'next/dynamic';
 import localParts from './partsData.json';
 
-const HAMILTON_FLEET = ["1625","1628","1629","1631","1632","1633","1634","1635","1636","1637","1638","1639","1640","1641","1642","1643","1644","1645","1646","1647","1648","1660","1802","1803","1804","1805","1806","1807","1808","1809","1810","1811","1812","1813","1815","1817","1818","1819","1820","1821","1822","1823","1824","1826","1827","1828","1829","1830","1831","1832","1833","1834","1835","1836","1837","1838","1839","1840","1841","1842","1843","1844","1845","1846","1847","1848","1849","1850","1851","1852","1853","1854","1855","1856","1858","1859","1860","1861","1862","1863","1864","1865","1867","1868","1870","1871","1872","1873","1874","1875","1876","1877","1878","1879","1880","1881","1883","1884","1885","1887","1888","1889","1895","1909","1912","1913","1921","1922","1923","1924","1925","1926","1927","1928","1929","1930","1931","1932","1933","1935","1951","1958","1959","7021","7022","7023","7024","7025","7026","7027","7028","7029","7030","7031","7033","7092","7093","7094","7095","7096","7097","7098","7099","7102","7103","7104","7105","1406","1408","1434","1440","2326","2343","2593"];
+// Condensed to save file space
+const HAMILTON_FLEET = "1625,1628,1629,1631,1632,1633,1634,1635,1636,1637,1638,1639,1640,1641,1642,1643,1644,1645,1646,1647,1648,1660,1802,1803,1804,1805,1806,1807,1808,1809,1810,1811,1812,1813,1815,1817,1818,1819,1820,1821,1822,1823,1824,1826,1827,1828,1829,1830,1831,1832,1833,1834,1835,1836,1837,1838,1839,1840,1841,1842,1843,1844,1845,1846,1847,1848,1849,1850,1851,1852,1853,1854,1855,1856,1858,1859,1860,1861,1862,1863,1864,1865,1867,1868,1870,1871,1872,1873,1874,1875,1876,1877,1878,1879,1880,1881,1883,1884,1885,1887,1888,1889,1895,1909,1912,1913,1921,1922,1923,1924,1925,1926,1927,1928,1929,1930,1931,1932,1933,1935,1951,1958,1959,7021,7022,7023,7024,7025,7026,7027,7028,7029,7030,7031,7033,7092,7093,7094,7095,7096,7097,7098,7099,7102,7103,7104,7105,1406,1408,1434,1440,2326,2343,2593".split(',');
 const ADMIN_EMAILS = ['anetowestfield@gmail.com', 'admin@fleetflow.services'];
 
 const BusTracker = dynamic(() => import('./BusTracker'), { ssr: false, loading: () => <div className="flex items-center justify-center h-[50vh] bg-slate-100 rounded-2xl"><div className="w-12 h-12 border-4 border-[#002d72] border-t-transparent rounded-full animate-spin"></div></div> });
@@ -72,12 +73,11 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptio
     useEffect(() => { if (showHistory) return onSnapshot(query(collection(db, "buses", bus.number, "history"), orderBy("timestamp", "desc")), (snap) => setHistoryLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))); }, [showHistory, bus.number]);
     
     const handleSave = async () => {
-        const today = new Date(); today.setHours(23, 59, 59, 999);
+        const todayStr = new Date().toISOString().split('T')[0];
         if (editData.oosStartDate) {
-            const oos = new Date(editData.oosStartDate);
-            if (oos > today) return showToast("Out of Service date cannot be a future date", 'error');
-            if (editData.expectedReturnDate && new Date(editData.expectedReturnDate) < oos) return showToast("Expected Return cannot be earlier than OOS Date", 'error');
-            if (editData.actualReturnDate && new Date(editData.actualReturnDate) < oos) return showToast("Actual Return cannot be earlier than OOS Date", 'error');
+            if (editData.oosStartDate > todayStr) return showToast("Out of Service date cannot be a future date", 'error');
+            if (editData.expectedReturnDate && editData.expectedReturnDate < editData.oosStartDate) return showToast("Expected Return cannot be earlier than OOS Date", 'error');
+            if (editData.actualReturnDate && editData.actualReturnDate < editData.oosStartDate) return showToast("Actual Return cannot be earlier than OOS Date", 'error');
         }
         try {
             const busRef = doc(db, "buses", bus.number);
@@ -108,30 +108,80 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptio
         } catch(err) { showToast("Reset failed", 'error'); }
     };
 
-    const handleDateClick = (e: any) => e.currentTarget.showPicker?.();
     const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
     const inputClass = darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-black';
     const type = statusOptions.find(o=>o.label===bus.status)?.type || (bus.status==='Active'?'ready':(['In Shop','Engine','Body Shop','Brakes'].includes(bus.status)?'shop':'hold'));
     const statusColorText = type==='ready' ? 'text-green-500' : type==='shop' ? 'text-orange-500' : 'text-red-500';
     const statusColorBadge = type==='ready' ? 'bg-green-500' : type==='shop' ? 'bg-orange-500' : 'bg-red-500';
 
-    if (showHistory) return (<div className={`p-6 rounded-xl shadow-2xl w-full max-w-lg h-[600px] flex flex-col animate-in zoom-in-95 border ${bgClass}`}><div className={`flex justify-between items-center mb-4 border-b pb-4 font-black uppercase ${statusColorText}`}><span>History: #{bus.number}</span><button onClick={()=>setShowHistory(false)} className="text-xs">Back</button></div><div className="flex-grow overflow-y-auto space-y-3">{historyLogs.map(l => (<div key={l.id} className={`p-3 rounded-lg border relative group ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}><div className={`flex justify-between text-[8px] font-black uppercase mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}><span>{l.action}</span><span>{formatTime(l.timestamp)}</span></div><p className="text-xs font-bold whitespace-pre-wrap leading-tight">{l.details}</p>{isAdmin && <button onClick={() => handleDeleteLog(l.id)} className="absolute top-2 right-2 text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold">DELETE</button>}</div>))}</div></div>);
-    if (isEditing) return (<div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}><h3 className={`text-2xl font-black mb-6 uppercase italic ${statusColorText}`}>Edit Bus #{bus.number}</h3><div className="grid grid-cols-2 gap-4 mb-4">
-        <select className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.status} onChange={e=>setEditData({...editData, status:e.target.value})}>
-            <option value="Active">Ready for Service</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option>
-            {statusOptions.map((o,i)=><option key={i} value={o.label}>{o.label}</option>)}
-        </select>
-        <input className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.location} onChange={e=>setEditData({...editData, location:e.target.value})} placeholder="Location" /></div><textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-4 font-bold ${inputClass}`} value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} placeholder="Maintenance Notes" /><div className="grid grid-cols-3 gap-4 mb-6 text-[9px] font-black uppercase"><div>OOS Date<input type="date" onClick={handleDateClick} max={new Date().toISOString().split('T')[0]} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.oosStartDate} onChange={e=>setEditData({...editData, oosStartDate:e.target.value})} /></div><div>Exp Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div><div>Act Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div></div><div className="flex gap-4"><button onClick={()=>setIsEditing(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>Cancel</button><button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg">Save</button></div></div>);
-    
+    if (showHistory) return (
+        <div className={`p-6 rounded-xl shadow-2xl w-full max-w-lg h-[600px] flex flex-col animate-in zoom-in-95 border ${bgClass}`}>
+            <div className={`flex justify-between items-center mb-4 border-b pb-4 font-black uppercase ${statusColorText}`}>
+                <span>History: #{bus.number}</span><button onClick={()=>setShowHistory(false)} className="text-xs">Back</button>
+            </div>
+            <div className="flex-grow overflow-y-auto space-y-3 pr-2">
+                {historyLogs.map(l => (
+                    <div key={l.id} className={`p-3 rounded-lg border relative group ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                        <div className={`flex justify-between text-[8px] font-black uppercase mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}><span>{l.action}</span><span>{formatTime(l.timestamp)}</span></div>
+                        <p className="text-xs font-bold whitespace-pre-wrap leading-tight">{l.details}</p>
+                        {isAdmin && <button onClick={() => handleDeleteLog(l.id)} className="absolute top-2 right-2 text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold">DELETE</button>}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+
+    if (isEditing) return (
+        <div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}>
+            <h3 className={`text-2xl font-black mb-6 uppercase italic ${statusColorText}`}>Edit Bus #{bus.number}</h3>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+                <select className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.status} onChange={e=>setEditData({...editData, status:e.target.value})}>
+                    <option value="Active">Ready for Service</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option>
+                    {statusOptions.map((o,i)=><option key={i} value={o.label}>{o.label}</option>)}
+                </select>
+                <input className={`p-3 border-2 rounded-lg font-bold ${inputClass}`} value={editData.location} onChange={e=>setEditData({...editData, location:e.target.value})} placeholder="Location" />
+            </div>
+            <textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-4 font-bold ${inputClass}`} value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} placeholder="Maintenance Notes" />
+            <div className="grid grid-cols-3 gap-4 mb-6 text-[9px] font-black uppercase">
+                <div>OOS Date<input type="date" max={new Date().toISOString().split('T')[0]} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.oosStartDate} onChange={e=>setEditData({...editData, oosStartDate:e.target.value})} /></div>
+                <div>Exp Return<input type="date" min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div>
+                <div>Act Return<input type="date" min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold ${inputClass}`} value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div>
+            </div>
+            <div className="flex gap-4">
+                <button onClick={()=>setIsEditing(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>Cancel</button>
+                <button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg">Save</button>
+            </div>
+        </div>
+    );
+
     return (
         <div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}>
             <div className="flex justify-between items-start mb-6 border-b border-slate-500/20 pb-4">
-                <div><h3 className={`text-4xl font-black italic uppercase ${statusColorText}`}>Bus #{bus.number}</h3><span className={`inline-block mt-2 px-3 py-1 rounded-full text-[10px] font-black uppercase text-white ${statusColorBadge}`}>{bus.status}</span></div>
-                <div className="flex gap-2"><button onClick={handleResetBus} className="text-red-500 text-xs font-black uppercase border border-red-500/30 bg-red-500/10 px-3 py-1 rounded">Reset</button><button onClick={onClose} className="text-slate-400 text-2xl font-bold">✕</button></div>
+                <div>
+                    <h3 className={`text-4xl font-black italic uppercase ${statusColorText}`}>Bus #{bus.number}</h3>
+                    <span className={`inline-block mt-2 px-3 py-1 rounded-full text-[10px] font-black uppercase text-white ${statusColorBadge}`}>{bus.status}</span>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={handleResetBus} className="text-red-500 text-xs font-black uppercase border border-red-500/30 bg-red-500/10 px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-colors">Reset</button>
+                    <button onClick={onClose} className="text-slate-400 text-2xl font-bold hover:text-slate-500 transition-colors">✕</button>
+                </div>
             </div>
-            <div className={`p-4 rounded-xl mb-6 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-50'}`}><p className="text-[10px] font-black uppercase mb-2 opacity-50">Fault Details</p><p className="text-lg font-medium">{bus.notes || "No active faults."}</p></div>
-            <div className="grid grid-cols-3 gap-4 mb-6"><div><p className="text-[9px] font-black uppercase opacity-50">OOS Date</p><p className="text-xl font-black text-[#002d72]">{bus.oosStartDate || '--'}</p></div><div><p className="text-[9px] font-black uppercase opacity-50">Exp Return</p><p className="text-xl font-black text-[#ef7c00]">{bus.expectedReturnDate || '--'}</p></div><div><p className="text-[9px] font-black uppercase opacity-50">Act Return</p><p className="text-xl font-black text-green-500">{bus.actualReturnDate || '--'}</p></div></div>
-            <div className="flex justify-between pt-6 border-t border-slate-500/20"><button onClick={()=>setShowHistory(true)} className={`px-5 py-3 rounded-lg text-[10px] font-black uppercase ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>📜 History</button><div className="flex gap-3"><button onClick={()=>setIsEditing(true)} className={`px-8 py-3 rounded-lg text-[10px] font-black uppercase ${darkMode ? 'bg-slate-700 text-[#ef7c00]' : 'bg-slate-100 text-[#002d72]'}`}>Edit</button><button onClick={onClose} className="px-8 py-3 bg-[#002d72] text-white rounded-lg text-[10px] font-black uppercase">Close</button></div></div>
+            <div className={`p-4 rounded-xl mb-6 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-50'}`}>
+                <p className="text-[10px] font-black uppercase mb-2 opacity-50">Fault Details</p>
+                <p className="text-lg font-medium">{bus.notes || "No active faults."}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-4 mb-6">
+                <div><p className="text-[9px] font-black uppercase opacity-50">OOS Date</p><p className="text-xl font-black text-[#002d72]">{bus.oosStartDate || '--'}</p></div>
+                <div><p className="text-[9px] font-black uppercase opacity-50">Exp Return</p><p className="text-xl font-black text-[#ef7c00]">{bus.expectedReturnDate || '--'}</p></div>
+                <div><p className="text-[9px] font-black uppercase opacity-50">Act Return</p><p className="text-xl font-black text-green-500">{bus.actualReturnDate || '--'}</p></div>
+            </div>
+            <div className="flex justify-between pt-6 border-t border-slate-500/20">
+                <button onClick={()=>setShowHistory(true)} className={`px-5 py-3 rounded-lg text-[10px] font-black uppercase ${darkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-100 hover:bg-slate-200'}`}>📜 History</button>
+                <div className="flex gap-3">
+                    <button onClick={()=>setIsEditing(true)} className={`px-8 py-3 rounded-lg text-[10px] font-black uppercase ${darkMode ? 'bg-slate-700 text-[#ef7c00] hover:bg-slate-600' : 'bg-slate-100 text-[#002d72] hover:bg-slate-200'}`}>Edit</button>
+                    <button onClick={onClose} className="px-8 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-lg text-[10px] font-black uppercase">Close</button>
+                </div>
+            </div>
         </div>
     );
 };
@@ -164,6 +214,7 @@ const AccessManager = ({ showToast, darkMode }: { showToast: any, darkMode: bool
     const toggleApproval = async (uid: string, current: string) => updateDoc(doc(db, "users", uid), { status: current === 'approved' ? 'pending' : 'approved' });
     const toggleRole = async (uid: string, current: string) => updateDoc(doc(db, "users", uid), { role: current === 'admin' ? 'user' : 'admin' });
     const deleteUser = async (uid: string) => { if (confirm("Delete user permanently?")) await deleteDoc(doc(db, "users", uid)); };
+    
     const fetchUserHistory = async (email: string) => {
         setSelectedUserHistory(email);
         const snap = await getDocs(query(collection(db, "activity_logs"), where("user", "==", email)));
@@ -173,7 +224,10 @@ const AccessManager = ({ showToast, darkMode }: { showToast: any, darkMode: bool
     const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
     return (
         <div className="space-y-8 max-w-6xl mx-auto pb-20 animate-in fade-in slide-in-from-bottom-4">
-            <div><h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Admin Panel</h2></div>
+            <div>
+                <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Admin Panel</h2>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-50 mt-1">Manage System Settings</p>
+            </div>
             <div className={`p-8 rounded-2xl border shadow-xl ${bgClass}`}>
                 <h3 className={`text-xl font-black uppercase italic mb-6 ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Status Menu Customization</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -181,8 +235,10 @@ const AccessManager = ({ showToast, darkMode }: { showToast: any, darkMode: bool
                         <p className="text-[10px] font-black uppercase opacity-50 mb-4">Add New Option</p>
                         <div className="flex gap-2">
                             <input className={`flex-grow p-3 rounded-lg border font-bold outline-none ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`} placeholder="Label (e.g. Parts Hold)" value={newStatus.label} onChange={e=>setNewStatus({...newStatus, label: e.target.value})} />
-                            <select className={`p-3 rounded-lg border font-bold outline-none ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`} value={newStatus.type} onChange={e=>setNewStatus({...newStatus, type: e.target.value})}><option value="ready">Ready (Green)</option><option value="shop">In Shop (Orange)</option><option value="hold">Hold/Down (Red)</option></select>
-                            <button onClick={handleAddStatus} className="px-6 bg-[#ef7c00] text-white font-black rounded-lg">+</button>
+                            <select className={`p-3 rounded-lg border font-bold outline-none ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`} value={newStatus.type} onChange={e=>setNewStatus({...newStatus, type: e.target.value})}>
+                                <option value="ready">Ready (Green)</option><option value="shop">In Shop (Orange)</option><option value="hold">Hold/Down (Red)</option>
+                            </select>
+                            <button onClick={handleAddStatus} className="px-6 bg-[#ef7c00] hover:bg-orange-600 text-white font-black rounded-lg transition-colors">+</button>
                         </div>
                     </div>
                     <div className="space-y-2">
@@ -190,29 +246,60 @@ const AccessManager = ({ showToast, darkMode }: { showToast: any, darkMode: bool
                         {statusOptions.map((s, i) => (
                             <div key={i} className={`flex justify-between items-center p-3 rounded-lg border ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                 <div className="flex items-center gap-3"><div className={`w-3 h-3 rounded-full ${s.type==='ready'?'bg-green-500':s.type==='shop'?'bg-orange-500':'bg-red-500'}`}></div><span className="font-bold">{s.label}</span></div>
-                                <button onClick={()=>handleRemoveStatus(i)} className="text-red-500 text-xs font-black">REMOVE</button>
+                                <button onClick={()=>handleRemoveStatus(i)} className="text-red-500 text-xs font-black hover:underline">REMOVE</button>
                             </div>
                         ))}
                     </div>
                 </div>
             </div>
             <div className={`rounded-2xl border shadow-xl overflow-hidden ${bgClass}`}>
-                <table className="w-full text-left text-sm"><thead className={`font-black uppercase text-[10px] tracking-widest border-b ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}><tr><th className="p-4">User (Click for Log)</th><th className="p-4 text-center">Role</th><th className="p-4 text-center">Access</th><th className="p-4 text-center">Actions</th></tr></thead>
-                <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                    {usersList.map(u => {
-                        const isMaster = ADMIN_EMAILS.includes(u.email?.toLowerCase());
-                        return (
-                            <tr key={u.id} className={darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}><td className="p-4 font-bold cursor-pointer text-[#ef7c00] hover:underline" onClick={()=>fetchUserHistory(u.email)}>{u.email} {isMaster && <span className="text-[8px] bg-purple-500 text-white px-1 py-0.5 rounded ml-2">MASTER</span>}</td><td className="p-4 text-center"><span className={`px-2 py-1 rounded text-[9px] font-black uppercase ${u.role==='admin'||isMaster?'bg-purple-100 text-purple-700':'bg-slate-100 text-slate-500'}`}>{u.role==='admin'||isMaster?'Admin (OP)':'Standard'}</span></td><td className="p-4 text-center"><span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase text-white ${u.status==='approved'||isMaster?'bg-green-500':'bg-orange-500'}`}>{u.status==='approved'||isMaster?'Approved':'Pending'}</span></td><td className="p-4 text-center space-x-2">{!isMaster && (<><button onClick={()=>toggleApproval(u.id, u.status)} className={`px-3 py-1.5 rounded font-black text-[9px] uppercase shadow-sm ${u.status==='approved'?'bg-orange-100 text-orange-700':'bg-green-500 text-white'}`}>{u.status==='approved'?'Revoke':'Approve'}</button><button onClick={()=>toggleRole(u.id, u.role)} className={`px-3 py-1.5 rounded font-black text-[9px] uppercase shadow-sm ${u.role==='admin'?'bg-slate-200 text-slate-700':'bg-purple-600 text-white'}`}>{u.role==='admin'?'De-OP':'OP'}</button><button onClick={()=>deleteUser(u.id)} className="px-3 py-1.5 rounded font-black text-[9px] uppercase shadow-sm bg-red-600 text-white">Delete</button></>)}</td></tr>
-                        );
-                    })}
-                </tbody></table>
+                <table className="w-full text-left text-sm">
+                    <thead className={`font-black uppercase text-[10px] tracking-widest border-b ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                        <tr><th className="p-4">User (Click for Log)</th><th className="p-4 text-center">Role</th><th className="p-4 text-center">Access</th><th className="p-4 text-right pr-6">Actions</th></tr>
+                    </thead>
+                    <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
+                        {usersList.map(u => {
+                            const isMaster = ADMIN_EMAILS.includes(u.email?.toLowerCase());
+                            return (
+                                <tr key={u.id} className={darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}>
+                                    <td className="p-4 font-bold cursor-pointer text-[#ef7c00] hover:underline" onClick={()=>fetchUserHistory(u.email)}>{u.email} {isMaster && <span className="text-[8px] bg-purple-500 text-white px-1 py-0.5 rounded ml-2">MASTER</span>}</td>
+                                    <td className="p-4 text-center"><span className={`px-2 py-1 rounded text-[9px] font-black uppercase ${u.role==='admin'||isMaster?'bg-purple-100 text-purple-700 border border-purple-200':'bg-slate-100 text-slate-500 border border-slate-200'}`}>{u.role==='admin'||isMaster?'Admin (OP)':'Standard'}</span></td>
+                                    <td className="p-4 text-center"><span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase text-white ${u.status==='approved'||isMaster?'bg-green-500':'bg-orange-500'}`}>{u.status==='approved'||isMaster?'Approved':'Pending'}</span></td>
+                                    <td className="p-4 text-right pr-6 space-x-2">
+                                        {!isMaster && (
+                                            <>
+                                                <button onClick={()=>toggleApproval(u.id, u.status)} className={`px-3 py-1.5 rounded font-black text-[9px] uppercase shadow-sm ${u.status==='approved'?'bg-orange-100 text-orange-700':'bg-green-500 text-white'}`}>{u.status==='approved'?'Revoke':'Approve'}</button>
+                                                <button onClick={()=>toggleRole(u.id, u.role)} className={`px-3 py-1.5 rounded font-black text-[9px] uppercase shadow-sm ${u.role==='admin'?'bg-slate-200 text-slate-700':'bg-purple-600 text-white'}`}>{u.role==='admin'?'De-OP':'OP'}</button>
+                                                <button onClick={()=>deleteUser(u.id)} className="px-3 py-1.5 rounded font-black text-[9px] uppercase shadow-sm bg-red-600 hover:bg-red-700 text-white">Delete</button>
+                                            </>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
             </div>
+
             {selectedUserHistory && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
                     <div className={`p-6 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl border ${bgClass}`}>
-                        <div className="flex justify-between items-center mb-6 border-b pb-4"><h3 className="text-xl font-black uppercase italic">{selectedUserHistory} History</h3><button onClick={()=>setSelectedUserHistory(null)} className="text-2xl font-bold">✕</button></div>
-                        <div className="overflow-y-auto custom-scrollbar space-y-3">
-                            {userLogs.map(log => (<div key={log.id} className={`p-3 rounded-lg border ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}><div className="flex justify-between text-[10px] font-black opacity-50 mb-1"><span>{log.category} • {log.target}</span><span>{formatTime(log.timestamp)}</span></div><p className="text-xs font-bold"><span className={`px-1 py-0.5 rounded text-[8px] uppercase mr-2 ${log.action === 'CREATED' ? 'bg-green-500/20 text-green-600' : log.action === 'UPDATE' ? 'bg-blue-500/20 text-blue-500' : 'bg-red-500/20 text-red-500'}`}>{log.action}</span> {log.details}</p></div>))}
+                        <div className="flex justify-between items-center mb-6 border-b pb-4 border-slate-500/20">
+                            <div><h3 className="text-xl font-black uppercase italic">{selectedUserHistory} History</h3></div>
+                            <button onClick={()=>setSelectedUserHistory(null)} className="text-2xl font-bold hover:text-red-500">✕</button>
+                        </div>
+                        <div className="overflow-y-auto custom-scrollbar space-y-3 pr-2">
+                            {userLogs.length === 0 ? <p className="text-center p-10 italic opacity-50">No logs found.</p> : userLogs.map(log => (
+                                <div key={log.id} className={`p-3 rounded-lg border ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                                    <div className="flex justify-between items-center text-[10px] font-black opacity-50 mb-2">
+                                        <span>{log.category} • {log.target}</span><span>{formatTime(log.timestamp)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase font-black ${log.action === 'CREATED' ? 'bg-green-500/20 text-green-600' : log.action === 'UPDATE' ? 'bg-blue-500/20 text-blue-500' : 'bg-red-500/20 text-red-500'}`}>{log.action}</span> 
+                                        <span className="text-xs font-bold leading-snug">{log.details}</span>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -234,6 +321,7 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
     const [logFilter, setLogFilter] = useState({ search: '', type: 'All', sort: 'desc' });
 
     useEffect(() => { return onSnapshot(query(collection(db, "personnel"), orderBy("name")), (snap) => setPersonnel(snap.docs.map(d => ({ ...d.data(), id: d.id })))); }, []);
+    
     const handleDateClick = (e: any) => e.currentTarget.showPicker?.();
 
     const allIncidents = useMemo(() => {
@@ -272,6 +360,16 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
         try { await addDoc(collection(db, "personnel"), { name: newEmpName, totalOccurrences: 0, incidents: [], timestamp: serverTimestamp() }); await logActivity(auth.currentUser?.email || 'Unknown', 'PERSONNEL', newEmpName, 'CREATED', `Added new employee`); showToast(`Added ${newEmpName}`, 'success'); setNewEmpName(''); setShowAddModal(false); } catch(err) { showToast("Failed to add employee", 'error'); } 
     };
 
+    const handleDeleteEmployee = async (empId: string, empName: string) => {
+        if(!confirm(`Are you sure you want to completely delete ${empName}? This action cannot be undone.`)) return;
+        try {
+            await deleteDoc(doc(db, "personnel", empId));
+            await logActivity(auth.currentUser?.email || 'Unknown', 'PERSONNEL', empName, 'DELETED', `Deleted entire employee profile.`);
+            showToast(`${empName} deleted.`, 'success');
+            setSelectedEmp(null);
+        } catch(err) { showToast("Failed to delete employee", 'error'); }
+    };
+
     const handleLogIncident = async () => {
         const targetId = selectedEmp ? selectedEmp.id : selectedEmpId; if(!targetId) return showToast("Select an employee", 'error');
         try {
@@ -300,17 +398,17 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
         const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
         const rollingIncidents = (selectedEmp.incidents || []).filter((inc:any) => new Date(inc.date) >= oneYearAgo).sort((a:any, b:any) => new Date(a.date).getTime() - new Date(b.date).getTime());
         let activePoints = 0; let incidentListHTML = "";
-        rollingIncidents.forEach((inc: any, i: number) => {
-            activePoints += parseInt(inc.count) || 0;
+        rollingIncidents.forEach((inc: any, index: number) => {
+            const points = parseInt(inc.count) || 0; activePoints += points;
             const d = new Date(inc.date);
-            incidentListHTML += `<p style="margin:0; margin-left: 60pt; font-family: 'Arial'; font-size: 10pt;">${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()} - ${inc.type}</p>`;
+            const formattedDate = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+            incidentListHTML += `<p style="margin:0; margin-left: 60pt; font-family: 'Arial'; font-size: 10pt;">${index + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${formattedDate} - ${inc.type}</p>`;
         });
         let dL = activePoints >= 6 ? "Discharge" : activePoints >= 5 ? "Final Written Warning" : activePoints >= 4 ? "Written Warning" : activePoints >= 3 ? "Verbal Warning" : "None";
         const parts = selectedEmp.name.split(' '); const fN = parts.length > 1 ? `${parts[parts.length-1]}, ${parts[0]}` : selectedEmp.name;
         const t = new Date(); const rD = `${String(t.getMonth() + 1).padStart(2, '0')}/${String(t.getDate()).padStart(2, '0')}/${t.getFullYear()}`;
         const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Notice of Discipline</title><style>body{font-family:'Arial',sans-serif;font-size:10pt;color:#000;line-height:1.1;margin:0;padding:0}p{margin:0;padding:0;margin-bottom:6pt}.hc{text-align:center;font-weight:bold;margin-bottom:12pt;text-transform:uppercase;font-size:11pt}.ir{margin-left:60pt;font-family:'Arial';font-size:10pt}</style></head><body><br><table style="width:100%;border:none;margin-bottom:8pt;"><tr><td style="width:60%;font-family:'Arial';font-size:10pt;">TO: ${fN}</td><td style="width:40%;text-align:right;font-family:'Arial';font-size:10pt;">DATE: ${rD}</td></tr></table><div class="hc"><p>ATTENDANCE PROGRAM<br>NOTICE OF DISCIPLINE</p></div><p>The Attendance Program states that an employee who accumulates excessive occurrences of absence within any twelve month period (rolling year) will be disciplined according to the following:</p><br><p style="margin-left: 30pt;">Number of Occurrences&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Level of Discipline</p><p class="ir">1-2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None</p><p class="ir">3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Verbal Warning</p><p class="ir">4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Written Warning</p><p class="ir">5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;* Final Written Warning</p><p class="ir">6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Discharge</p><br><p>My records indicate that you have accumulated <strong>${activePoints} occurrences</strong> during the past rolling twelve months. The Occurrences are as follows:</p><p style="margin-left: 60pt; text-decoration: underline;">Occurrences</p>${incidentListHTML || '<p class="ir">None recorded.</p>'}<br><p>Therefore, in accordance with the schedule of progressive discipline, this is your <strong>${dL}</strong> for excessive absenteeism under the rule.</p><br><p>Please be advised that your rate of absenteeism is not acceptable and YOUR corrective action is required. Additional occurrences will result in the progressive disciplinary action indicated above.</p><br><div style="text-align:center;border-top:1px dashed #000;border-bottom:1px dashed #000;padding:3pt 0;width:50%;margin:auto;font-weight:bold;margin-top:10pt;margin-bottom:10pt;">ACKNOWLEDGEMENT</div><p>I acknowledge receipt of this Notice of Discipline and that I have been informed of the potential for progressive discipline, up to and including discharge.</p><br><table style="width:100%;border:none;margin-top:15pt;"><tr><td style="width:50%;border-bottom:1px solid #000;">&nbsp;</td><td style="width:10%;">&nbsp;</td><td style="width:40%;border-bottom:1px solid #000;">&nbsp;</td></tr><tr><td style="vertical-align:top;padding-top:2px;">Employee</td><td></td><td style="vertical-align:top;padding-top:2px;">Date</td></tr></table><table style="width:100%;border:none;margin-top:20pt;"><tr><td style="width:50%;border-bottom:1px solid #000;">&nbsp;</td><td style="width:10%;">&nbsp;</td><td style="width:40%;border-bottom:1px solid #000;">&nbsp;</td></tr><tr><td style="vertical-align:top;padding-top:2px;">Foreman/Supervisor/Superintendent</td><td></td><td style="vertical-align:top;padding-top:2px;">Date</td></tr></table><table style="width:100%;border:none;margin-top:20pt;"><tr><td style="width:50%;border-bottom:1px solid #000;">&nbsp;</td><td style="width:10%;">&nbsp;</td><td style="width:40%;border-bottom:1px solid #000;">&nbsp;</td></tr><tr><td style="vertical-align:top;padding-top:2px;">General Foreman/Manager/General Superintendent</td><td></td><td style="vertical-align:top;padding-top:2px;">Date</td></tr></table></body></html>`;
-        saveAs(new Blob(['\ufeff', html], { type: 'application/msword' }), `${selectedEmp.name.replace(' ','_')}_Notice.doc`);
-        showToast("Notice Generated", 'success');
+        saveAs(new Blob(['\ufeff', html], { type: 'application/msword' }), `${selectedEmp.name.replace(' ','_')}_Notice.doc`); showToast("Notice Generated", 'success');
     };
 
     const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
@@ -318,35 +416,63 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
-            <div className="flex justify-between items-end mb-6 flex-wrap gap-2">
-                <div><h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Attendance Tracker</h2><p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Incident Dashboard & Logs</p></div>
+            <div className="flex justify-between items-end mb-6 flex-wrap gap-4">
+                <div>
+                    <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Attendance Tracker</h2>
+                    <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Incident Dashboard & Logs</p>
+                </div>
                 <div className="flex gap-2 flex-wrap">
-                    <div className={`border rounded-lg p-1 flex ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}><button onClick={()=>setViewMode('dashboard')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all ${viewMode==='dashboard'?'bg-[#002d72] text-white shadow':(darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]')}`}>Dashboard</button><button onClick={()=>setViewMode('log')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all ${viewMode==='log'?'bg-[#002d72] text-white shadow':(darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]')}`}>Master Log</button></div>
-                    <button onClick={() => setShowIncidentModal(true)} className="px-6 py-2 bg-[#ef7c00] text-white rounded-lg font-black uppercase text-[10px] shadow-lg">+ Log Incident</button>
-                    <button onClick={() => setShowAddModal(true)} className={`px-4 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg ${darkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-700'}`}>+ Emp</button>
+                    <div className={`border rounded-lg p-1 flex shadow-sm ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                        <button onClick={()=>setViewMode('dashboard')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all ${viewMode==='dashboard'?'bg-[#002d72] text-white shadow':(darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]')}`}>Dashboard</button>
+                        <button onClick={()=>setViewMode('log')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all ${viewMode==='log'?'bg-[#002d72] text-white shadow':(darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]')}`}>Master Log</button>
+                    </div>
+                    <button onClick={() => setShowIncidentModal(true)} className="px-6 py-2 bg-[#ef7c00] text-white rounded-lg font-black uppercase text-[10px] shadow-lg hover:bg-orange-600 transition-transform active:scale-95">+ Log Incident</button>
+                    <button onClick={() => setShowAddModal(true)} className={`px-4 py-2 rounded-lg font-black uppercase text-[10px] shadow-sm transition-transform active:scale-95 ${darkMode ? 'bg-slate-700 text-slate-200 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>+ Emp</button>
                 </div>
             </div>
 
             {selectedEmp && (
                 <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
                     <div className={`rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ${darkMode ? 'bg-slate-800 text-white border border-slate-700' : 'bg-white text-black'}`}>
-                        <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}><div><h3 className={`text-2xl font-black uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>{selectedEmp.name}</h3><p className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Occurrences: <span className="text-red-500">{selectedEmp.totalOccurrences || 0}</span></p></div><div className="flex gap-2"><button onClick={handleExportWord} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-black text-[10px] uppercase shadow hover:bg-blue-700 transition-colors">📄 Export Notice</button><button onClick={()=>setSelectedEmp(null)} className="text-2xl text-slate-400 hover:text-red-500">✕</button></div></div>
+                        <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                            <div>
+                                <h3 className={`text-2xl font-black uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>{selectedEmp.name}</h3>
+                                <p className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Occurrences: <span className="text-red-500">{selectedEmp.totalOccurrences || 0}</span></p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={handleExportWord} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-black text-[10px] uppercase shadow transition-colors">📄 Export Notice</button>
+                                <button onClick={()=>handleDeleteEmployee(selectedEmp.id, selectedEmp.name)} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-black text-[10px] uppercase shadow transition-colors">Delete Employee</button>
+                                <button onClick={()=>setSelectedEmp(null)} className="text-2xl text-slate-400 hover:text-red-500 ml-2">✕</button>
+                            </div>
+                        </div>
                         <div className="p-6 overflow-y-auto custom-scrollbar">
                             <div className={`p-4 rounded-xl border mb-6 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-blue-50/50 border-blue-100'}`}>
                                 <h4 className={`text-[10px] font-black uppercase tracking-widest mb-3 ${darkMode ? 'text-[#ef7c00]' : 'text-blue-800'}`}>Log New Incident</h4>
-                                <div className="grid grid-cols-2 gap-4 mb-3"><select className={`p-2 border rounded font-bold text-xs ${inputClass}`} value={incData.type} onChange={e=>setIncData({...incData, type:e.target.value})}><option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option></select><input type="number" className={`p-2 border rounded font-bold text-xs ${inputClass}`} placeholder="Count" value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} /></div>
-                                <div className="flex gap-2 mb-3"><input type="date" onClick={handleDateClick} className={`p-2 border rounded font-bold text-xs flex-grow cursor-pointer ${inputClass}`} value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} /><div className={`p-2 border rounded cursor-pointer font-bold text-xs flex items-center gap-2 ${incData.docReceived?(darkMode?'bg-green-900/50 border-green-700 text-green-400':'bg-green-100 border-green-200 text-green-700'):inputClass}`} onClick={()=>setIncData({...incData, docReceived:!incData.docReceived})}><span>Doc?</span>{incData.docReceived && '✓'}</div></div>
-                                <input className={`w-full p-2 border rounded font-bold text-xs mb-3 ${inputClass}`} placeholder="Notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} />
-                                <button onClick={handleLogIncident} className="w-full py-2 bg-[#002d72] text-white rounded font-black text-xs hover:bg-[#ef7c00] transition-colors">Add Record</button>
+                                <div className="grid grid-cols-2 gap-4 mb-3">
+                                    <select className={`p-2 border rounded font-bold text-xs outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.type} onChange={e=>setIncData({...incData, type:e.target.value})}><option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option><option>Vacation</option><option>Bereavement</option><option>Other</option></select>
+                                    <input type="number" className={`p-2 border rounded font-bold text-xs outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Count" value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} />
+                                </div>
+                                <div className="flex gap-2 mb-3">
+                                    <input type="date" onClick={handleDateClick} className={`p-2 border rounded font-bold text-xs flex-grow cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} />
+                                    <div className={`p-2 border rounded cursor-pointer font-bold text-xs flex items-center gap-2 transition-colors ${incData.docReceived?(darkMode?'bg-green-900/50 border-green-700 text-green-400':'bg-green-100 border-green-200 text-green-700'):inputClass}`} onClick={()=>setIncData({...incData, docReceived:!incData.docReceived})}><span>Doc?</span>{incData.docReceived && '✓'}</div>
+                                </div>
+                                <input className={`w-full p-2 border rounded font-bold text-xs mb-3 outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} />
+                                <button onClick={handleLogIncident} className="w-full py-3 bg-[#002d72] hover:bg-[#ef7c00] text-white rounded font-black text-xs uppercase tracking-widest shadow-lg transition-colors">Add Record</button>
                             </div>
                             <h4 className={`text-[10px] font-black uppercase tracking-widest mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Incident History</h4>
                             <div className={`border rounded-xl overflow-hidden overflow-x-auto ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
                                 <table className="w-full text-left text-xs min-w-[400px]">
-                                    <thead className={`font-black ${darkMode ? 'bg-slate-900 text-slate-400 border-b border-slate-700' : 'bg-slate-50 text-slate-500 border-b border-slate-200'}`}><tr><th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3 text-center">Pts</th><th className="p-3">Notes</th><th className="p-3 text-center">Action</th></tr></thead><tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                                        {selectedEmp.incidents?.map((inc: any, i: number) => {
+                                    <thead className={`font-black ${darkMode ? 'bg-slate-900 text-slate-400 border-b border-slate-700' : 'bg-slate-50 text-slate-500 border-b border-slate-200'}`}><tr><th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3 text-center">Pts</th><th className="p-3">Notes</th><th className="p-3 text-center">Action</th></tr></thead>
+                                    <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
+                                        {selectedEmp.incidents && selectedEmp.incidents.length > 0 ? selectedEmp.incidents.map((inc: any, i: number) => {
                                             const isOld = (new Date().getTime() - new Date(inc.date).getTime()) / (1000 * 60 * 60 * 24) > 365;
-                                            return (<tr key={i} className={isOld ? (darkMode ? "bg-red-900/20 text-red-400 font-medium" : "bg-red-50 text-red-600 font-medium") : ""}><td className="p-3 font-mono">{inc.date} {isOld && <span className="text-[8px] font-black uppercase ml-1">(>1yr)</span>}</td><td className="p-3 font-bold">{inc.type}</td><td className="p-3 text-center font-black">{inc.count}</td><td className={`p-3 italic truncate max-w-[150px] ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{inc.notes}</td><td className="p-3 text-center"><button onClick={() => handleDeleteIncident(selectedEmp.id, inc)} className="text-red-500 font-bold">🗑️</button></td></tr>);
-                                        })}
+                                            return (
+                                                <tr key={i} className={isOld ? (darkMode ? "bg-red-900/20 text-red-400 font-medium" : "bg-red-50 text-red-600 font-medium") : ""}>
+                                                    <td className="p-3 font-mono">{inc.date} {isOld && <span className="text-[8px] font-black uppercase ml-1">(>1yr)</span>}</td>
+                                                    <td className="p-3 font-bold">{inc.type}</td><td className="p-3 text-center font-black">{inc.count}</td><td className={`p-3 italic truncate max-w-[150px] ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{inc.notes}</td><td className="p-3 text-center"><button onClick={() => handleDeleteIncident(selectedEmp.id, inc)} className="text-red-500 hover:text-red-400 font-bold">🗑️</button></td>
+                                                </tr>
+                                            );
+                                        }) : <tr><td colSpan={5} className={`p-4 text-center italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>No history found.</td></tr>}
                                     </tbody>
                                 </table>
                             </div>
@@ -358,29 +484,135 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
             {viewMode === 'dashboard' && (
                 <div className="space-y-6 overflow-y-auto pb-10">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className={`p-6 rounded-2xl shadow-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}><p className="text-[10px] font-black uppercase tracking-widest mb-1">Total Occurrences</p><p className="text-4xl font-black text-[#ef7c00]">{stats.totalOccurrences}</p></div>
-                        <div className={`p-6 rounded-2xl shadow-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}><p className="text-[10px] font-black uppercase tracking-widest mb-1">Employees Tracked</p><p className="text-4xl font-black">{personnel.length}</p></div>
+                        <div onClick={()=>jumpToLog('All')} className={`p-6 rounded-2xl shadow-sm border cursor-pointer transition-all hover:-translate-y-1 ${darkMode ? 'bg-slate-800 border-slate-700 hover:border-[#ef7c00]' : 'bg-white border-slate-200 hover:border-[#002d72] hover:bg-blue-50'}`}>
+                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Occurrences</p>
+                            <p className={`text-4xl font-black ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>{stats.totalOccurrences}</p>
+                        </div>
+                        <div onClick={()=>jumpToLog('All')} className={`p-6 rounded-2xl shadow-sm border cursor-pointer transition-all hover:-translate-y-1 ${darkMode ? 'bg-slate-800 border-slate-700 hover:border-[#ef7c00]' : 'bg-white border-slate-200 hover:border-[#002d72] hover:bg-blue-50'}`}>
+                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Employees Tracked</p>
+                            <p className={`text-4xl font-black ${darkMode ? 'text-white' : 'text-slate-700'}`}>{personnel.length}</p>
+                        </div>
+                        <div className={`p-6 rounded-2xl shadow-sm border ${bgClass}`}>
+                            <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Incidents by Type</p>
+                            <div className="space-y-1">
+                                {Object.entries(stats.typeCounts).slice(0,3).map(([k,v]) => (
+                                    <div key={k} onClick={()=>jumpToLog(k)} className={`flex justify-between text-xs font-bold cursor-pointer transition-colors ${darkMode ? 'text-slate-300 hover:text-[#ef7c00]' : 'text-slate-600 hover:text-[#ef7c00]'}`}>
+                                        <span>{k}</span><span>{v as React.ReactNode}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className={`rounded-2xl shadow-sm border overflow-hidden ${bgClass}`}>
+                            <div className={`p-4 border-b ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                                <h3 className={`text-xs font-black uppercase tracking-widest ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Monthly Incident Summary</h3>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className={`font-black uppercase border-b ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-white text-slate-400 border-slate-200'}`}>
+                                        <tr><th className="p-3">Month</th><th className="p-3 text-right">Sick</th><th className="p-3 text-right">FMLA</th><th className="p-3 text-right">No Show</th><th className="p-3 text-right">Total</th></tr>
+                                    </thead>
+                                    <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-50'}`}>
+                                        {stats.monthNames.map(month => { 
+                                            const data = stats.monthlyCounts[month] || {}; 
+                                            if (!data.Total) return null; 
+                                            return (
+                                                <tr key={month} className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
+                                                    <td className="p-3 font-bold">{month}</td>
+                                                    <td className="p-3 text-right font-mono text-orange-500">{data['Sick'] || 0}</td>
+                                                    <td className="p-3 text-right font-mono text-blue-500">{data['FMLA'] || 0}</td>
+                                                    <td className="p-3 text-right font-mono text-red-500">{(data['No Call/No Show'] || 0) + (data['Failure to Report'] || 0)}</td>
+                                                    <td className="p-3 text-right font-black">{data.Total || 0}</td>
+                                                </tr>
+                                            ); 
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         <div className={`rounded-2xl shadow-sm border overflow-hidden flex flex-col h-[400px] ${bgClass}`}>
-                            <div className="p-4 border-b flex justify-between items-center"><h3 className="text-xs font-black uppercase tracking-widest text-[#ef7c00]">Employee Roster</h3></div>
-                            <div className="overflow-y-auto flex-grow custom-scrollbar"><table className="w-full text-left text-xs"><thead className="font-black uppercase border-b sticky top-0 z-10"><tr><th className="p-3">Employee Name</th><th className="p-3 text-right">Count</th></tr></thead><tbody className="divide-y">{filteredRoster.map(emp => (<tr key={emp.id} onClick={() => setSelectedEmp(emp)} className="cursor-pointer"><td className="p-3 font-bold">{emp.name}</td><td className="p-3 text-right font-black">{emp.totalOccurrences}</td></tr>))}</tbody></table></div>
+                            <div className={`p-4 border-b flex justify-between items-center ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                                <h3 className={`text-xs font-black uppercase tracking-widest ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Employee Roster</h3>
+                                <input type="text" placeholder="Search Name..." className={`text-xs p-2 border rounded w-32 font-bold outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={rosterSearch} onChange={e=>setRosterSearch(e.target.value)} />
+                            </div>
+                            <div className="overflow-y-auto flex-grow custom-scrollbar">
+                                <table className="w-full text-left text-xs">
+                                    <thead className={`font-black uppercase border-b sticky top-0 z-10 ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                        <tr><th className="p-3">Employee Name</th><th className="p-3 text-right">Count</th></tr>
+                                    </thead>
+                                    <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
+                                        {filteredRoster.map(emp => (
+                                            <tr key={emp.id} onClick={() => setSelectedEmp(emp)} className={`cursor-pointer transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}`}>
+                                                <td className="p-3 font-bold">{emp.name}</td>
+                                                <td className={`p-3 text-right font-black ${emp.totalOccurrences > 5 ? 'text-red-500' : ''}`}>{emp.totalOccurrences}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
+
             {viewMode === 'log' && (
                 <div className={`rounded-2xl shadow-lg border flex-grow overflow-hidden flex flex-col ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-                    <div className="overflow-x-auto flex-grow custom-scrollbar"><div className="min-w-[700px] border-b p-3 grid grid-cols-12 gap-2 text-[9px] font-black uppercase tracking-widest"><div className="col-span-3">Employee Name</div><div className="col-span-2">Incident Type</div><div className="col-span-2">Date</div><div className="col-span-1 text-center">Count</div><div className="col-span-1 text-center">Doc?</div><div className="col-span-2">Notes</div><div className="col-span-1 text-center">Action</div></div><div className="min-w-[700px] divide-y">{filteredLog.map((log, i) => (<div key={i} className="grid grid-cols-12 gap-2 p-3 items-center text-xs"><div className="col-span-3 font-bold cursor-pointer hover:underline text-[#ef7c00]" onClick={() => setSelectedEmp(personnel.find(p => p.id === log.employeeId))}>{log.employeeName}</div><div className="col-span-2 font-medium">{log.type}</div><div className="col-span-2 font-mono">{log.date}</div><div className="col-span-1 text-center font-black">{log.count}</div><div className="col-span-1 text-center">{log.docReceived ? '✅' : '❌'}</div><div className="col-span-2 truncate italic opacity-70">{log.notes || '-'}</div><div className="col-span-1 text-center"><button onClick={() => handleDeleteIncident(log.employeeId, log)} className="text-red-500 font-bold">🗑️</button></div></div>))}</div></div>
+                    <div className={`p-4 border-b flex gap-4 flex-wrap ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                        <input className={`p-2 border rounded font-bold text-xs flex-grow min-w-[150px] outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Search Employee..." value={logFilter.search} onChange={e=>setLogFilter({...logFilter, search:e.target.value})} />
+                        <select className={`p-2 border rounded font-bold text-xs outline-none focus:border-[#ef7c00] ${inputClass}`} value={logFilter.type} onChange={e=>setLogFilter({...logFilter, type:e.target.value})}><option value="All">All Types</option><option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option><option>Vacation</option><option>Bereavement</option><option>Other</option></select>
+                        <select className={`p-2 border rounded font-bold text-xs outline-none focus:border-[#ef7c00] ${inputClass}`} value={logFilter.sort} onChange={e=>setLogFilter({...logFilter, sort:e.target.value})}><option value="desc">Newest First</option><option value="asc">Oldest First</option></select>
+                    </div>
+                    <div className="overflow-x-auto flex-grow custom-scrollbar">
+                        <div className={`min-w-[700px] border-b p-3 grid grid-cols-12 gap-2 text-[9px] font-black uppercase tracking-widest ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                            <div className="col-span-3">Employee Name</div><div className="col-span-2">Incident Type</div><div className="col-span-2">Date</div><div className="col-span-1 text-center">Count</div><div className="col-span-1 text-center">Doc?</div><div className="col-span-2">Notes</div><div className="col-span-1 text-center">Action</div>
+                        </div>
+                        <div className={`min-w-[700px] divide-y ${darkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
+                            {filteredLog.length === 0 ? <div className={`p-10 text-center italic font-bold ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>No records found.</div> : filteredLog.map((log, i) => (
+                                <div key={i} className={`grid grid-cols-12 gap-2 p-3 items-center transition-colors text-xs ${darkMode ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-blue-50 text-slate-700'}`}>
+                                    <div className={`col-span-3 font-bold cursor-pointer hover:underline ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`} onClick={() => setSelectedEmp(personnel.find(p => p.id === log.employeeId))}>{log.employeeName}</div>
+                                    <div className="col-span-2 font-medium"><span className={`px-2 py-0.5 rounded text-[10px] uppercase font-black ${log.type==='Sick'?'bg-orange-500/20 text-orange-500':log.type==='FMLA'?'bg-blue-500/20 text-blue-500':'bg-red-500/20 text-red-500'}`}>{log.type}</span></div>
+                                    <div className="col-span-2 font-mono">{log.date}</div>
+                                    <div className="col-span-1 text-center font-black">{log.count}</div>
+                                    <div className="col-span-1 text-center">{log.docReceived ? '✅' : '❌'}</div>
+                                    <div className="col-span-2 truncate italic opacity-70">{log.notes || '-'}</div>
+                                    <div className="col-span-1 text-center"><button onClick={() => handleDeleteIncident(log.employeeId, log)} className="text-red-500 hover:text-red-400 font-bold">🗑️</button></div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
 
             {showAddModal && (
                 <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
-                    <div className={`p-6 rounded-2xl w-full max-w-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                    <div className={`p-6 rounded-2xl w-full max-w-sm shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                         <h3 className={`text-xl font-black mb-4 uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Add Employee</h3>
                         <input className={`w-full p-3 border-2 rounded-lg mb-4 font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Full Name (e.g. John Doe)" value={newEmpName} onChange={e=>setNewEmpName(e.target.value)} />
-                        <div className="flex gap-2"><button onClick={()=>setShowAddModal(false)} className={`flex-1 py-3 rounded-lg font-bold text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'}`}>Cancel</button><button onClick={handleAddEmployee} className="flex-1 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-lg font-bold text-xs transition-colors">Add Employee</button></div>
+                        <div className="flex gap-2">
+                            <button onClick={()=>setShowAddModal(false)} className={`flex-1 py-3 rounded-lg font-bold text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'}`}>Cancel</button>
+                            <button onClick={handleAddEmployee} className="flex-1 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-lg font-bold text-xs transition-colors">Add Employee</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showIncidentModal && (
+                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
+                    <div className={`p-8 rounded-2xl w-full max-w-md shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                        <h3 className="text-2xl font-black text-[#ef7c00] mb-6 uppercase">Log Attendance</h3>
+                        <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Employee</label>
+                        <select className={`w-full p-3 border-2 rounded-lg font-bold mb-4 outline-none focus:border-[#ef7c00] ${inputClass}`} value={selectedEmpId} onChange={e=>setSelectedEmpId(e.target.value)}><option value="">-- Select Employee --</option>{personnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div><label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Type</label><select className={`w-full p-3 border-2 rounded-lg font-bold text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.type} onChange={e=>setIncData({...incData, type:e.target.value})}><option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option><option>Vacation</option><option>Bereavement</option><option>Other</option></select></div>
+                            <div><label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Occurrences</label><input type="number" className={`w-full p-3 border-2 rounded-lg font-bold text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} /></div>
+                        </div>
+                        <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Date</label>
+                        <input type="date" onClick={handleDateClick} className={`w-full p-3 border-2 rounded-lg font-bold mb-4 text-sm outline-none focus:border-[#ef7c00] cursor-pointer ${inputClass}`} value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} />
+                        <div className={`flex items-center gap-3 mb-4 p-3 rounded-lg border cursor-pointer ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-blue-50 border-blue-100'}`} onClick={()=>setIncData({...incData, docReceived:!incData.docReceived})}><div className={`w-5 h-5 rounded border flex items-center justify-center ${incData.docReceived ? 'bg-[#ef7c00] border-[#ef7c00] text-white' : (darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-300')}`}>{incData.docReceived && '✓'}</div><span className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-blue-800'}`}>Documentation Received?</span></div>
+                        <textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-6 font-medium text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Additional notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} />
+                        <div className="flex gap-4"><button onClick={()=>setShowIncidentModal(false)} className={`w-1/3 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'}`}>Cancel</button><button onClick={handleLogIncident} className="w-2/3 py-3 bg-[#002d72] hover:bg-[#ef7c00] text-white rounded-xl font-black uppercase text-xs shadow-lg transition-colors">Save Record</button></div>
                     </div>
                 </div>
             )}
@@ -388,7 +620,7 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
     );
 };
 
-const PartsInventory = ({ showToast, darkMode }: { showToast: any, darkMode: boolean }) => {
+const PartsInventory = ({ showToast, darkMode }: { showToast: (msg: string, type: 'success'|'error') => void, darkMode: boolean }) => {
     const [searchTerm, setSearchTerm] = useState(''); const [displayLimit, setDisplayLimit] = useState(100); const [isLargeText, setIsLargeText] = useState(false);
     const filteredParts = useMemo(() => { let r = localParts; if (searchTerm) r = r.filter((p: any) => (p.partNumber && String(p.partNumber).toLowerCase().includes(searchTerm.toLowerCase())) || (p.name && String(p.name).toLowerCase().includes(searchTerm.toLowerCase()))); return r.slice(0, displayLimit); }, [searchTerm, displayLimit]);
     const inputClass = darkMode ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-black placeholder:text-gray-400';
@@ -396,11 +628,11 @@ const PartsInventory = ({ showToast, darkMode }: { showToast: any, darkMode: boo
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col relative">
             <div className="flex justify-between items-end mb-6 px-2 flex-wrap gap-4">
                 <div><h2 className={`text-3xl font-black italic uppercase tracking-tighter leading-none ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Parts Registry</h2><p className={`text-[10px] font-black uppercase tracking-widest mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Local Reference</p></div>
-                <div className="flex items-center gap-3 w-full max-w-lg"><button onClick={() => setIsLargeText(!isLargeText)} className={`h-12 w-12 flex items-center justify-center rounded-2xl border-2 font-black transition-all ${isLargeText ? 'bg-[#002d72] border-[#002d72] text-white' : inputClass}`}>Aa</button><input type="text" placeholder="Search Part #..." className={`w-full p-4 rounded-2xl font-bold border-2 outline-none focus:border-[#ef7c00] transition-all shadow-sm ${inputClass}`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
+                <div className="flex items-center gap-3 w-full max-w-lg"><button onClick={() => setIsLargeText(!isLargeText)} className={`h-12 w-12 flex items-center justify-center rounded-2xl border-2 font-black transition-all ${isLargeText ? 'bg-[#002d72] border-[#002d72] text-white' : inputClass}`}>Aa</button><input type="text" placeholder="Search Part # or Description..." className={`w-full p-4 rounded-2xl font-bold border-2 outline-none focus:border-[#ef7c00] transition-colors shadow-sm ${inputClass}`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
             </div>
             <div className={`rounded-3xl shadow-xl border flex-grow overflow-hidden flex flex-col relative ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
                 <div className="bg-[#002d72] grid grid-cols-12 gap-4 p-5 text-[10px] font-black uppercase text-white tracking-widest select-none"><div className="col-span-3">Part Number</div><div className="col-span-8">Description</div><div className="col-span-1 text-center">View</div></div>
-                <div className="overflow-y-auto flex-grow custom-scrollbar"><div className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>{filteredParts.map((p: any, i: number) => (<div key={i} className={`grid grid-cols-12 gap-4 p-4 transition-all items-center ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}><div onClick={() => { navigator.clipboard.writeText(p.partNumber); showToast(`Copied!`, 'success'); }} className={`col-span-3 font-mono font-black rounded-lg cursor-pointer transition-all shadow-sm ${darkMode ? 'bg-slate-900 text-[#ef7c00]' : 'bg-blue-50 text-[#002d72]'} ${isLargeText ? 'text-xl px-4 py-2' : 'text-sm px-3 py-1'}`}>{p.partNumber}</div><div className={`col-span-8 font-bold uppercase flex items-center ${darkMode ? 'text-slate-200' : 'text-slate-700'} ${isLargeText ? 'text-lg leading-normal' : 'text-[11px] leading-tight'}`}>{p.name}</div><div className="col-span-1 flex justify-center"><a href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(p.name + " " + p.partNumber + " bus part")}`} target="_blank" rel="noopener noreferrer" className={`text-[#ef7c00] hover:scale-125 transition-transform ${isLargeText ? 'text-2xl' : 'text-lg'}`}>👁️</a></div></div>))}</div></div>
+                <div className="overflow-y-auto flex-grow custom-scrollbar"><div className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>{filteredParts.map((p: any, i: number) => (<div key={i} className={`grid grid-cols-12 gap-4 p-4 transition-colors items-center ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}><div onClick={() => { navigator.clipboard.writeText(p.partNumber); showToast(`Copied!`, 'success'); }} className={`col-span-3 font-mono font-black rounded-lg cursor-pointer transition-all shadow-sm ${darkMode ? 'bg-slate-900 text-[#ef7c00]' : 'bg-blue-50 text-[#002d72]'} ${isLargeText ? 'text-xl px-4 py-2' : 'text-sm px-3 py-1'}`}>{p.partNumber}</div><div className={`col-span-8 font-bold uppercase flex items-center ${darkMode ? 'text-slate-200' : 'text-slate-700'} ${isLargeText ? 'text-lg leading-normal' : 'text-[11px] leading-tight'}`}>{p.name}</div><div className="col-span-1 flex justify-center"><a href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(p.name + " " + p.partNumber + " bus part")}`} target="_blank" rel="noopener noreferrer" className={`text-[#ef7c00] hover:scale-125 transition-transform ${isLargeText ? 'text-2xl' : 'text-lg'}`}>👁️</a></div></div>))}</div></div>
             </div>
         </div>
     );
@@ -444,7 +676,7 @@ const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: any
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fleet Availability</p><p className="text-4xl font-black text-[#002d72] italic">{Math.round(((buses.length - avgOOS) / Math.max(buses.length, 1)) * 100)}%</p></div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Down Units</p><p className="text-4xl font-black text-red-500 italic">{avgOOS}</p></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><div className="flex justify-between items-center mb-2"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Analytics Admin</p><button onClick={handleResetMetrics} disabled={isResetting} className="text-[9px] font-black text-red-500 hover:text-red-700 uppercase border border-red-200 rounded px-2 py-1 bg-red-50 disabled:opacity-50">{isResetting ? "..." : "Wipe All Databases"}</button></div><div className="space-y-2">{shopQueens.map((queen, i) => (<div key={i} className="flex justify-between items-center text-xs border-b border-slate-100 pb-1"><span className="font-bold text-slate-700">#{queen.number}</span><span className="font-mono text-red-500">{queen.count} logs</span></div>))}</div></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><div className="flex justify-between items-center mb-2"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Analytics Admin</p><button onClick={handleResetMetrics} disabled={isResetting} className="text-[9px] font-black text-red-500 hover:text-red-700 uppercase border border-red-200 rounded px-2 py-1 bg-red-50 disabled:opacity-50 transition-colors">{isResetting ? "..." : "Wipe All Databases"}</button></div><div className="space-y-2">{shopQueens.map((queen, i) => (<div key={i} className="flex justify-between items-center text-xs border-b border-slate-100 pb-1"><span className="font-bold text-slate-700">#{queen.number}</span><span className="font-mono text-red-500">{queen.count} logs</span></div>))}</div></div>
         </div>
     );
 };
@@ -468,12 +700,11 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault(); 
-        const today = new Date(); today.setHours(23,59,59,999);
+        const todayStr = new Date().toISOString().split('T')[0];
         if (formData.oosStartDate) {
-            const oos = new Date(formData.oosStartDate);
-            if (oos > today) return showToast("Out of Service date cannot be a future date", 'error');
-            if (formData.expectedReturnDate && new Date(formData.expectedReturnDate) < oos) return showToast("Expected Return cannot be earlier than OOS Date", 'error');
-            if (formData.actualReturnDate && new Date(formData.actualReturnDate) < oos) return showToast("Actual Return cannot be earlier than OOS Date", 'error');
+            if (formData.oosStartDate > todayStr) return showToast("Out of Service date cannot be a future date", 'error');
+            if (formData.expectedReturnDate && formData.expectedReturnDate < formData.oosStartDate) return showToast("Expected Return cannot be earlier than OOS Date", 'error');
+            if (formData.actualReturnDate && formData.actualReturnDate < formData.oosStartDate) return showToast("Actual Return cannot be earlier than OOS Date", 'error');
         }
 
         const busRef = doc(db, "buses", formData.number); const busSnap = await getDoc(busRef);
@@ -537,9 +768,9 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
             <div className="flex justify-between items-end mb-8 flex-wrap gap-4">
                 <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Data Entry</h2>
                 <div className="flex gap-2 flex-wrap">
-                    {isAdmin && <button type="button" onClick={resetAllFleet} className="px-3 py-2 rounded-lg font-black uppercase text-[9px] bg-red-600 hover:bg-red-700 text-white shadow-md">🚨 Reset Fleet</button>}
-                    {isAdmin && <button type="button" onClick={populateFleet} className={`px-3 py-2 rounded-lg font-black uppercase text-[9px] border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>⚙️ Init Fleet</button>}
-                    <button type="button" onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-black uppercase text-[10px] shadow-md">+ Add Bus</button>
+                    {isAdmin && <button type="button" onClick={resetAllFleet} className="px-3 py-2 rounded-lg font-black uppercase text-[9px] bg-red-600 hover:bg-red-700 text-white shadow-md transition-colors">🚨 Reset Fleet</button>}
+                    {isAdmin && <button type="button" onClick={populateFleet} className={`px-3 py-2 rounded-lg font-black uppercase text-[9px] border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-[#002d72]'} transition-colors`}>⚙️ Init Fleet</button>}
+                    <button type="button" onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-black uppercase text-[10px] shadow-md transition-colors">+ Add Bus</button>
                 </div>
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -553,11 +784,11 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
                 <input type="text" placeholder="Location" className={`w-full p-4 border-2 rounded-xl outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.location} onChange={handleChange} name="location" />
                 <textarea placeholder="Maintenance Notes" className={`w-full p-4 border-2 rounded-xl h-24 outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.notes} onChange={handleChange} name="notes" />
                 <div className="grid grid-cols-3 gap-4">
-                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>OOS Date</label><input name="oosStartDate" type="date" onClick={handleDateClick} max={new Date().toISOString().split('T')[0]} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer ${inputClass}`} value={formData.oosStartDate} onChange={handleChange} /></div>
-                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Exp Return</label><input name="expectedReturnDate" type="date" onClick={handleDateClick} min={formData.oosStartDate} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer ${inputClass}`} value={formData.expectedReturnDate} onChange={handleChange} /></div>
-                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Act Return</label><input name="actualReturnDate" type="date" onClick={handleDateClick} min={formData.oosStartDate} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer ${inputClass}`} value={formData.actualReturnDate} onChange={handleChange} /></div>
+                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>OOS Date</label><input name="oosStartDate" type="date" onClick={handleDateClick} max={new Date().toISOString().split('T')[0]} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.oosStartDate} onChange={handleChange} /></div>
+                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Exp Return</label><input name="expectedReturnDate" type="date" onClick={handleDateClick} min={formData.oosStartDate} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.expectedReturnDate} onChange={handleChange} /></div>
+                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Act Return</label><input name="actualReturnDate" type="date" onClick={handleDateClick} min={formData.oosStartDate} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.actualReturnDate} onChange={handleChange} /></div>
                 </div>
-                <button className="w-full py-4 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase tracking-widest shadow-lg">Update Record</button>
+                <button className="w-full py-4 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase tracking-widest shadow-lg transition-transform active:scale-95">Update Record</button>
             </form>
 
             {showAddModal && (
@@ -567,7 +798,7 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
                         <form onSubmit={handleAddNewBus} className="space-y-4">
                             <div><label className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unit Number *</label><input type="text" className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={newBusData.number} onChange={e => setNewBusData({...newBusData, number: e.target.value})} required placeholder="e.g., 2001" /></div>
                             <div><label className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Initial Status</label><select className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={newBusData.status} onChange={e => setNewBusData({...newBusData, status: e.target.value})}><option value="Active">Ready for Service</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option>{statusOptions.map((opt, i) => <option key={i} value={opt.label}>{opt.label}</option>)}</select></div>
-                            <div className="flex gap-4 mt-8"><button type="button" onClick={() => setShowAddModal(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white' : 'bg-slate-100 text-black'}`}>Cancel</button><button type="submit" className="w-1/2 py-3 bg-green-600 text-white rounded-xl font-black uppercase text-xs shadow-lg">Save Bus</button></div>
+                            <div className="flex gap-4 mt-8"><button type="button" onClick={() => setShowAddModal(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'} transition-colors`}>Cancel</button><button type="submit" className="w-1/2 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black uppercase text-xs shadow-lg transition-transform active:scale-95">Save Bus</button></div>
                         </form>
                     </div>
                 </div>
@@ -620,10 +851,10 @@ export default function FleetManager() {
         });
     }, [user]);
 
-    useEffect(() => { 
-        if (!user || userStatus !== 'approved') return; 
-        const uBuses = onSnapshot(query(collection(db, "buses"), orderBy("number", "asc")), s => setBuses(s.docs.map(d => ({...d.data(), docId: d.id})))); 
-        const uOpts = onSnapshot(doc(db, "settings", "status_options"), s => { if (s.exists()) setStatusOptions(s.data().list || []); });
+    useEffect(() => {
+        if (!user || userStatus !== 'approved') return;
+        const uBuses = onSnapshot(query(collection(db, "buses"), orderBy("number", "asc")), s => setBuses(s.docs.map(d => ({...d.data(), docId: d.id}))));
+        const uOpts = onSnapshot(doc(db, "settings", "status_options"), s => { if(s.exists()) setStatusOptions(s.data().list || []); });
         return () => { uBuses(); uOpts(); };
     }, [user, userStatus]);
 
@@ -707,10 +938,10 @@ export default function FleetManager() {
         <div className="min-h-screen flex flex-col bg-slate-900 font-sans">
             {toast && <Toast message={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}
             <div className="flex-grow flex items-center justify-center p-4">
-                <form onSubmit={handleAuth} className="bg-slate-800 p-10 rounded-2xl w-full max-w-md border-t-[12px] border-[#ef7c00] shadow-2xl animate-in fade-in zoom-in">
+                <form onSubmit={handleAuth} className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-[#ef7c00] animate-in fade-in zoom-in">
                     <h2 className="text-3xl font-black text-white italic mb-8 uppercase text-center">{isSignUp ? 'Join Fleetflow' : 'Fleet Operations'}</h2>
-                    <input className="w-full p-4 mb-4 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00]" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
-                    <input className="w-full p-4 mb-6 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00]" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} />
+                    <input className="w-full p-4 mb-4 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00] transition-colors" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
+                    <input className="w-full p-4 mb-6 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold outline-none focus:border-[#ef7c00] transition-colors" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} />
                     <button className="w-full py-5 bg-[#ef7c00] text-white font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-orange-600 transition-colors">{isSignUp ? 'Register' : 'Login'}</button>
                     <button type="button" onClick={()=>setIsSignUp(!isSignUp)} className="w-full mt-6 text-slate-400 text-xs font-bold hover:text-white transition-colors">{isSignUp ? 'Back to Login' : "Don't have an account? Sign Up"}</button>
                 </form>
@@ -724,7 +955,7 @@ export default function FleetManager() {
             <div className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-red-500 animate-in zoom-in-95">
                 <h2 className="text-3xl font-black uppercase italic mb-4">Access Restricted</h2>
                 <p className="opacity-50 font-bold mb-8">Account pending administrator approval.</p>
-                <button onClick={()=>signOut(auth)} className="w-full py-4 bg-[#002d72] rounded-xl font-black uppercase tracking-widest shadow-xl">Sign Out</button>
+                <button onClick={()=>signOut(auth)} className="w-full py-4 bg-[#002d72] rounded-xl font-black uppercase tracking-widest shadow-xl hover:bg-blue-800 transition-colors">Sign Out</button>
             </div>
             <div className="absolute bottom-0 w-full"><Footer onShowLegal={setLegalType} darkMode={true} /></div>
         </div>
@@ -742,9 +973,9 @@ export default function FleetManager() {
                     {['inventory', 'input', 'tracker', 'handover', 'parts'].concat(isAdmin ? ['analytics', 'personnel', 'admin'] : []).map(v => (
                         <button key={v} onClick={()=>setView(v as any)} className={`text-[9px] font-black uppercase tracking-widest border-b-2 pb-1 transition-all whitespace-nowrap ${view === v ? 'border-[#ef7c00] text-[#ef7c00]' : (darkMode ? 'border-transparent text-slate-400 hover:text-white' : 'border-transparent text-slate-500 hover:text-[#002d72]')}`}>{v.replace('admin','panel').replace('input', 'Data Entry').replace('parts', 'Parts List')}</button>
                     ))}
-                    <button onClick={()=>setDarkMode(!darkMode)} className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${darkMode ? 'bg-slate-800 text-yellow-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
-                    <button onClick={exportExcel} className={`text-[10px] font-black uppercase whitespace-nowrap ${darkMode ? 'text-green-400 hover:text-green-300' : 'text-[#002d72] hover:text-[#ef7c00]'}`}>Excel</button>
-                    <button onClick={()=>signOut(auth)} className="text-red-500 font-black text-[10px] uppercase whitespace-nowrap">Logout</button>
+                    <button onClick={()=>setDarkMode(!darkMode)} className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-slate-800 text-yellow-400 border-slate-700 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'}`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
+                    <button onClick={exportExcel} className={`text-[10px] font-black uppercase whitespace-nowrap transition-colors ${darkMode ? 'text-green-400 hover:text-green-300' : 'text-[#002d72] hover:text-[#ef7c00]'}`}>Excel</button>
+                    <button onClick={()=>signOut(auth)} className="text-red-500 font-black text-[10px] uppercase whitespace-nowrap hover:text-red-400 transition-colors">Logout</button>
                 </div>
             </nav>
 
@@ -778,21 +1009,17 @@ export default function FleetManager() {
                             <input className={`w-full max-w-md p-3 rounded-lg border-2 font-bold outline-none transition-colors focus:border-[#ef7c00] ${darkMode ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-black placeholder:text-slate-400'}`} placeholder="Search Unit #..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
                             <div className={`flex w-full md:w-auto gap-2 p-1 border rounded-lg ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                                 {['list', 'grid', 'tv'].map(m => <button key={m} onClick={()=>setInventoryMode(m as any)} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all ${inventoryMode === m ? 'bg-[#ef7c00] text-white shadow-md' : (darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]')}`}>{m}</button>)}
+                                {inventoryMode === 'tv' && <button onClick={toggleFullScreen} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-black uppercase rounded transition-all flex items-center justify-center gap-1 ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]'}`}>⛶ Fullscreen</button>}
                             </div>
                         </div>
                         
-                        <div className={`rounded-2xl border shadow-sm overflow-hidden min-h-[500px] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                        <div className={`rounded-3xl border shadow-sm overflow-hidden min-h-[500px] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                             {inventoryMode === 'tv' && (
                                 <div ref={tvBoardRef} className={`p-4 sm:p-6 overflow-y-auto custom-scrollbar min-h-[75vh] h-full ${isFullscreen ? (darkMode ? 'bg-slate-900' : 'bg-slate-100') : ''}`}>
                                     {isFullscreen && (
                                         <div className={`flex justify-between items-end mb-6 border-b-2 pb-4 ${darkMode ? 'border-slate-800' : 'border-slate-300'}`}>
                                             <div><h2 className="text-5xl font-black uppercase tracking-tighter text-[#ef7c00]">Fleet Status Board</h2><p className={`text-xl font-bold mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Total Units: {buses.length} | Down: <span className="text-red-500">{buses.filter(b=>b.status!=='Active').length}</span></p></div>
                                             <button onClick={toggleFullScreen} className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl transition-all transform active:scale-95">Exit Fullscreen</button>
-                                        </div>
-                                    )}
-                                    {!isFullscreen && (
-                                        <div className="mb-6 flex justify-end">
-                                            <button onClick={toggleFullScreen} className="px-6 py-3 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase text-xs shadow-lg flex items-center gap-2 transition-all transform active:scale-95">⛶ Launch Fullscreen TV Mode</button>
                                         </div>
                                     )}
                                     <div className={`grid gap-4 sm:gap-6 pb-20 ${isFullscreen ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}`}>
@@ -859,7 +1086,7 @@ export default function FleetManager() {
                     </>
                  )}
             </main>
-            <Footer onShowLegal={setLegalType} darkMode={darkMode} />
+            {view !== 'input' && view !== 'admin' && view !== 'personnel' && view !== 'analytics' && <Footer onShowLegal={setLegalType} darkMode={darkMode} />}
         </div>
     );
 }

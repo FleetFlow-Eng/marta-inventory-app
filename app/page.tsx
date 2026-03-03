@@ -592,48 +592,6 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: (msg: string, ty
                 </div>
             )}
 
-            {showIncidentModal && (
-                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in zoom-in-95">
-                    <div className={`p-8 rounded-2xl w-full max-w-md shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                        <h3 className="text-2xl font-black text-[#ef7c00] mb-6 uppercase">Log Attendance</h3>
-                        
-                        <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Employee</label>
-                        <select className={`w-full p-3 border-2 rounded-lg font-bold mb-4 outline-none focus:border-[#ef7c00] ${inputClass}`} value={selectedEmpId} onChange={e=>setSelectedEmpId(e.target.value)}>
-                            <option value="">-- Select Employee --</option>
-                            {personnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                        
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Type</label>
-                                <select className={`w-full p-3 border-2 rounded-lg font-bold text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.type} onChange={e=>setIncData({...incData, type:e.target.value})}>
-                                    <option>Sick</option><option>FMLA</option><option>Failure to Report</option><option>Late Reporting</option><option>NC/NS</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Occurrences</label>
-                                <input type="number" className={`w-full p-3 border-2 rounded-lg font-bold text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} value={incData.count} onChange={e=>setIncData({...incData, count:Number(e.target.value)})} />
-                            </div>
-                        </div>
-                        
-                        <label className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Date</label>
-                        <input type="date" onClick={handleDateClick} className={`w-full p-3 border-2 rounded-lg font-bold mb-4 text-sm outline-none focus:border-[#ef7c00] cursor-pointer ${inputClass}`} value={incData.date} onChange={e=>setIncData({...incData, date:e.target.value})} />
-                        
-                        <div className={`flex items-center gap-3 mb-4 p-3 rounded-lg border cursor-pointer ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-blue-50 border-blue-100'}`} onClick={()=>setIncData({...incData, docReceived:!incData.docReceived})}>
-                            <div className={`w-5 h-5 rounded border flex items-center justify-center ${incData.docReceived ? 'bg-[#ef7c00] border-[#ef7c00] text-white' : (darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-300')}`}>{incData.docReceived && '✓'}</div>
-                            <span className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-blue-800'}`}>Documentation Received?</span>
-                        </div>
-                        
-                        <textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-6 font-medium text-sm outline-none focus:border-[#ef7c00] ${inputClass}`} placeholder="Additional notes..." value={incData.notes} onChange={e=>setIncData({...incData, notes:e.target.value})} />
-                        
-                        <div className="flex gap-4">
-                            <button onClick={()=>setShowIncidentModal(false)} className={`w-1/3 py-3 rounded-xl font-black uppercase text-xs ${darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-black hover:bg-slate-200'}`}>Cancel</button>
-                            <button onClick={handleLogIncident} className="w-2/3 py-3 bg-[#002d72] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-[#ef7c00] transition-colors">Save Record</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Dashboard View */}
             {viewMode === 'dashboard' && (
                 <div className="space-y-6 overflow-y-auto pb-10">
@@ -792,45 +750,41 @@ const AnalyticsDashboard = ({ buses, showToast }: { buses: any[], showToast: (ms
     const handleResetMetrics = async () => { 
         if(!confirm("⚠️ WARNING: This will permanently wipe ALL bus history, personnel incidents, and global audit logs. Proceed?")) return; 
         setIsResetting(true); 
+        let errorCount = 0;
         try { 
-            let allDeletes: any[] = [];
+            showToast("Wiping databases... please wait.", "success");
             
             // 1. Wipe Activity Logs
             const aSnap = await getDocs(collection(db, "activity_logs"));
-            aSnap.docs.forEach(docSnap => allDeletes.push(docSnap.ref));
+            await Promise.all(aSnap.docs.map(docSnap => deleteDoc(docSnap.ref).catch(e => {
+                console.error("Failed to delete activity log:", e);
+                errorCount++;
+            })));
             
-            // 2. Wipe Bus History concurrently in chunks
-            for (let i = 0; i < buses.length; i += 20) {
-                const batchPromises = buses.slice(i, i + 20).map(bus => getDocs(collection(db, "buses", bus.docId, "history")));
-                const batchSnaps = await Promise.all(batchPromises);
-                batchSnaps.forEach(snap => {
-                    snap.docs.forEach(docSnap => allDeletes.push(docSnap.ref));
-                });
-            }
-
-            // Execute deletes safely in batches of 400
-            for (let i = 0; i < allDeletes.length; i += 400) {
-                const batch = writeBatch(db);
-                const chunk = allDeletes.slice(i, i + 400);
-                chunk.forEach(ref => batch.delete(ref));
-                await batch.commit();
-            }
+            // 2. Wipe Bus History
+            for (const bus of buses) { 
+                const hSnap = await getDocs(collection(db, "buses", bus.number, "history")); 
+                await Promise.all(hSnap.docs.map(docSnap => deleteDoc(docSnap.ref).catch(e => {
+                    console.error(`Failed to delete history for bus ${bus.number}:`, e);
+                    errorCount++;
+                })));
+            } 
 
             // 3. Reset Personnel Incidents
             const pSnap = await getDocs(collection(db, "personnel"));
-            for (let i = 0; i < pSnap.docs.length; i += 400) {
-                const pBatch = writeBatch(db);
-                const pChunk = pSnap.docs.slice(i, i + 400);
-                pChunk.forEach(docSnap => {
-                    pBatch.update(docSnap.ref, { incidents: [], totalOccurrences: 0 });
-                });
-                await pBatch.commit();
-            }
+            await Promise.all(pSnap.docs.map(docSnap => updateDoc(docSnap.ref, { incidents: [], totalOccurrences: 0 }).catch(e => {
+                console.error("Failed to reset personnel:", e);
+                errorCount++;
+            })));
 
-            showToast(`All databases wiped successfully.`, 'success'); 
+            if (errorCount > 0) {
+                showToast(`Wiped, but ${errorCount} items failed. (Check console logs)`, 'error'); 
+            } else {
+                showToast(`All databases wiped successfully.`, 'success'); 
+            }
             setShopQueens([]); 
         } catch (err: any) { 
-            console.error(err);
+            console.error("Fatal Reset Error:", err);
             showToast(`Failed: ${err.message || "Unknown error"}`, 'error'); 
         } 
         setIsResetting(false); 
@@ -971,25 +925,20 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin }: { showToast: (m:s
     const resetAllFleet = async () => {
         if (!confirm("⚠️ DANGER: This will instantly set EVERY bus back to 'Active' and clear all faults/locations. Are you absolutely sure?")) return;
         try {
-            const chunks = [];
-            for (let i = 0; i < buses.length; i += 400) { chunks.push(buses.slice(i, i + 400)); }
+            showToast("Resetting fleet... please wait.", "success");
             
-            for (const chunk of chunks) {
-                const batch = writeBatch(db);
-                chunk.forEach((bus: any) => {
-                    const busRef = doc(db, "buses", bus.docId);
-                    batch.update(busRef, {
-                        status: 'Active',
-                        location: '',
-                        notes: '',
-                        oosStartDate: '',
-                        expectedReturnDate: '',
-                        actualReturnDate: '',
-                        timestamp: serverTimestamp()
-                    });
-                });
-                await batch.commit();
-            }
+            await Promise.all(buses.map(bus => 
+                updateDoc(doc(db, "buses", bus.docId), {
+                    status: 'Active',
+                    location: '',
+                    notes: '',
+                    oosStartDate: '',
+                    expectedReturnDate: '',
+                    actualReturnDate: '',
+                    timestamp: serverTimestamp()
+                }).catch(e => console.error("Failed to reset bus", bus.docId, e))
+            ));
+            
             await logActivity(auth.currentUser?.email || 'Unknown', 'SYSTEM', 'Entire Fleet', 'UPDATE', 'Master Reset triggered. All buses set to Active.');
             showToast("Fleet successfully reset to Active.", 'success');
         } catch (err: any) {

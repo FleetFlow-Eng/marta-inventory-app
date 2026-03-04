@@ -95,6 +95,33 @@ export default function FleetManager() {
         else if (document.fullscreenElement) document.exitFullscreen();
     };
 
+    useEffect(() => {
+        const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', handleFsChange);
+        return () => document.removeEventListener('fullscreenchange', handleFsChange);
+    }, []);
+
+    useEffect(() => {
+        let animationFrameId: number; let isPaused = false; let scrollPos = 0;
+        const scroll = () => {
+            if (inventoryMode === 'tv' && isFullscreen && tvBoardRef.current && !isPaused) {
+                const el = tvBoardRef.current;
+                if (el.scrollHeight > el.clientHeight) {
+                    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) {
+                        isPaused = true;
+                        setTimeout(() => { if(tvBoardRef.current) { tvBoardRef.current.scrollTop = 0; scrollPos = 0; } setTimeout(() => { isPaused = false; }, 2000); }, 4000); 
+                    } else {
+                        scrollPos += 1.2; el.scrollTop = scrollPos;
+                        if (Math.abs(el.scrollTop - Math.round(scrollPos)) > 2) scrollPos = el.scrollTop;
+                    }
+                }
+            }
+            animationFrameId = requestAnimationFrame(scroll);
+        };
+        if (inventoryMode === 'tv' && isFullscreen) animationFrameId = requestAnimationFrame(scroll);
+        return () => { if(animationFrameId) cancelAnimationFrame(animationFrameId); };
+    }, [inventoryMode, isFullscreen]);
+
     const sortedBuses = [...buses].filter(b => {
         if (!b.number.includes(searchTerm)) return false;
         if (activeFilter === 'Total Fleet') return true;
@@ -165,7 +192,7 @@ export default function FleetManager() {
             <div className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-red-500 animate-in zoom-in-95">
                 <div className="flex justify-center mb-4"><Icons.Shield /></div>
                 <h2 className="text-3xl font-black uppercase italic mb-4">Access Restricted</h2>
-                <p className="opacity-50 font-bold mb-8">Your account is pending administrator approval.</p>
+                <p className="opacity-50 font-bold mb-8">Your account is pending administrator approval. Please check back later.</p>
                 <button onClick={()=>signOut(auth)} className="w-full py-4 bg-[#002d72] rounded-xl font-black uppercase tracking-widest shadow-xl hover:bg-blue-800 transition-colors">Sign Out</button>
             </div>
             <div className="absolute bottom-0 w-full"><Footer onShowLegal={setLegalType} darkMode={true} /></div>
@@ -202,7 +229,7 @@ export default function FleetManager() {
                     <button onClick={exportExcel} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors ${darkMode ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}><Icons.Download /> Export Data</button>
                     <div className="flex gap-2">
                         <button onClick={()=>setDarkMode(!darkMode)} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-slate-800/50 text-yellow-400 border-slate-700/50 hover:bg-slate-700' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
-                        <button onClick={()=>signOut(auth)} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20' : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'}`}>Logout</button>
+                        <button onClick={()=>signOut(auth)} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100'}`}>Logout</button>
                     </div>
                 </div>
             </aside>
@@ -228,6 +255,10 @@ export default function FleetManager() {
                                 ))}
                             </ul>
                         </nav>
+                        <div className={`p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                            <button onClick={exportExcel} className={`w-full flex items-center justify-center gap-2 py-4 mb-3 rounded-xl text-sm font-black uppercase tracking-widest ${darkMode ? 'bg-green-900/40 text-green-400' : 'bg-green-100 text-green-700'}`}><Icons.Download /> Export Data</button>
+                            <button onClick={()=>signOut(auth)} className={`w-full py-4 rounded-xl text-sm font-black uppercase tracking-widest ${darkMode ? 'bg-red-900/20 text-red-500' : 'bg-red-50 text-red-600'}`}>Logout</button>
+                        </div>
                     </div>
                 )}
 
@@ -269,15 +300,15 @@ export default function FleetManager() {
 // --- SUB-COMPONENT: INVENTORY VIEW (Glassmorphism & Pastel Badges) ---
 const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventoryMode, setInventoryMode, activeFilter, setActiveFilter, sortConfig, requestSort, getStatusType, setSelectedBusDetail, toggleFullScreen, isFullscreen, tvBoardRef, darkMode, isAdmin }: any) => {
     
-    // Helper to generate soft pastel badges for status
+    // Helper to generate soft pastel badges for status (True Red)
     const getBadgeStyle = (type: string) => {
         if (type === 'ready') return darkMode ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border border-emerald-200';
         if (type === 'shop') return darkMode ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-200';
-        return darkMode ? 'bg-rose-500/15 text-rose-400 border border-rose-500/20' : 'bg-rose-50 text-rose-700 border border-rose-200';
+        return darkMode ? 'bg-red-500/15 text-red-400 border border-red-500/20' : 'bg-red-50 text-red-700 border border-red-200';
     };
 
     return (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-[1600px] mx-auto">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-[1600px] mx-auto h-full flex flex-col">
             <div className="flex justify-between items-end mb-6">
                 <div>
                     <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Fleet Inventory</h2>
@@ -304,7 +335,7 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                     return (
                         <div key={l} onClick={()=>setActiveFilter(l==='Total'?'Total Fleet':l)} className={`cursor-pointer p-6 rounded-2xl border transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm ${cardBg}`}>
                             <p className={`text-[9px] font-black uppercase tracking-widest mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{l}</p>
-                            <p className={`text-4xl font-black ${l==='Ready'?'text-emerald-500':l==='In Shop'?'text-amber-500':l==='Hold'?'text-rose-500':(darkMode ? 'text-white' : 'text-slate-900')}`}>{count}</p>
+                            <p className={`text-4xl font-black ${l==='Ready'?'text-emerald-500':l==='In Shop'?'text-amber-500':l==='Hold'?'text-red-500':(darkMode ? 'text-white' : 'text-slate-900')}`}>{count}</p>
                         </div>
                     );
                 })}
@@ -319,10 +350,41 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                 </div>
             </div>
             
-            <div className={`rounded-3xl border shadow-xl overflow-hidden min-h-[500px] backdrop-blur-xl ${darkMode ? 'bg-slate-900/50 border-slate-800/50' : 'bg-white/80 border-slate-200/50'}`}>
-                {/* GRID MODE (Premium Glass Cards) */}
+            {/* INVENTORY CONTAINER */}
+            <div className={`rounded-3xl border shadow-xl overflow-hidden backdrop-blur-xl flex-grow flex flex-col ${darkMode ? 'bg-slate-900/50 border-slate-800/50' : 'bg-white/80 border-slate-200/50'}`}>
+                
+                {/* TV MODE */}
+                {inventoryMode === 'tv' && (
+                    <div ref={tvBoardRef} className={`p-4 sm:p-8 overflow-y-auto custom-scrollbar w-full ${isFullscreen ? (darkMode ? 'bg-slate-950 text-white h-screen' : 'bg-slate-50 text-slate-900 h-screen') : 'min-h-[500px]'}`}>
+                        {isFullscreen && (
+                            <div className={`flex justify-between items-end mb-8 border-b-2 pb-6 ${darkMode ? 'border-slate-800' : 'border-slate-300'}`}>
+                                <div><h2 className="text-6xl font-black uppercase tracking-tighter text-[#ef7c00]">Fleet Status Board</h2><p className={`text-2xl font-bold mt-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Total Units: {buses.length} | Down: <span className="text-red-500">{buses.filter((b:any)=>b.status!=='Active').length}</span></p></div>
+                                <button onClick={toggleFullScreen} className="px-10 py-5 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest text-lg shadow-2xl transition-all transform active:scale-95">Exit Fullscreen</button>
+                            </div>
+                        )}
+                        <div className={`grid gap-4 sm:gap-6 pb-20 ${isFullscreen ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5'}`}>
+                            {sortedBuses.map((b: any) => {
+                                const type = getStatusType(b.status);
+                                const cardBg = darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200';
+                                const color = type==='ready'?'text-emerald-500':type==='shop'?'text-amber-500':'text-red-500';
+                                const borderColor = type==='ready'?'border-emerald-500/30':type==='shop'?'border-amber-500/30':'border-red-600/30';
+                                
+                                return (
+                                    <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`cursor-pointer p-5 rounded-2xl flex flex-col justify-between border-[3px] shadow-lg transition-transform hover:scale-105 ${borderColor} ${cardBg}`}>
+                                        <div className="flex justify-between items-start mb-4"><span className={`text-5xl font-black leading-none tracking-tighter ${color}`}>#{b.number}</span><span className={`w-fit px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-sm ${getBadgeStyle(type)}`}>{b.status}</span></div>
+                                        <div className={`text-base font-black mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'Location Unavailable'}</div>
+                                        <div className={`text-sm font-bold leading-relaxed mb-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.notes || 'No active faults recorded.'}</div>
+                                        <div className="mt-auto pt-2">{b.status !== 'Active' && <div className={`text-sm font-black px-3 py-2 rounded-xl text-center tracking-widest ${type==='shop'?'bg-amber-500/10 text-amber-600 border border-amber-500/20':'bg-red-500/10 text-red-500 border border-red-500/20'}`}>DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* GRID MODE */}
                 {inventoryMode === 'grid' && (
-                    <div className="p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-5">
+                    <div className="p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-5 overflow-y-auto custom-scrollbar">
                         {sortedBuses.map((b: any) => {
                             const type = getStatusType(b.status);
                             const cardBg = darkMode ? 'bg-gradient-to-br from-slate-800 to-slate-800/80 border-slate-700 hover:border-slate-500' : 'bg-gradient-to-br from-white to-slate-50/50 border-slate-200 hover:border-slate-300';
@@ -340,7 +402,7 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                                         {b.notes || <span className="italic opacity-50">No active faults recorded.</span>}
                                     </div>
                                     {b.status !== 'Active' && (
-                                        <div className={`mt-auto text-[9px] font-black uppercase tracking-widest px-3 py-2 rounded-lg text-center ${type==='shop'?'bg-amber-500/10 text-amber-600 border border-amber-500/20 dark:text-amber-400':'bg-rose-500/10 text-rose-600 border border-rose-500/20 dark:text-rose-400'}`}>
+                                        <div className={`mt-auto text-[9px] font-black uppercase tracking-widest px-3 py-2 rounded-lg text-center ${type==='shop'?'bg-amber-500/10 text-amber-600 border border-amber-500/20 dark:text-amber-400':'bg-red-500/10 text-red-500 border border-red-500/20 dark:text-red-400'}`}>
                                             Down {calculateDaysOOS(b.oosStartDate)} Days
                                         </div>
                                     )}
@@ -352,9 +414,9 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
 
                 {/* LIST MODE */}
                 {inventoryMode === 'list' && (
-                    <div className="overflow-x-auto custom-scrollbar">
+                    <div className="overflow-x-auto overflow-y-auto flex-grow custom-scrollbar">
                         <table className="w-full text-left text-sm">
-                            <thead className={`font-black uppercase text-[10px] tracking-widest border-b ${darkMode ? 'bg-slate-900/80 text-slate-400 border-slate-700' : 'bg-slate-50/80 text-slate-500 border-slate-200'}`}>
+                            <thead className={`font-black uppercase text-[10px] tracking-widest border-b sticky top-0 z-10 ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                                 <tr>
                                     <th className="p-5 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('number')}>Unit #</th>
                                     <th className="p-5">Status</th>
@@ -372,7 +434,7 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                                             <td className="p-5"><span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${getBadgeStyle(type)}`}>{b.status}</span></td>
                                             <td className="p-5 font-bold text-xs">{b.location || '-'}</td>
                                             <td className="p-5 font-medium text-xs opacity-70 max-w-xs truncate">{b.notes || '-'}</td>
-                                            <td className={`p-5 font-black ${type==='shop'?'text-amber-500':type==='hold'?'text-rose-500':''}`}>{b.status !== 'Active' ? calculateDaysOOS(b.oosStartDate) : '-'}</td>
+                                            <td className={`p-5 font-black ${type==='shop'?'text-amber-500':type==='hold'?'text-red-500':''}`}>{b.status !== 'Active' ? calculateDaysOOS(b.oosStartDate) : '-'}</td>
                                         </tr>
                                     );
                                 })}

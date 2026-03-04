@@ -8,44 +8,7 @@ import { saveAs } from 'file-saver';
 import dynamic from 'next/dynamic';
 import localParts from './partsData.json';
 
-const HAMILTON_FLEET = ["1625","1628","1629","1631","1632","1633","1634","1635","1636","1637","1638","1639","1640","1641","1642","1643","1644","1645","1646","1647","1648","1660","1802","1803","1804","1805","1806","1807","1808","1809","1810","1811","1812","1813","1815","1817","1818","1819","1820","1821","1822","1823","1824","1826","1827","1828","1829","1830","1831","1832","1833","1834","1835","1836","1837","1838","1839","1840","1841","1842","1843","1844","1845","1846","1847","1848","1849","1850","1851","1852","1853","1854","1855","1856","1858","1859","1860","1861","1862","1863","1864","1865","1867","1868","1870","1871","1872","1873","1874","1875","1876","1877","1878","1879","1880","1881","1883","1884","1885","1887","1888","1889","1895","1909","1912","1913","1921","1922","1923","1924","1925","1926","1927","1928","1929","1930","1931","1932","1933","1935","1951","1958","1959","7021","7022","7023","7024","7025","7026","7027","7028","7029","7030","7031","7033","7092","7093","7094","7095","7096","7097","7098","7099","7102","7103","7104","7105","1406","1408","1434","1440","2326","2343","2593"];
-
-// Dispositon Data parsed directly from the Hamilton CSV report provided
-const HAMILTON_ROUTES = [
-    { route: "All Routes", planned: 134, cancelled: 41, delivered: 133, percent: 99.3 },
-    { route: "42 Pryor Road", planned: 4, cancelled: 1, delivered: 3, percent: 75.0 },
-    { route: "49 McDonough Boulevard", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "55 Jonesboro Road", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-    { route: "78 Cleveland Avenue", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "79 Sylvan Hills", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "81 Venetian Hills / Delowe Drive", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-    { route: "82 Camp Creek / South Fulton Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "83 Campleton Road", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "84 Washington Road / Camp Creek Marketplace", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-    { route: "89 Old National Highway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "93 Headland Drive / Main Street", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-    { route: "95 Metropolitan Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "155 Pittsburgh", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-    { route: "162 Myrtle Drive / Alison Court", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-    { route: "172 Sylvan Road / Virginia Avenue", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-    { route: "178 Empire Boulevard", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "180 Roosevelt Highway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "181 Washington Road / Fairburn", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "183 Greenbriar", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "188 Oakley Industrial", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "189 Flat Shoals Road / Scofield Road", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "191 Riverdale / ATL Intl Terminal", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "191 Old Dixie / Tara Boulevard", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "193 Morrow / Jonesboro", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "194 Conley Road / Mt Zion", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "195 Forest Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "197 Battle Creek Road", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "198 Southlake Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-    { route: "295 Metropolitan Campus Express", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-    { route: "800 Lovejoy", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-    { route: "832 Grant Park", planned: 1, cancelled: 0, delivered: 1, percent: 100 }
-];
-
+const HAMILTON_FLEET = "1625,1628,1629,1631,1632,1633,1634,1635,1636,1637,1638,1639,1640,1641,1642,1643,1644,1645,1646,1647,1648,1660,1802,1803,1804,1805,1806,1807,1808,1809,1810,1811,1812,1813,1815,1817,1818,1819,1820,1821,1822,1823,1824,1826,1827,1828,1829,1830,1831,1832,1833,1834,1835,1836,1837,1838,1839,1840,1841,1842,1843,1844,1845,1846,1847,1848,1849,1850,1851,1852,1853,1854,1855,1856,1858,1859,1860,1861,1862,1863,1864,1865,1867,1868,1870,1871,1872,1873,1874,1875,1876,1877,1878,1879,1880,1881,1883,1884,1885,1887,1888,1889,1895,1909,1912,1913,1921,1922,1923,1924,1925,1926,1927,1928,1929,1930,1931,1932,1933,1935,1951,1958,1959,7021,7022,7023,7024,7025,7026,7027,7028,7029,7030,7031,7033,7092,7093,7094,7095,7096,7097,7098,7099,7102,7103,7104,7105,1406,1408,1434,1440,2326,2343,2593".split(',');
 const ADMIN_EMAILS = ['anetowestfield@gmail.com', 'admin@fleetflow.services'];
 
 const BusTracker = dynamic(() => import('./BusTracker'), { ssr: false, loading: () => <div className="flex items-center justify-center h-[50vh] bg-slate-100 rounded-2xl"><div className="w-12 h-12 border-4 border-[#002d72] border-t-transparent rounded-full animate-spin"></div></div> });
@@ -63,12 +26,9 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
 const LegalModal = ({ type, onClose, darkMode }: { type: 'privacy'|'about', onClose: ()=>void, darkMode: boolean }) => (
     <div className="fixed inset-0 z-[9000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in-95">
         <div className={`p-8 rounded-2xl w-full max-w-lg shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
-            <div className="flex justify-between items-center mb-6 border-b pb-4 border-slate-500/20">
-                <h3 className={`text-2xl font-black uppercase italic ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>{type === 'privacy' ? 'Privacy Policy' : 'About Us'}</h3>
-                <button onClick={onClose} className="text-2xl font-bold hover:text-red-500">✕</button>
-            </div>
-            <p className="font-medium leading-relaxed text-sm opacity-90">{type === 'privacy' ? "LLC Fleetflow Transit Solutions values your privacy. We collect minimal data necessary for internal fleet management, diagnostic tracking, and attendance coordination. We do not sell or share your data with unauthorized third parties. All data is securely handled via industry-standard encrypted databases." : "LLC Fleetflow Transit Solutions is dedicated to modernizing fleet operations. Our management systems provide real-time tracking, inventory analytics, and seamless personnel coordination to keep your transit systems moving safely and efficiently. Built for reliability and high visibility on the shop floor."}</p>
-            <button onClick={onClose} className="mt-8 w-full py-3 bg-[#002d72] text-white rounded-xl font-black uppercase tracking-widest hover:bg-[#ef7c00] shadow-lg">Acknowledge & Close</button>
+            <div className="flex justify-between items-center mb-6 border-b pb-4 border-slate-500/20"><h3 className={`text-2xl font-black uppercase italic ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>{type === 'privacy' ? 'Privacy Policy' : 'About Us'}</h3><button onClick={onClose} className="text-2xl font-bold hover:text-red-500">✕</button></div>
+            <p className="font-medium leading-relaxed text-sm opacity-90">{type === 'privacy' ? "LLC Fleetflow Transit Solutions values your privacy. We collect minimal data necessary for internal fleet management, diagnostic tracking, and attendance coordination. We do not sell or share your data with unauthorized third parties." : "LLC Fleetflow Transit Solutions is dedicated to modernizing fleet operations. Our management systems provide real-time tracking, inventory analytics, and seamless personnel coordination to keep your transit systems moving safely and efficiently."}</p>
+            <button onClick={onClose} className="mt-8 w-full py-3 bg-[#002d72] text-white rounded-xl font-black uppercase tracking-widest hover:bg-[#ef7c00] shadow-lg transition-colors">Acknowledge & Close</button>
         </div>
     </div>
 );
@@ -76,16 +36,13 @@ const LegalModal = ({ type, onClose, darkMode }: { type: 'privacy'|'about', onCl
 const Footer = ({ onShowLegal, darkMode }: { onShowLegal: (type: 'privacy'|'about')=>void, darkMode?: boolean }) => (
     <div className={`w-full py-6 text-center text-[10px] font-bold tracking-widest uppercase mt-auto border-t ${darkMode ? 'border-slate-800 text-slate-500 bg-slate-900' : 'border-slate-200 text-slate-400 bg-slate-100'}`}>
         <p>© {new Date().getFullYear()} LLC Fleetflow Transit Solutions.</p>
-        <div className="flex justify-center gap-6 mt-3">
-            <button onClick={() => onShowLegal('privacy')} className={`transition-colors ${darkMode ? 'hover:text-white' : 'hover:text-[#002d72]'}`}>Privacy Policy</button>
-            <button onClick={() => onShowLegal('about')} className={`transition-colors ${darkMode ? 'hover:text-white' : 'hover:text-[#002d72]'}`}>About Us</button>
-        </div>
+        <div className="flex justify-center gap-6 mt-3"><button onClick={() => onShowLegal('privacy')} className={`transition-colors ${darkMode ? 'hover:text-white' : 'hover:text-[#002d72]'}`}>Privacy Policy</button><button onClick={() => onShowLegal('about')} className={`transition-colors ${darkMode ? 'hover:text-white' : 'hover:text-[#002d72]'}`}>About Us</button></div>
     </div>
 );
 
 const logActivity = async (userEmail: string, category: string, target: string, action: string, details: string) => {
     if (!userEmail) return;
-    try { await addDoc(collection(db, "activity_logs"), { user: userEmail, category, target, action, details, timestamp: serverTimestamp() }); } catch(e) { console.error(e); }
+    try { await addDoc(collection(db, "activity_logs"), { user: userEmail, category, target, action, details, timestamp: serverTimestamp() }); } catch(e) {}
 };
 
 const logHistory = async (busNumber: string, action: string, details: string, userEmail: string) => {
@@ -93,12 +50,168 @@ const logHistory = async (busNumber: string, action: string, details: string, us
     try { 
         await addDoc(collection(db, "buses", busNumber, "history"), { action, details, user: userEmail, timestamp: serverTimestamp() }); 
         await logActivity(userEmail, 'BUS', `Bus #${busNumber}`, action, details);
-    } catch (err) { console.error(err); }
+    } catch (err) {}
 };
 
 const formatTime = (ts: any) => ts ? (ts.toDate ? ts.toDate() : new Date(ts)).toLocaleString() : 'Just now';
 const getBusSpecs = (num: string) => parseInt(num) > 1950 && parseInt(num) < 1960 ? { length: "30'" } : parseInt(num) < 1936 ? { length: "35'" } : { length: "40'" };
 const calculateDaysOOS = (start: string) => start ? Math.max(0, Math.ceil((new Date().getTime() - new Date(start).getTime()) / (1000 * 3600 * 24))) : 0;
+
+// --- ROUTE DISPOSITION REPORT ---
+const DispositionReport = ({ showToast, darkMode, isAdmin }: { showToast: any, darkMode: boolean, isAdmin: boolean }) => {
+    const [routes, setRoutes] = useState<any[]>([]);
+    const [editRoute, setEditRoute] = useState<any>(null);
+    const [editForm, setEditForm] = useState({ planned: 0, cancelled: 0, unscheduled: 0 });
+
+    const INITIAL_ROUTES = [
+        { route: "42 Pryor Road", planned: 4, cancelled: 1, unscheduled: 0 },
+        { route: "49 McDonough Boulevard", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "55 Jonesboro Road", planned: 1, cancelled: 0, unscheduled: 0 },
+        { route: "78 Cleveland Avenue", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "79 Sylvan Hills", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "81 Venetian Hills / Delowe Drive", planned: 1, cancelled: 0, unscheduled: 0 },
+        { route: "82 Camp Creek / South Fulton Pkwy", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "83 Campleton Road", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "84 Washington Road / Camp Creek", planned: 1, cancelled: 0, unscheduled: 0 },
+        { route: "89 Old National Highway", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "93 Headland Drive / Main Street", planned: 1, cancelled: 0, unscheduled: 0 },
+        { route: "95 Metropolitan Parkway", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "155 Pittsburgh", planned: 1, cancelled: 0, unscheduled: 0 },
+        { route: "162 Myrtle Drive / Alison Court", planned: 1, cancelled: 0, unscheduled: 0 },
+        { route: "172 Sylvan Road / Virginia Avenue", planned: 1, cancelled: 0, unscheduled: 0 },
+        { route: "178 Empire Boulevard", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "180 Roosevelt Highway", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "181 Washington Road / Fairburn", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "183 Greenbriar", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "188 Oakley Industrial", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "189 Flat Shoals Road / Scofield Road", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "191 Riverdale / ATL Intl Terminal", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "191 Old Dixie / Tara Boulevard", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "193 Morrow / Jonesboro", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "194 Conley Road / Mt Zion", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "195 Forest Parkway", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "197 Battle Creek Road", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "198 Southlake Parkway", planned: 6, cancelled: 2, unscheduled: 2 },
+        { route: "295 Metropolitan Campus Express", planned: 1, cancelled: 0, unscheduled: 0 },
+        { route: "800 Lovejoy", planned: 1, cancelled: 0, unscheduled: 0 },
+        { route: "832 Grant Park", planned: 1, cancelled: 0, unscheduled: 0 }
+    ];
+
+    useEffect(() => {
+        return onSnapshot(collection(db, "route_disposition"), (snap) => {
+            const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            fetched.sort((a:any,b:any) => a.route.localeCompare(b.route, undefined, {numeric: true}));
+            setRoutes(fetched);
+        });
+    }, []);
+
+    const initializeRoutes = async () => {
+        if (!confirm("Load default Hamilton routes?")) return;
+        const batch = writeBatch(db);
+        INITIAL_ROUTES.forEach(r => {
+            const ref = doc(collection(db, "route_disposition"));
+            batch.set(ref, r);
+        });
+        await batch.commit();
+        showToast("Routes Initialized", "success");
+    };
+
+    const handleSave = async () => {
+        if (!editRoute) return;
+        try {
+            await updateDoc(doc(db, "route_disposition", editRoute.id), {
+                planned: Number(editForm.planned),
+                cancelled: Number(editForm.cancelled),
+                unscheduled: Number(editForm.unscheduled)
+            });
+            showToast(`Updated ${editRoute.route}`, "success");
+            setEditRoute(null);
+        } catch(e) {
+            showToast("Failed to save", "error");
+        }
+    };
+
+    const totals = useMemo(() => {
+        let planned = 0, cancelled = 0, unscheduled = 0;
+        routes.forEach(r => {
+            planned += (Number(r.planned) || 0);
+            cancelled += (Number(r.cancelled) || 0);
+            unscheduled += (Number(r.unscheduled) || 0);
+        });
+        const delivered = planned - cancelled + unscheduled;
+        const percent = planned === 0 ? 0 : Math.round((delivered / Math.max(planned, 1)) * 100);
+        return { planned, cancelled, unscheduled, delivered, percent };
+    }, [routes]);
+
+    const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
+    const inputClass = darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-black';
+
+    return (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col space-y-6">
+            <div className="flex justify-between items-end mb-2">
+                <div>
+                    <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Route Disposition</h2>
+                    <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Hamilton (C) • Fleet Delivery</p>
+                </div>
+                {isAdmin && routes.length === 0 && (
+                    <button onClick={initializeRoutes} className="px-6 py-2 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md transition-transform active:scale-95">Init Routes</button>
+                )}
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className={`p-4 rounded-2xl border shadow-sm ${bgClass}`}><p className="text-[9px] font-black uppercase opacity-50 mb-1">Total Planned</p><p className="text-3xl font-black text-[#002d72]">{totals.planned}</p></div>
+                <div className={`p-4 rounded-2xl border shadow-sm ${bgClass}`}><p className="text-[9px] font-black uppercase opacity-50 mb-1">Less Cancelled</p><p className="text-3xl font-black text-red-500">{totals.cancelled}</p></div>
+                <div className={`p-4 rounded-2xl border shadow-sm ${bgClass}`}><p className="text-[9px] font-black uppercase opacity-50 mb-1">Unscheduled</p><p className="text-3xl font-black text-blue-500">{totals.unscheduled}</p></div>
+                <div className={`p-4 rounded-2xl border shadow-sm ${bgClass}`}><p className="text-[9px] font-black uppercase opacity-50 mb-1">Total Delivered</p><p className="text-3xl font-black text-green-500">{totals.delivered}</p></div>
+                <div className={`p-4 rounded-2xl border shadow-sm ${bgClass}`}><p className="text-[9px] font-black uppercase opacity-50 mb-1">Delivery %</p><p className="text-3xl font-black text-[#ef7c00]">{totals.percent}%</p></div>
+            </div>
+
+            <div className={`rounded-2xl shadow-lg border overflow-hidden flex flex-col ${bgClass}`}>
+                <div className="overflow-x-auto flex-grow custom-scrollbar">
+                    <table className="w-full text-left text-sm">
+                        <thead className={`font-black uppercase text-[10px] tracking-widest border-b ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                            <tr><th className="p-4">Route</th><th className="p-4 text-center">Planned/Req</th><th className="p-4 text-center">Less Cancelled</th><th className="p-4 text-center">Unscheduled</th><th className="p-4 text-center">Delivered</th><th className="p-4 text-center">Delivery %</th></tr>
+                        </thead>
+                        <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
+                            {routes.map((r) => {
+                                const delivered = (Number(r.planned) || 0) - (Number(r.cancelled) || 0) + (Number(r.unscheduled) || 0);
+                                const percent = (Number(r.planned) || 0) === 0 ? 0 : Math.round((delivered / (Number(r.planned) || 0)) * 100);
+                                return (
+                                    <tr key={r.id} onClick={() => { setEditRoute(r); setEditForm({ planned: r.planned, cancelled: r.cancelled, unscheduled: r.unscheduled || 0 }); }} className={`cursor-pointer transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}`}>
+                                        <td className="p-4 font-bold">{r.route}</td>
+                                        <td className="p-4 text-center font-black">{r.planned}</td>
+                                        <td className="p-4 text-center font-black text-red-500">{r.cancelled}</td>
+                                        <td className="p-4 text-center font-black text-blue-500">{r.unscheduled || 0}</td>
+                                        <td className="p-4 text-center font-black text-green-500">{delivered}</td>
+                                        <td className="p-4 text-center"><span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${percent >= 100 ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>{percent}%</span></td>
+                                    </tr>
+                                );
+                            })}
+                            {routes.length === 0 && <tr><td colSpan={6} className="p-8 text-center italic opacity-50">No routes found. Admin: Click 'Init Routes'.</td></tr>}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {editRoute && (
+                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in-95">
+                    <div className={`p-8 rounded-2xl w-full max-w-md shadow-2xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-black'}`}>
+                        <div className="flex justify-between items-center mb-6 border-b pb-4 border-slate-500/20">
+                            <h3 className={`text-2xl font-black uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>{editRoute.route}</h3>
+                            <button onClick={() => setEditRoute(null)} className="text-2xl font-bold hover:text-red-500">✕</button>
+                        </div>
+                        <div className="space-y-4 mb-6">
+                            <div><label className="text-[10px] font-black uppercase tracking-widest opacity-50">Planned / Required</label><input type="number" className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={editForm.planned} onChange={e => setEditForm({...editForm, planned: Number(e.target.value)})} /></div>
+                            <div><label className="text-[10px] font-black uppercase tracking-widest opacity-50">Less Cancelled</label><input type="number" className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-red-500 ${inputClass}`} value={editForm.cancelled} onChange={e => setEditForm({...editForm, cancelled: Number(e.target.value)})} /></div>
+                            <div><label className="text-[10px] font-black uppercase tracking-widest opacity-50">Unscheduled (Extras)</label><input type="number" className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-blue-500 ${inputClass}`} value={editForm.unscheduled} onChange={e => setEditForm({...editForm, unscheduled: Number(e.target.value)})} /></div>
+                        </div>
+                        <div className="flex gap-4"><button onClick={() => setEditRoute(null)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs transition-colors ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-100 hover:bg-slate-200 text-black'}`}>Cancel</button><button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-xl font-black uppercase text-xs shadow-lg transition-colors">Save Route</button></div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptions }: { bus: any; onClose: () => void; showToast: any, darkMode: boolean, isAdmin: boolean, statusOptions: any[] }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -153,15 +266,12 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptio
 
     if (showHistory) return (
         <div className={`p-6 rounded-xl shadow-2xl w-full max-w-lg h-[600px] flex flex-col animate-in zoom-in-95 border ${bgClass}`}>
-            <div className={`flex justify-between items-center mb-4 border-b pb-4 font-black uppercase ${statusColorText}`}>
-                <span>History: #{bus.number}</span><button onClick={()=>setShowHistory(false)} className="text-xs hover:underline">Back</button>
-            </div>
+            <div className={`flex justify-between items-center mb-4 border-b pb-4 font-black uppercase ${statusColorText}`}><span>History: #{bus.number}</span><button onClick={()=>setShowHistory(false)} className="text-xs hover:underline">Back</button></div>
             <div className="flex-grow overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                 {historyLogs.map(l => (
                     <div key={l.id} className={`p-3 rounded-lg border relative group ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
                         <div className={`flex justify-between text-[8px] font-black uppercase mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}><span>{l.action}</span><span>{formatTime(l.timestamp)}</span></div>
-                        <p className="text-xs font-bold whitespace-pre-wrap leading-tight">{l.details}</p>
-                        <p className="text-[8px] font-black uppercase mt-2 opacity-30">{l.user}</p>
+                        <p className="text-xs font-bold whitespace-pre-wrap leading-tight">{l.details}</p><p className="text-[8px] font-black uppercase mt-2 opacity-30">{l.user}</p>
                         {isAdmin && <button onClick={() => handleDeleteLog(l.id)} className="absolute top-2 right-2 text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold">DELETE</button>}
                     </div>
                 ))}
@@ -185,41 +295,23 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptio
                 <div>Exp Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div>
                 <div>Act Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div>
             </div>
-            <div className="flex gap-4">
-                <button onClick={()=>setIsEditing(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs transition-colors ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-100 hover:bg-slate-200 text-black'}`}>Cancel</button>
-                <button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-xl font-black uppercase text-xs shadow-lg transition-colors">Save Changes</button>
-            </div>
+            <div className="flex gap-4"><button onClick={()=>setIsEditing(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs transition-colors ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-100 hover:bg-slate-200 text-black'}`}>Cancel</button><button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-xl font-black uppercase text-xs shadow-lg transition-colors">Save Changes</button></div>
         </div>
     );
 
     return (
         <div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}>
             <div className="flex justify-between items-start mb-6 border-b border-slate-500/20 pb-4">
-                <div>
-                    <h3 className={`text-4xl font-black italic uppercase ${statusColorText}`}>Bus #{bus.number}</h3>
-                    <span className={`inline-block mt-2 px-3 py-1 rounded-full text-[10px] font-black uppercase text-white shadow-sm ${statusColorBadge}`}>{bus.status}</span>
-                </div>
-                <div className="flex gap-2 items-start">
-                    <button onClick={handleResetBus} className="text-red-500 text-xs font-black uppercase border border-red-500/30 bg-red-500/10 px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-colors">Reset</button>
-                    <button onClick={onClose} className="text-slate-400 text-2xl font-bold hover:text-slate-500 transition-colors ml-2">✕</button>
-                </div>
+                <div><h3 className={`text-4xl font-black italic uppercase ${statusColorText}`}>Bus #{bus.number}</h3><span className={`inline-block mt-2 px-3 py-1 rounded-full text-[10px] font-black uppercase text-white shadow-sm ${statusColorBadge}`}>{bus.status}</span></div>
+                <div className="flex gap-2 items-start"><button onClick={handleResetBus} className="text-red-500 text-xs font-black uppercase border border-red-500/30 bg-red-500/10 px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-colors">Reset</button><button onClick={onClose} className="text-slate-400 text-2xl font-bold hover:text-slate-500 transition-colors ml-2">✕</button></div>
             </div>
-            <div className={`p-4 rounded-xl mb-6 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-50'}`}>
-                <p className="text-[10px] font-black uppercase mb-2 opacity-50">Fault Details</p>
-                <p className="text-lg font-medium">{bus.notes || "No active faults."}</p>
-            </div>
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className={`p-4 rounded-xl mb-6 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-50'}`}><p className="text-[10px] font-black uppercase mb-2 opacity-50">Fault Details</p><p className="text-lg font-medium">{bus.notes || "No active faults."}</p></div>
+            <div className={`grid grid-cols-3 gap-4 mb-6`}>
                 <div><p className="text-[9px] font-black uppercase opacity-50">OOS Date</p><p className="text-xl font-black text-[#002d72]">{bus.oosStartDate || '--'}</p></div>
                 <div><p className="text-[9px] font-black uppercase opacity-50">Exp Return</p><p className="text-xl font-black text-[#ef7c00]">{bus.expectedReturnDate || '--'}</p></div>
                 <div><p className="text-[9px] font-black uppercase opacity-50">Act Return</p><p className="text-xl font-black text-green-500">{bus.actualReturnDate || '--'}</p></div>
             </div>
-            <div className="flex justify-between pt-6 border-t border-slate-500/20">
-                <button onClick={()=>setShowHistory(true)} className={`px-5 py-3 rounded-lg text-[10px] font-black uppercase transition-colors ${darkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-100 hover:bg-slate-200'}`}>📜 History</button>
-                <div className="flex gap-3">
-                    <button onClick={()=>setIsEditing(true)} className={`px-8 py-3 rounded-lg text-[10px] font-black uppercase transition-colors ${darkMode ? 'bg-slate-700 text-[#ef7c00] hover:bg-slate-600' : 'bg-slate-100 text-[#002d72] hover:bg-slate-200'}`}>Edit</button>
-                    <button onClick={onClose} className="px-8 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-lg text-[10px] font-black uppercase transition-colors shadow-md">Close</button>
-                </div>
-            </div>
+            <div className="flex justify-between pt-6 border-t border-slate-500/20"><button onClick={()=>setShowHistory(true)} className={`px-5 py-3 rounded-lg text-[10px] font-black uppercase transition-colors ${darkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-100 hover:bg-slate-200'}`}>📜 History</button><div className="flex gap-3"><button onClick={()=>setIsEditing(true)} className={`px-8 py-3 rounded-lg text-[10px] font-black uppercase transition-colors ${darkMode ? 'bg-slate-700 text-[#ef7c00] hover:bg-slate-600' : 'bg-slate-100 text-[#002d72] hover:bg-slate-200'}`}>Edit</button><button onClick={onClose} className="px-8 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-lg text-[10px] font-black uppercase transition-colors shadow-md">Close</button></div></div>
         </div>
     );
 };
@@ -412,10 +504,8 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
         const rollingIncidents = (selectedEmp.incidents || []).filter((inc:any) => new Date(inc.date) >= oneYearAgo).sort((a:any, b:any) => new Date(a.date).getTime() - new Date(b.date).getTime());
         let activePoints = 0; let incidentListHTML = "";
         rollingIncidents.forEach((inc: any, index: number) => {
-            const points = parseInt(inc.count) || 0; activePoints += points;
-            const d = new Date(inc.date);
-            const formattedDate = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
-            incidentListHTML += `<p style="margin:0; margin-left: 60pt; font-family: 'Arial'; font-size: 10pt;">${index + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${formattedDate} - ${inc.type}</p>`;
+            const points = parseInt(inc.count) || 0; activePoints += points; const d = new Date(inc.date);
+            incidentListHTML += `<p style="margin:0; margin-left: 60pt; font-family: 'Arial'; font-size: 10pt;">${index + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()} - ${inc.type}</p>`;
         });
         let dL = activePoints >= 6 ? "Discharge" : activePoints >= 5 ? "Final Written Warning" : activePoints >= 4 ? "Written Warning" : activePoints >= 3 ? "Verbal Warning" : "None";
         const parts = selectedEmp.name.split(' '); const fN = parts.length > 1 ? `${parts[parts.length-1]}, ${parts[0]}` : selectedEmp.name;
@@ -827,228 +917,6 @@ const ShiftHandover = ({ buses, showToast }: { buses: any[], showToast: any }) =
     );
 };
 
-// --- NEW COMPONENT: ROUTE DISPOSITION REPORT ---
-const DispositionReport = ({ darkMode }: { darkMode: boolean }) => {
-    const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
-    
-    const HAMILTON_ROUTES = [
-        { route: "All Routes", planned: 134, cancelled: 41, delivered: 133, percent: 99.3 },
-        { route: "42 Pryor Road", planned: 4, cancelled: 1, delivered: 3, percent: 75.0 },
-        { route: "49 McDonough Boulevard", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "55 Jonesboro Road", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-        { route: "78 Cleveland Avenue", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "79 Sylvan Hills", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "81 Venetian Hills / Delowe Drive", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-        { route: "82 Camp Creek / South Fulton Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "83 Campleton Road", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "84 Washington Road / Camp Creek Marketplace", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-        { route: "89 Old National Highway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "93 Headland Drive / Main Street", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-        { route: "95 Metropolitan Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "155 Pittsburgh", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-        { route: "162 Myrtle Drive / Alison Court", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-        { route: "172 Sylvan Road / Virginia Avenue", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-        { route: "178 Empire Boulevard", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "180 Roosevelt Highway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "181 Washington Road / Fairburn", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "183 Greenbriar", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "188 Oakley Industrial", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "189 Flat Shoals Road / Scofield Road", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "191 Riverdale / ATL Intl Terminal", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "191 Old Dixie / Tara Boulevard", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "193 Morrow / Jonesboro", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "194 Conley Road / Mt Zion", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "195 Forest Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "197 Battle Creek Road", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "198 Southlake Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
-        { route: "295 Metropolitan Campus Express", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-        { route: "800 Lovejoy", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
-        { route: "832 Grant Park", planned: 1, cancelled: 0, delivered: 1, percent: 100 }
-    ];
-
-    const allRoutes = HAMILTON_ROUTES[0];
-    const specificRoutes = HAMILTON_ROUTES.slice(1);
-
-    return (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col space-y-6">
-            <div className="flex justify-between items-end mb-2">
-                <div>
-                    <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Route Disposition</h2>
-                    <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Hamilton (C) • Nov 17, 2019 Forecast</p>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className={`p-6 rounded-2xl border shadow-sm ${bgClass}`}>
-                    <p className="text-[10px] font-black uppercase opacity-50 mb-1">Total Planned</p>
-                    <p className="text-4xl font-black text-[#002d72]">{allRoutes.planned}</p>
-                </div>
-                <div className={`p-6 rounded-2xl border shadow-sm ${bgClass}`}>
-                    <p className="text-[10px] font-black uppercase opacity-50 mb-1">Total Cancelled</p>
-                    <p className="text-4xl font-black text-red-500">{allRoutes.cancelled}</p>
-                </div>
-                <div className={`p-6 rounded-2xl border shadow-sm ${bgClass}`}>
-                    <p className="text-[10px] font-black uppercase opacity-50 mb-1">Total Delivered</p>
-                    <p className="text-4xl font-black text-green-500">{allRoutes.delivered}</p>
-                </div>
-                <div className={`p-6 rounded-2xl border shadow-sm ${bgClass}`}>
-                    <p className="text-[10px] font-black uppercase opacity-50 mb-1">Delivery %</p>
-                    <p className="text-4xl font-black text-[#ef7c00]">{allRoutes.percent}%</p>
-                </div>
-            </div>
-
-            <div className={`rounded-2xl shadow-lg border overflow-hidden flex flex-col ${bgClass}`}>
-                <div className="overflow-x-auto flex-grow custom-scrollbar">
-                    <table className="w-full text-left text-sm">
-                        <thead className={`font-black uppercase text-[10px] tracking-widest border-b ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                            <tr>
-                                <th className="p-4">Route</th>
-                                <th className="p-4 text-center">Planned</th>
-                                <th className="p-4 text-center">Cancelled</th>
-                                <th className="p-4 text-center">Delivered</th>
-                                <th className="p-4 text-center">Delivery %</th>
-                            </tr>
-                        </thead>
-                        <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                            {specificRoutes.map((r, i) => (
-                                <tr key={i} className={`transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}`}>
-                                    <td className="p-4 font-bold">{r.route}</td>
-                                    <td className="p-4 text-center font-black">{r.planned}</td>
-                                    <td className="p-4 text-center font-black text-red-500">{r.cancelled}</td>
-                                    <td className="p-4 text-center font-black text-green-500">{r.delivered}</td>
-                                    <td className="p-4 text-center">
-                                        <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${r.percent === 100 ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
-                                            {r.percent}%
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { showToast: any, darkMode: boolean, buses: any[], isAdmin: boolean, statusOptions: any[] }) => {
-    const [formData, setFormData] = useState({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
-    const [showAddModal, setShowAddModal] = useState(false);
-    const [newBusData, setNewBusData] = useState({ number: '', status: 'Active' });
-
-    const handleChange = (e: any) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    const handleDateClick = (e: any) => e.target.showPicker?.();
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault(); 
-        const todayStr = new Date().toISOString().split('T')[0];
-        
-        if (formData.oosStartDate) {
-            if (formData.oosStartDate > todayStr) return showToast("Out of Service date cannot be a future date", 'error');
-            if (formData.expectedReturnDate && formData.expectedReturnDate < formData.oosStartDate) return showToast("Expected Return cannot be earlier than OOS Date", 'error');
-            if (formData.actualReturnDate && formData.actualReturnDate < formData.oosStartDate) return showToast("Actual Return cannot be earlier than OOS Date", 'error');
-        }
-
-        const busRef = doc(db, "buses", formData.number); const busSnap = await getDoc(busRef);
-        if (!busSnap.exists()) return showToast(`⛔ Bus #${formData.number} not found. Please add it first.`, 'error');
-        
-        const old = busSnap.data(); let changes = []; 
-        if (old.status !== formData.status) changes.push(`STATUS: ${old.status} ➝ ${formData.status}`); 
-        if (old.notes !== formData.notes) changes.push(`NOTES: "${old.notes || ''}" ➝ "${formData.notes}"`); 
-        if (old.oosStartDate !== formData.oosStartDate) changes.push(`OOS: ${old.oosStartDate || '—'} ➝ ${formData.oosStartDate}`);
-        
-        await setDoc(busRef, { ...formData, timestamp: serverTimestamp() }, { merge: true });
-        await logHistory(formData.number, "UPDATE", changes.length > 0 ? changes.join('\n') : "Routine Update via Terminal", auth.currentUser?.email || 'Unknown');
-        showToast(`Bus #${formData.number} Updated`, 'success'); 
-        setFormData({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
-    };
-
-    const handleAddNewBus = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newBusData.number) return showToast("Bus number required", 'error');
-        const busRef = doc(db, "buses", newBusData.number);
-        const snap = await getDoc(busRef);
-        if (snap.exists()) return showToast(`⛔ Bus #${newBusData.number} already exists!`, 'error');
-
-        await setDoc(busRef, { number: newBusData.number, status: newBusData.status, location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', timestamp: serverTimestamp() });
-        await logHistory(newBusData.number, "CREATED", "Bus added to registry.", auth.currentUser?.email || 'Unknown');
-        showToast(`Bus #${newBusData.number} Added`, 'success');
-        setShowAddModal(false); setNewBusData({ number: '', status: 'Active' });
-    };
-
-    const populateFleet = async () => {
-        if (!confirm(`Initialize database with ${HAMILTON_FLEET.length} Hamilton buses?`)) return;
-        const existingBusNumbers = new Set(buses.map(b => b.number));
-        const batch = writeBatch(db);
-        let count = 0;
-        for (const b of HAMILTON_FLEET) {
-            if (!existingBusNumbers.has(b)) {
-                batch.set(doc(db, "buses", b), { number: b, status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', timestamp: serverTimestamp() });
-                count++;
-            }
-        }
-        if (count > 0) { await batch.commit(); showToast(`Added ${count} missing buses!`, 'success'); } 
-        else showToast("All Hamilton buses already in system.", 'success');
-    };
-
-    const resetAllFleet = async () => {
-        if (!confirm("⚠️ Master Reset: Set all buses to Active?")) return;
-        showToast("Resetting fleet... please wait.", "success");
-        for (let i = 0; i < buses.length; i += 250) {
-            await Promise.all(buses.slice(i, i + 250).map(bus => 
-                updateDoc(doc(db, "buses", bus.docId), { status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', timestamp: serverTimestamp() }).catch(e => console.error(e))
-            ));
-        }
-        await logActivity(auth.currentUser?.email || 'Unknown', 'SYSTEM', 'Entire Fleet', 'UPDATE', 'Master Reset triggered.');
-        showToast("Fleet successfully reset.", 'success');
-    };
-
-    const inputClass = darkMode ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-black placeholder:text-gray-400';
-    
-    return (
-        <div className={`max-w-2xl mx-auto mt-4 md:mt-10 p-6 md:p-8 rounded-2xl shadow-xl border-t-8 border-[#ef7c00] animate-in slide-in-from-bottom-4 duration-500 ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
-            <div className="flex justify-between items-end mb-8 flex-wrap gap-4">
-                <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Data Entry</h2>
-                <div className="flex gap-2 flex-wrap">
-                    {isAdmin && <button type="button" onClick={resetAllFleet} className="px-3 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all bg-red-600 hover:bg-red-700 text-white shadow-md">🚨 Reset Fleet</button>}
-                    {isAdmin && <button type="button" onClick={populateFleet} className={`px-3 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest border transition-all ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-[#002d72]'}`}>⚙️ Init Fleet</button>}
-                    <button type="button" onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-black uppercase text-[10px] tracking-widest shadow-md transition-all">+ Add Bus</button>
-                </div>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-2 gap-6">
-                    <input type="text" placeholder="Unit # to Update" className={`p-4 border-2 rounded-xl font-black outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.number} onChange={handleChange} name="number" required />
-                    <select className={`p-4 border-2 rounded-xl font-bold outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.status} onChange={handleChange} name="status">
-                        <option value="Active">Ready for Service</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option>
-                        {statusOptions.map((opt, i) => <option key={i} value={opt.label}>{opt.label}</option>)}
-                    </select>
-                </div>
-                <input type="text" placeholder="Location" className={`w-full p-4 border-2 rounded-xl outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.location} onChange={handleChange} name="location" />
-                <textarea placeholder="Maintenance Notes" className={`w-full p-4 border-2 rounded-xl h-24 outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.notes} onChange={handleChange} name="notes" />
-                <div className="grid grid-cols-3 gap-4">
-                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>OOS Date</label><input name="oosStartDate" type="date" onClick={handleDateClick} max={new Date().toISOString().split('T')[0]} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.oosStartDate} onChange={handleChange} /></div>
-                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Exp Return</label><input name="expectedReturnDate" type="date" onClick={handleDateClick} min={formData.oosStartDate} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.expectedReturnDate} onChange={handleChange} /></div>
-                    <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Act Return</label><input name="actualReturnDate" type="date" onClick={handleDateClick} min={formData.oosStartDate} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.actualReturnDate} onChange={handleChange} /></div>
-                </div>
-                <button className="w-full py-4 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase tracking-widest transition-transform active:scale-95 shadow-lg">Update Record</button>
-            </form>
-
-            {showAddModal && (
-                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className={`p-8 rounded-xl shadow-2xl w-full max-w-md border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                        <h3 className={`text-2xl font-black mb-6 uppercase italic ${darkMode ? 'text-white' : 'text-[#002d72]'}`}>Add New Bus</h3>
-                        <form onSubmit={handleAddNewBus} className="space-y-4">
-                            <div><label className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unit Number *</label><input type="text" className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={newBusData.number} onChange={e => setNewBusData({...newBusData, number: e.target.value})} required placeholder="e.g., 2001" /></div>
-                            <div><label className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Initial Status</label><select className={`w-full p-3 mt-1 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={newBusData.status} onChange={e => setNewBusData({...newBusData, status: e.target.value})}><option value="Active">Ready for Service</option><option value="On Hold">On Hold</option><option value="In Shop">In Shop</option><option value="Engine">Engine</option><option value="Body Shop">Body Shop</option><option value="Vendor">Vendor</option><option value="Brakes">Brakes</option><option value="Safety">Safety</option>{statusOptions.map((opt, i) => <option key={i} value={opt.label}>{opt.label}</option>)}</select></div>
-                            <div className="flex gap-4 mt-8"><button type="button" onClick={() => setShowAddModal(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs transition-colors ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-100 hover:bg-slate-200 text-black'}`}>Cancel</button><button type="submit" className="w-1/2 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black uppercase text-xs shadow-lg transition-transform active:scale-95">Save Bus</button></div>
-                        </form>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
 export default function FleetManager() {
     const [user, setUser] = useState<any>(null);
     const [isSignUp, setIsSignUp] = useState(false);
@@ -1228,7 +1096,7 @@ export default function FleetManager() {
                  view === 'parts' ? <PartsInventory showToast={showToast} darkMode={darkMode} /> :
                  view === 'handover' ? <ShiftHandover buses={buses} showToast={showToast} /> :
                  view === 'personnel' ? <PersonnelManager showToast={showToast} darkMode={darkMode} /> :
-                 view === 'disposition' ? <DispositionReport darkMode={darkMode} /> :
+                 view === 'disposition' ? <DispositionReport showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} /> :
                  view === 'tracker' ? <div className={`h-[85vh] rounded-2xl border shadow-sm overflow-hidden relative ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}><BusTracker /></div> : (
                     <>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">

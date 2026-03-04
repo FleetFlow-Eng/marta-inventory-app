@@ -9,6 +9,43 @@ import dynamic from 'next/dynamic';
 import localParts from './partsData.json';
 
 const HAMILTON_FLEET = ["1625","1628","1629","1631","1632","1633","1634","1635","1636","1637","1638","1639","1640","1641","1642","1643","1644","1645","1646","1647","1648","1660","1802","1803","1804","1805","1806","1807","1808","1809","1810","1811","1812","1813","1815","1817","1818","1819","1820","1821","1822","1823","1824","1826","1827","1828","1829","1830","1831","1832","1833","1834","1835","1836","1837","1838","1839","1840","1841","1842","1843","1844","1845","1846","1847","1848","1849","1850","1851","1852","1853","1854","1855","1856","1858","1859","1860","1861","1862","1863","1864","1865","1867","1868","1870","1871","1872","1873","1874","1875","1876","1877","1878","1879","1880","1881","1883","1884","1885","1887","1888","1889","1895","1909","1912","1913","1921","1922","1923","1924","1925","1926","1927","1928","1929","1930","1931","1932","1933","1935","1951","1958","1959","7021","7022","7023","7024","7025","7026","7027","7028","7029","7030","7031","7033","7092","7093","7094","7095","7096","7097","7098","7099","7102","7103","7104","7105","1406","1408","1434","1440","2326","2343","2593"];
+
+// Dispositon Data parsed directly from the Hamilton CSV report provided
+const HAMILTON_ROUTES = [
+    { route: "All Routes", planned: 134, cancelled: 41, delivered: 133, percent: 99.3 },
+    { route: "42 Pryor Road", planned: 4, cancelled: 1, delivered: 3, percent: 75.0 },
+    { route: "49 McDonough Boulevard", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "55 Jonesboro Road", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+    { route: "78 Cleveland Avenue", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "79 Sylvan Hills", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "81 Venetian Hills / Delowe Drive", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+    { route: "82 Camp Creek / South Fulton Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "83 Campleton Road", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "84 Washington Road / Camp Creek Marketplace", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+    { route: "89 Old National Highway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "93 Headland Drive / Main Street", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+    { route: "95 Metropolitan Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "155 Pittsburgh", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+    { route: "162 Myrtle Drive / Alison Court", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+    { route: "172 Sylvan Road / Virginia Avenue", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+    { route: "178 Empire Boulevard", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "180 Roosevelt Highway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "181 Washington Road / Fairburn", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "183 Greenbriar", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "188 Oakley Industrial", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "189 Flat Shoals Road / Scofield Road", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "191 Riverdale / ATL Intl Terminal", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "191 Old Dixie / Tara Boulevard", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "193 Morrow / Jonesboro", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "194 Conley Road / Mt Zion", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "195 Forest Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "197 Battle Creek Road", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "198 Southlake Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+    { route: "295 Metropolitan Campus Express", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+    { route: "800 Lovejoy", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+    { route: "832 Grant Park", planned: 1, cancelled: 0, delivered: 1, percent: 100 }
+];
+
 const ADMIN_EMAILS = ['anetowestfield@gmail.com', 'admin@fleetflow.services'];
 
 const BusTracker = dynamic(() => import('./BusTracker'), { ssr: false, loading: () => <div className="flex items-center justify-center h-[50vh] bg-slate-100 rounded-2xl"><div className="w-12 h-12 border-4 border-[#002d72] border-t-transparent rounded-full animate-spin"></div></div> });
@@ -67,7 +104,7 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptio
     const [isEditing, setIsEditing] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [historyLogs, setHistoryLogs] = useState<any[]>([]); 
-    const [editData, setEditData] = useState({ status: bus.status || 'Active', location: bus.location || '', notes: bus.notes || '', oosStartDate: bus.oosStartDate || '', expectedReturnDate: bus.expectedReturnDate || '', actualReturnDate: bus.actualReturnDate || '', disposition: bus.disposition || '' });
+    const [editData, setEditData] = useState({ status: bus.status || 'Active', location: bus.location || '', notes: bus.notes || '', oosStartDate: bus.oosStartDate || '', expectedReturnDate: bus.expectedReturnDate || '', actualReturnDate: bus.actualReturnDate || '' });
     
     useEffect(() => { if (showHistory) return onSnapshot(query(collection(db, "buses", bus.number, "history"), orderBy("timestamp", "desc")), (snap) => setHistoryLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))); }, [showHistory, bus.number]);
     
@@ -86,8 +123,6 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptio
             if (old.status !== editData.status) changes.push(`STATUS: ${old.status} ➝ ${editData.status}`);
             if (old.notes !== editData.notes) changes.push(`NOTES: "${old.notes || ''}" ➝ "${editData.notes}"`);
             if (old.location !== editData.location) changes.push(`LOC: ${old.location || '—'} ➝ ${editData.location}`);
-            if (isAdmin && old.disposition !== editData.disposition) changes.push(`DISP: "${old.disposition || ''}" ➝ "${editData.disposition}"`);
-            
             await setDoc(busRef, { ...editData, timestamp: serverTimestamp() }, { merge: true });
             if (changes.length > 0) await logHistory(bus.number, "EDIT", changes.join('\n'), auth.currentUser?.email || 'Unknown');
             showToast(`Bus #${bus.number} updated`, 'success'); setIsEditing(false);
@@ -103,7 +138,7 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptio
     const handleResetBus = async () => {
         if(!confirm("Reset this bus to Active?")) return;
         try {
-            await setDoc(doc(db, "buses", bus.number), { status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', disposition: '', timestamp: serverTimestamp() }, { merge: true });
+            await setDoc(doc(db, "buses", bus.number), { status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', timestamp: serverTimestamp() }, { merge: true });
             await logHistory(bus.number, "RESET", "Bus reset to default state.", auth.currentUser?.email || 'Unknown');
             showToast(`Bus #${bus.number} reset`, 'success'); onClose();
         } catch(err) { showToast("Reset failed", 'error'); }
@@ -144,31 +179,47 @@ const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptio
                 </select>
                 <input className={`p-3 border-2 rounded-lg font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={editData.location} onChange={e=>setEditData({...editData, location:e.target.value})} placeholder="Location" />
             </div>
-            {isAdmin && <input className={`w-full p-3 border-2 rounded-lg font-bold mb-4 outline-none focus:border-purple-500 ${inputClass}`} value={editData.disposition} onChange={e=>setEditData({...editData, disposition:e.target.value})} placeholder="Disposition / Fleet Status (Admin Only)" />}
             <textarea className={`w-full p-3 border-2 rounded-lg h-24 mb-4 font-bold outline-none focus:border-[#ef7c00] ${inputClass}`} value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} placeholder="Maintenance Notes" />
             <div className="grid grid-cols-3 gap-4 mb-6 text-[9px] font-black uppercase">
                 <div>OOS Date<input type="date" onClick={handleDateClick} max={new Date().toISOString().split('T')[0]} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={editData.oosStartDate} onChange={e=>setEditData({...editData, oosStartDate:e.target.value})} /></div>
                 <div>Exp Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={editData.expectedReturnDate} onChange={e=>setEditData({...editData, expectedReturnDate:e.target.value})} /></div>
                 <div>Act Return<input type="date" onClick={handleDateClick} min={editData.oosStartDate} className={`w-full p-2 border rounded mt-1 font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={editData.actualReturnDate} onChange={e=>setEditData({...editData, actualReturnDate:e.target.value})} /></div>
             </div>
-            <div className="flex gap-4"><button onClick={()=>setIsEditing(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs transition-colors ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-100 hover:bg-slate-200 text-black'}`}>Cancel</button><button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-xl font-black uppercase text-xs shadow-lg transition-colors">Save Changes</button></div>
+            <div className="flex gap-4">
+                <button onClick={()=>setIsEditing(false)} className={`w-1/2 py-3 rounded-xl font-black uppercase text-xs transition-colors ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-100 hover:bg-slate-200 text-black'}`}>Cancel</button>
+                <button onClick={handleSave} className="w-1/2 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-xl font-black uppercase text-xs shadow-lg transition-colors">Save Changes</button>
+            </div>
         </div>
     );
 
     return (
         <div className={`p-8 rounded-xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 border ${bgClass}`}>
             <div className="flex justify-between items-start mb-6 border-b border-slate-500/20 pb-4">
-                <div><h3 className={`text-4xl font-black italic uppercase ${statusColorText}`}>Bus #{bus.number}</h3><span className={`inline-block mt-2 px-3 py-1 rounded-full text-[10px] font-black uppercase text-white shadow-sm ${statusColorBadge}`}>{bus.status}</span></div>
-                <div className="flex gap-2 items-start"><button onClick={handleResetBus} className="text-red-500 text-xs font-black uppercase border border-red-500/30 bg-red-500/10 px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-colors">Reset</button><button onClick={onClose} className="text-slate-400 text-2xl font-bold hover:text-slate-500 transition-colors ml-2">✕</button></div>
+                <div>
+                    <h3 className={`text-4xl font-black italic uppercase ${statusColorText}`}>Bus #{bus.number}</h3>
+                    <span className={`inline-block mt-2 px-3 py-1 rounded-full text-[10px] font-black uppercase text-white shadow-sm ${statusColorBadge}`}>{bus.status}</span>
+                </div>
+                <div className="flex gap-2 items-start">
+                    <button onClick={handleResetBus} className="text-red-500 text-xs font-black uppercase border border-red-500/30 bg-red-500/10 px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-colors">Reset</button>
+                    <button onClick={onClose} className="text-slate-400 text-2xl font-bold hover:text-slate-500 transition-colors ml-2">✕</button>
+                </div>
             </div>
-            <div className={`p-4 rounded-xl mb-6 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-50'}`}><p className="text-[10px] font-black uppercase mb-2 opacity-50">Fault Details</p><p className="text-lg font-medium">{bus.notes || "No active faults."}</p></div>
-            <div className={`grid ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-4 mb-6`}>
+            <div className={`p-4 rounded-xl mb-6 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-50'}`}>
+                <p className="text-[10px] font-black uppercase mb-2 opacity-50">Fault Details</p>
+                <p className="text-lg font-medium">{bus.notes || "No active faults."}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-4 mb-6">
                 <div><p className="text-[9px] font-black uppercase opacity-50">OOS Date</p><p className="text-xl font-black text-[#002d72]">{bus.oosStartDate || '--'}</p></div>
                 <div><p className="text-[9px] font-black uppercase opacity-50">Exp Return</p><p className="text-xl font-black text-[#ef7c00]">{bus.expectedReturnDate || '--'}</p></div>
                 <div><p className="text-[9px] font-black uppercase opacity-50">Act Return</p><p className="text-xl font-black text-green-500">{bus.actualReturnDate || '--'}</p></div>
-                {isAdmin && <div><p className="text-[9px] font-black uppercase opacity-50 text-purple-500">Disposition</p><p className="text-sm font-black text-purple-500 mt-1">{bus.disposition || '--'}</p></div>}
             </div>
-            <div className="flex justify-between pt-6 border-t border-slate-500/20"><button onClick={()=>setShowHistory(true)} className={`px-5 py-3 rounded-lg text-[10px] font-black uppercase transition-colors ${darkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-100 hover:bg-slate-200'}`}>📜 History</button><div className="flex gap-3"><button onClick={()=>setIsEditing(true)} className={`px-8 py-3 rounded-lg text-[10px] font-black uppercase transition-colors ${darkMode ? 'bg-slate-700 text-[#ef7c00] hover:bg-slate-600' : 'bg-slate-100 text-[#002d72] hover:bg-slate-200'}`}>Edit</button><button onClick={onClose} className="px-8 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-lg text-[10px] font-black uppercase transition-colors shadow-md">Close</button></div></div>
+            <div className="flex justify-between pt-6 border-t border-slate-500/20">
+                <button onClick={()=>setShowHistory(true)} className={`px-5 py-3 rounded-lg text-[10px] font-black uppercase transition-colors ${darkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-100 hover:bg-slate-200'}`}>📜 History</button>
+                <div className="flex gap-3">
+                    <button onClick={()=>setIsEditing(true)} className={`px-8 py-3 rounded-lg text-[10px] font-black uppercase transition-colors ${darkMode ? 'bg-slate-700 text-[#ef7c00] hover:bg-slate-600' : 'bg-slate-100 text-[#002d72] hover:bg-slate-200'}`}>Edit</button>
+                    <button onClick={onClose} className="px-8 py-3 bg-[#002d72] hover:bg-blue-800 text-white rounded-lg text-[10px] font-black uppercase transition-colors shadow-md">Close</button>
+                </div>
+            </div>
         </div>
     );
 };
@@ -271,7 +322,13 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
     const [logFilter, setLogFilter] = useState({ search: '', type: 'All' });
     const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
 
-    useEffect(() => { return onSnapshot(query(collection(db, "personnel"), orderBy("name")), (snap) => setPersonnel(snap.docs.map(d => ({ ...d.data(), id: d.id })))); }, []);
+    useEffect(() => { 
+        return onSnapshot(collection(db, "personnel"), (snap) => {
+            const raw = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+            raw.sort((a,b) => (a.name || '').localeCompare(b.name || ''));
+            setPersonnel(raw);
+        }); 
+    }, []);
     
     const handleDateClick = (e: any) => e.currentTarget.showPicker?.();
 
@@ -304,7 +361,7 @@ const PersonnelManager = ({ showToast, darkMode }: { showToast: any, darkMode: b
             let aVal = a[sortConfig.key]; let bVal = b[sortConfig.key];
             if (sortConfig.key === 'date') { aVal = new Date(aVal).getTime(); bVal = new Date(bVal).getTime(); } 
             else if (sortConfig.key === 'count') { aVal = Number(aVal) || 0; bVal = Number(bVal) || 0; } 
-            else if (typeof aVal === 'string') { aVal = aVal.toLowerCase(); bVal = bVal.toLowerCase(); }
+            else if (typeof aVal === 'string') { aVal = (aVal||'').toLowerCase(); bVal = (bVal||'').toLowerCase(); }
             if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
             if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
             return 0;
@@ -770,8 +827,112 @@ const ShiftHandover = ({ buses, showToast }: { buses: any[], showToast: any }) =
     );
 };
 
+// --- NEW COMPONENT: ROUTE DISPOSITION REPORT ---
+const DispositionReport = ({ darkMode }: { darkMode: boolean }) => {
+    const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
+    
+    const HAMILTON_ROUTES = [
+        { route: "All Routes", planned: 134, cancelled: 41, delivered: 133, percent: 99.3 },
+        { route: "42 Pryor Road", planned: 4, cancelled: 1, delivered: 3, percent: 75.0 },
+        { route: "49 McDonough Boulevard", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "55 Jonesboro Road", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+        { route: "78 Cleveland Avenue", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "79 Sylvan Hills", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "81 Venetian Hills / Delowe Drive", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+        { route: "82 Camp Creek / South Fulton Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "83 Campleton Road", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "84 Washington Road / Camp Creek Marketplace", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+        { route: "89 Old National Highway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "93 Headland Drive / Main Street", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+        { route: "95 Metropolitan Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "155 Pittsburgh", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+        { route: "162 Myrtle Drive / Alison Court", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+        { route: "172 Sylvan Road / Virginia Avenue", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+        { route: "178 Empire Boulevard", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "180 Roosevelt Highway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "181 Washington Road / Fairburn", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "183 Greenbriar", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "188 Oakley Industrial", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "189 Flat Shoals Road / Scofield Road", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "191 Riverdale / ATL Intl Terminal", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "191 Old Dixie / Tara Boulevard", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "193 Morrow / Jonesboro", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "194 Conley Road / Mt Zion", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "195 Forest Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "197 Battle Creek Road", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "198 Southlake Parkway", planned: 6, cancelled: 2, delivered: 6, percent: 100 },
+        { route: "295 Metropolitan Campus Express", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+        { route: "800 Lovejoy", planned: 1, cancelled: 0, delivered: 1, percent: 100 },
+        { route: "832 Grant Park", planned: 1, cancelled: 0, delivered: 1, percent: 100 }
+    ];
+
+    const allRoutes = HAMILTON_ROUTES[0];
+    const specificRoutes = HAMILTON_ROUTES.slice(1);
+
+    return (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col space-y-6">
+            <div className="flex justify-between items-end mb-2">
+                <div>
+                    <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Route Disposition</h2>
+                    <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Hamilton (C) • Nov 17, 2019 Forecast</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className={`p-6 rounded-2xl border shadow-sm ${bgClass}`}>
+                    <p className="text-[10px] font-black uppercase opacity-50 mb-1">Total Planned</p>
+                    <p className="text-4xl font-black text-[#002d72]">{allRoutes.planned}</p>
+                </div>
+                <div className={`p-6 rounded-2xl border shadow-sm ${bgClass}`}>
+                    <p className="text-[10px] font-black uppercase opacity-50 mb-1">Total Cancelled</p>
+                    <p className="text-4xl font-black text-red-500">{allRoutes.cancelled}</p>
+                </div>
+                <div className={`p-6 rounded-2xl border shadow-sm ${bgClass}`}>
+                    <p className="text-[10px] font-black uppercase opacity-50 mb-1">Total Delivered</p>
+                    <p className="text-4xl font-black text-green-500">{allRoutes.delivered}</p>
+                </div>
+                <div className={`p-6 rounded-2xl border shadow-sm ${bgClass}`}>
+                    <p className="text-[10px] font-black uppercase opacity-50 mb-1">Delivery %</p>
+                    <p className="text-4xl font-black text-[#ef7c00]">{allRoutes.percent}%</p>
+                </div>
+            </div>
+
+            <div className={`rounded-2xl shadow-lg border overflow-hidden flex flex-col ${bgClass}`}>
+                <div className="overflow-x-auto flex-grow custom-scrollbar">
+                    <table className="w-full text-left text-sm">
+                        <thead className={`font-black uppercase text-[10px] tracking-widest border-b ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                            <tr>
+                                <th className="p-4">Route</th>
+                                <th className="p-4 text-center">Planned</th>
+                                <th className="p-4 text-center">Cancelled</th>
+                                <th className="p-4 text-center">Delivered</th>
+                                <th className="p-4 text-center">Delivery %</th>
+                            </tr>
+                        </thead>
+                        <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
+                            {specificRoutes.map((r, i) => (
+                                <tr key={i} className={`transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-blue-50'}`}>
+                                    <td className="p-4 font-bold">{r.route}</td>
+                                    <td className="p-4 text-center font-black">{r.planned}</td>
+                                    <td className="p-4 text-center font-black text-red-500">{r.cancelled}</td>
+                                    <td className="p-4 text-center font-black text-green-500">{r.delivered}</td>
+                                    <td className="p-4 text-center">
+                                        <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${r.percent === 100 ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
+                                            {r.percent}%
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { showToast: any, darkMode: boolean, buses: any[], isAdmin: boolean, statusOptions: any[] }) => {
-    const [formData, setFormData] = useState({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', disposition: '' });
+    const [formData, setFormData] = useState({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
     const [showAddModal, setShowAddModal] = useState(false);
     const [newBusData, setNewBusData] = useState({ number: '', status: 'Active' });
 
@@ -788,20 +949,18 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
             if (formData.actualReturnDate && formData.actualReturnDate < formData.oosStartDate) return showToast("Actual Return cannot be earlier than OOS Date", 'error');
         }
 
-        const busRef = doc(db, "buses", formData.number); 
-        const busSnap = await getDoc(busRef);
+        const busRef = doc(db, "buses", formData.number); const busSnap = await getDoc(busRef);
         if (!busSnap.exists()) return showToast(`⛔ Bus #${formData.number} not found. Please add it first.`, 'error');
         
         const old = busSnap.data(); let changes = []; 
         if (old.status !== formData.status) changes.push(`STATUS: ${old.status} ➝ ${formData.status}`); 
         if (old.notes !== formData.notes) changes.push(`NOTES: "${old.notes || ''}" ➝ "${formData.notes}"`); 
         if (old.oosStartDate !== formData.oosStartDate) changes.push(`OOS: ${old.oosStartDate || '—'} ➝ ${formData.oosStartDate}`);
-        if (isAdmin && old.disposition !== formData.disposition && formData.disposition !== '') changes.push(`DISP: ${old.disposition || '—'} ➝ ${formData.disposition}`);
         
         await setDoc(busRef, { ...formData, timestamp: serverTimestamp() }, { merge: true });
         await logHistory(formData.number, "UPDATE", changes.length > 0 ? changes.join('\n') : "Routine Update via Terminal", auth.currentUser?.email || 'Unknown');
         showToast(`Bus #${formData.number} Updated`, 'success'); 
-        setFormData({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', disposition: '' });
+        setFormData({ number: '', status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '' });
     };
 
     const handleAddNewBus = async (e: React.FormEvent) => {
@@ -837,7 +996,7 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
         showToast("Resetting fleet... please wait.", "success");
         for (let i = 0; i < buses.length; i += 250) {
             await Promise.all(buses.slice(i, i + 250).map(bus => 
-                updateDoc(doc(db, "buses", bus.docId), { status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', disposition: '', timestamp: serverTimestamp() }).catch(e => console.error(e))
+                updateDoc(doc(db, "buses", bus.docId), { status: 'Active', location: '', notes: '', oosStartDate: '', expectedReturnDate: '', actualReturnDate: '', timestamp: serverTimestamp() }).catch(e => console.error(e))
             ));
         }
         await logActivity(auth.currentUser?.email || 'Unknown', 'SYSTEM', 'Entire Fleet', 'UPDATE', 'Master Reset triggered.');
@@ -865,7 +1024,6 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
                     </select>
                 </div>
                 <input type="text" placeholder="Location" className={`w-full p-4 border-2 rounded-xl outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.location} onChange={handleChange} name="location" />
-                {isAdmin && <input type="text" name="disposition" placeholder="Disposition / Fleet Status (Admin Only)" value={formData.disposition} onChange={handleChange} className={`w-full p-4 border-2 rounded-xl outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} />}
                 <textarea placeholder="Maintenance Notes" className={`w-full p-4 border-2 rounded-xl h-24 outline-none focus:border-[#ef7c00] transition-colors ${inputClass}`} value={formData.notes} onChange={handleChange} name="notes" />
                 <div className="grid grid-cols-3 gap-4">
                     <div><label className={`text-[9px] font-black uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>OOS Date</label><input name="oosStartDate" type="date" onClick={handleDateClick} max={new Date().toISOString().split('T')[0]} className={`w-full p-2 border-2 rounded-lg text-xs font-bold cursor-pointer outline-none focus:border-[#ef7c00] ${inputClass}`} value={formData.oosStartDate} onChange={handleChange} /></div>
@@ -875,7 +1033,6 @@ const BusInputForm = ({ showToast, darkMode, buses, isAdmin, statusOptions }: { 
                 <button className="w-full py-4 bg-[#ef7c00] hover:bg-orange-600 text-white rounded-xl font-black uppercase tracking-widest transition-transform active:scale-95 shadow-lg">Update Record</button>
             </form>
 
-            {/* ADD NEW BUS MODAL */}
             {showAddModal && (
                 <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className={`p-8 rounded-xl shadow-2xl w-full max-w-md border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -897,7 +1054,7 @@ export default function FleetManager() {
     const [isSignUp, setIsSignUp] = useState(false);
     const [userStatus, setUserStatus] = useState<'loading' | 'approved' | 'pending' | 'rejected'>('loading');
     const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
-    const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'personnel' | 'parts' | 'admin'>('inventory');
+    const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'personnel' | 'parts' | 'disposition' | 'admin'>('inventory');
     const [inventoryMode, setInventoryMode] = useState<'list' | 'grid' | 'tv'>('grid');
     const [buses, setBuses] = useState<any[]>([]);
     const [selectedBusDetail, setSelectedBusDetail] = useState<any>(null);
@@ -935,9 +1092,9 @@ export default function FleetManager() {
         });
     }, [user]);
 
-    useEffect(() => {
-        if (!user || userStatus !== 'approved') return;
-        const uBuses = onSnapshot(query(collection(db, "buses"), orderBy("number", "asc")), s => setBuses(s.docs.map(d => ({...d.data(), docId: d.id}))));
+    useEffect(() => { 
+        if (!user || userStatus !== 'approved') return; 
+        const uBuses = onSnapshot(query(collection(db, "buses"), orderBy("number", "asc")), s => setBuses(s.docs.map(d => ({...d.data(), docId: d.id})))); 
         const uOpts = onSnapshot(doc(db, "settings", "status_options"), s => { if(s.exists()) setStatusOptions(s.data().list || []); });
         return () => { uBuses(); uOpts(); };
     }, [user, userStatus]);
@@ -1001,9 +1158,8 @@ export default function FleetManager() {
     const exportExcel = async () => {
         const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('OOS Detail');
         const cols: any = [{header:'Bus #',key:'number',width:10},{header:'Status',key:'status',width:15},{header:'Location',key:'location',width:15},{header:'Fault',key:'notes',width:30},{header:'OOS Start',key:'start',width:15}];
-        if (isAdmin) cols.push({header:'Disposition',key:'disposition',width:20});
         ws.columns = cols;
-        buses.forEach(b => ws.addRow({number:b.number, status:b.status, location:b.location||'', notes:b.notes||'', start:b.oosStartDate||'', disposition: b.disposition||''}));
+        buses.forEach(b => ws.addRow({number:b.number, status:b.status, location:b.location||'', notes:b.notes||'', start:b.oosStartDate||''}));
         const buf = await wb.xlsx.writeBuffer(); saveAs(new Blob([buf]), `Fleet_Status_Report.xlsx`); showToast("Excel Downloaded", 'success');
     };
 
@@ -1056,8 +1212,8 @@ export default function FleetManager() {
             <nav className={`backdrop-blur-md border-b sticky top-0 z-[1001] px-6 py-4 flex justify-between items-center shadow-sm overflow-x-auto ${darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
                 <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-6 bg-[#ef7c00] rounded-full"></div><span className="font-black text-lg italic uppercase tracking-tighter">Fleet Manager</span></div>
                 <div className="flex gap-4 items-center flex-nowrap">
-                    {['inventory', 'input', 'tracker', 'handover', 'parts'].concat(isAdmin ? ['analytics', 'personnel', 'admin'] : []).map(v => (
-                        <button key={v} onClick={()=>setView(v as any)} className={`text-[9px] font-black uppercase tracking-widest border-b-2 pb-1 transition-all whitespace-nowrap ${view === v ? 'border-[#ef7c00] text-[#ef7c00]' : (darkMode ? 'border-transparent text-slate-400 hover:text-white' : 'border-transparent text-slate-500 hover:text-[#002d72]')}`}>{v.replace('admin','panel').replace('input', 'Data Entry').replace('parts', 'Parts List')}</button>
+                    {['inventory', 'input', 'tracker', 'handover', 'parts', 'disposition'].concat(isAdmin ? ['analytics', 'personnel', 'admin'] : []).map(v => (
+                        <button key={v} onClick={()=>setView(v as any)} className={`text-[9px] font-black uppercase tracking-widest border-b-2 pb-1 transition-all whitespace-nowrap ${view === v ? 'border-[#ef7c00] text-[#ef7c00]' : (darkMode ? 'border-transparent text-slate-400 hover:text-white' : 'border-transparent text-slate-500 hover:text-[#002d72]')}`}>{v.replace('admin','panel').replace('input', 'Data Entry').replace('parts', 'Parts List').replace('disposition', 'Route Report')}</button>
                     ))}
                     <button onClick={()=>setDarkMode(!darkMode)} className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-slate-800 text-yellow-400 border-slate-700 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'}`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
                     <button onClick={exportExcel} className={`text-[10px] font-black uppercase whitespace-nowrap transition-colors ${darkMode ? 'text-green-400 hover:text-green-300' : 'text-[#002d72] hover:text-[#ef7c00]'}`}>Excel</button>
@@ -1072,6 +1228,7 @@ export default function FleetManager() {
                  view === 'parts' ? <PartsInventory showToast={showToast} darkMode={darkMode} /> :
                  view === 'handover' ? <ShiftHandover buses={buses} showToast={showToast} /> :
                  view === 'personnel' ? <PersonnelManager showToast={showToast} darkMode={darkMode} /> :
+                 view === 'disposition' ? <DispositionReport darkMode={darkMode} /> :
                  view === 'tracker' ? <div className={`h-[85vh] rounded-2xl border shadow-sm overflow-hidden relative ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}><BusTracker /></div> : (
                     <>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -1137,7 +1294,6 @@ export default function FleetManager() {
                                                 <div className="flex justify-between items-start mb-3"><span className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>#{b.number}</span><span className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-500'}`}>{b.status}</span></div>
                                                 <div className={`flex items-center gap-1 text-xs font-bold mb-2 truncate ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>📍 {b.location || 'Location Unavailable'}</div>
                                                 <div className={`text-[10px] italic line-clamp-2 mb-3 h-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>🔧 {b.notes || 'No active faults recorded.'}</div>
-                                                {isAdmin && b.disposition && <div className="text-[9px] font-black uppercase text-purple-500 truncate mt-1">DISP: {b.disposition}</div>}
                                                 {b.status !== 'Active' && <div className={`mt-auto text-[10px] font-black text-white p-1.5 rounded-lg text-center shadow-inner tracking-widest ${type==='shop'?'bg-orange-500 border border-orange-600':'bg-red-600 border border-red-700'}`}>⏱️ DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}
                                             </div>
                                         );
@@ -1149,7 +1305,7 @@ export default function FleetManager() {
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-sm">
                                         <thead className={`font-black uppercase text-[10px] tracking-widest border-b ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                            <tr><th className="p-4 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('number')}>Unit #</th><th className="p-4">Status</th><th className="p-4">Location</th><th className="p-4">Notes</th>{isAdmin && <th className="p-4 cursor-pointer hover:text-[#ef7c00]" onClick={()=>requestSort('disposition')}>Disposition</th>}<th className="p-4 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('daysOOS')}>Days OOS</th></tr>
+                                            <tr><th className="p-4 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('number')}>Unit #</th><th className="p-4">Status</th><th className="p-4">Location</th><th className="p-4">Notes</th><th className="p-4 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('daysOOS')}>Days OOS</th></tr>
                                         </thead>
                                         <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
                                             {sortedBuses.map(b => {
@@ -1160,7 +1316,6 @@ export default function FleetManager() {
                                                         <td className="p-4"><span className={`px-2 py-1 rounded text-[9px] font-black uppercase text-white ${type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-500'}`}>{b.status}</span></td>
                                                         <td className="p-4 font-bold text-xs">{b.location || '-'}</td>
                                                         <td className="p-4 italic text-xs opacity-70">{b.notes || '-'}</td>
-                                                        {isAdmin && <td className="p-4 font-bold text-xs text-purple-500">{b.disposition || '-'}</td>}
                                                         <td className={`p-4 font-black ${type==='shop'?'text-orange-500':type==='hold'?'text-red-500':''}`}>{b.status !== 'Active' ? calculateDaysOOS(b.oosStartDate) : '-'}</td>
                                                     </tr>
                                                 );
@@ -1173,7 +1328,7 @@ export default function FleetManager() {
                     </>
                  )}
             </main>
-            {view !== 'input' && view !== 'admin' && view !== 'personnel' && view !== 'analytics' && <Footer onShowLegal={setLegalType} darkMode={darkMode} />}
+            {view !== 'input' && view !== 'admin' && view !== 'personnel' && view !== 'analytics' && view !== 'disposition' && <Footer onShowLegal={setLegalType} darkMode={darkMode} />}
         </div>
     );
 }

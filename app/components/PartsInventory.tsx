@@ -1,0 +1,20 @@
+import React, { useState, useMemo } from 'react';
+import localParts from '../partsData.json';
+
+export const PartsInventory = ({ showToast, darkMode }: { showToast: (msg: string, type: 'success'|'error') => void, darkMode: boolean }) => {
+    const [searchTerm, setSearchTerm] = useState(''); const [displayLimit, setDisplayLimit] = useState(100); const [isLargeText, setIsLargeText] = useState(false);
+    const filteredParts = useMemo(() => { let r = localParts; if (searchTerm) r = r.filter((p: any) => (p.partNumber && String(p.partNumber).toLowerCase().includes(searchTerm.toLowerCase())) || (p.name && String(p.name).toLowerCase().includes(searchTerm.toLowerCase()))); return r.slice(0, displayLimit); }, [searchTerm, displayLimit]);
+    const inputClass = darkMode ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-black placeholder:text-gray-400';
+    return (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col relative">
+            <div className="flex justify-between items-end mb-6 px-2 flex-wrap gap-4">
+                <div><h2 className={`text-3xl font-black italic uppercase tracking-tighter leading-none ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Parts Registry</h2><p className={`text-[10px] font-black uppercase tracking-widest mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Local Reference</p></div>
+                <div className="flex items-center gap-3 w-full max-w-lg"><button onClick={() => setIsLargeText(!isLargeText)} className={`h-12 w-12 flex items-center justify-center rounded-2xl border-2 font-black transition-all ${isLargeText ? 'bg-[#002d72] border-[#002d72] text-white' : inputClass}`}>Aa</button><input type="text" placeholder="Search Part #..." className={`w-full p-4 rounded-2xl font-bold border-2 outline-none focus:border-[#ef7c00] transition-colors shadow-sm ${inputClass}`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
+            </div>
+            <div className={`rounded-3xl shadow-xl border flex-grow overflow-hidden flex flex-col relative ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
+                <div className="bg-[#002d72] grid grid-cols-12 gap-4 p-5 text-[10px] font-black uppercase text-white tracking-widest select-none"><div className="col-span-3">Part Number</div><div className="col-span-8">Description</div><div className="col-span-1 text-center">View</div></div>
+                <div className="overflow-y-auto flex-grow custom-scrollbar"><div className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>{filteredParts.map((p: any, i: number) => (<div key={i} className={`grid grid-cols-12 gap-4 p-4 transition-colors items-center ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}><div onClick={() => { navigator.clipboard.writeText(p.partNumber); showToast(`Copied!`, 'success'); }} className={`col-span-3 font-mono font-black rounded-lg cursor-pointer transition-all shadow-sm ${darkMode ? 'bg-slate-900 text-[#ef7c00]' : 'bg-blue-50 text-[#002d72]'} ${isLargeText ? 'text-xl px-4 py-2' : 'text-sm px-3 py-1'}`}>{p.partNumber}</div><div className={`col-span-8 font-bold uppercase flex items-center ${darkMode ? 'text-slate-200' : 'text-slate-700'} ${isLargeText ? 'text-lg leading-normal' : 'text-[11px] leading-tight'}`}>{p.name}</div><div className="col-span-1 flex justify-center"><a href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(p.name + " " + p.partNumber + " bus part")}`} target="_blank" rel="noopener noreferrer" className={`text-[#ef7c00] hover:scale-125 transition-transform ${isLargeText ? 'text-2xl' : 'text-lg'}`}>👁️</a></div></div>))}</div></div>
+            </div>
+        </div>
+    );
+};

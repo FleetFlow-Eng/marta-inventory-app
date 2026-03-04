@@ -229,7 +229,7 @@ export default function FleetManager() {
                     <button onClick={exportExcel} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors ${darkMode ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}><Icons.Download /> Export Data</button>
                     <div className="flex gap-2">
                         <button onClick={()=>setDarkMode(!darkMode)} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-slate-800/50 text-yellow-400 border-slate-700/50 hover:bg-slate-700' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
-                        <button onClick={()=>signOut(auth)} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100'}`}>Logout</button>
+                        <button onClick={()=>signOut(auth)} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'}`}>Logout</button>
                     </div>
                 </div>
             </aside>
@@ -272,13 +272,7 @@ export default function FleetManager() {
                          view === 'handover' ? <ShiftHandover buses={buses} showToast={showToast} /> :
                          view === 'personnel' ? <PersonnelManager showToast={showToast} darkMode={darkMode} /> :
                          view === 'disposition' ? <DispositionReport showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} /> :
-                         view === 'tracker' ? <div className={`h-[80vh] rounded-2xl border shadow-sm overflow-hidden relative ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>// Inside app/page.tsx:
-view === 'tracker' ? (
-    <div className="h-[85vh] w-full relative">
-        <BusTracker darkMode={darkMode} />
-    </div>
-) : (
-</div> : (
+                         view === 'tracker' ? <div className={`h-[80vh] rounded-3xl border shadow-sm overflow-hidden relative ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}><BusTracker darkMode={darkMode} /></div> : (
                             <InventoryView buses={buses} sortedBuses={sortedBuses} searchTerm={searchTerm} setSearchTerm={setSearchTerm} inventoryMode={inventoryMode} setInventoryMode={setInventoryMode} activeFilter={activeFilter} setActiveFilter={setActiveFilter} sortConfig={sortConfig} requestSort={requestSort} getStatusType={getStatusType} setSelectedBusDetail={setSelectedBusDetail} toggleFullScreen={toggleFullScreen} isFullscreen={isFullscreen} tvBoardRef={tvBoardRef} darkMode={darkMode} isAdmin={isAdmin} />
                          )}
                     </main>
@@ -294,13 +288,7 @@ view === 'tracker' ? (
                  view === 'handover' ? <ShiftHandover buses={buses} showToast={showToast} /> :
                  view === 'personnel' ? <PersonnelManager showToast={showToast} darkMode={darkMode} /> :
                  view === 'disposition' ? <DispositionReport showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} /> :
-                 view === 'tracker' ? <div className={`h-[85vh] rounded-3xl border shadow-2xl overflow-hidden relative ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>// Inside app/page.tsx:
-view === 'tracker' ? (
-    <div className="h-[85vh] w-full relative">
-        <BusTracker darkMode={darkMode} />
-    </div>
-) : (
-</div> : (
+                 view === 'tracker' ? <div className={`h-[85vh] rounded-3xl border shadow-2xl overflow-hidden relative ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}><BusTracker darkMode={darkMode} /></div> : (
                     <InventoryView buses={buses} sortedBuses={sortedBuses} searchTerm={searchTerm} setSearchTerm={setSearchTerm} inventoryMode={inventoryMode} setInventoryMode={setInventoryMode} activeFilter={activeFilter} setActiveFilter={setActiveFilter} sortConfig={sortConfig} requestSort={requestSort} getStatusType={getStatusType} setSelectedBusDetail={setSelectedBusDetail} toggleFullScreen={toggleFullScreen} isFullscreen={isFullscreen} tvBoardRef={tvBoardRef} darkMode={darkMode} isAdmin={isAdmin} />
                  )}
                  {view !== 'input' && view !== 'admin' && view !== 'personnel' && view !== 'analytics' && view !== 'disposition' && <div className="mt-12"><Footer onShowLegal={setLegalType} darkMode={darkMode} /></div>}

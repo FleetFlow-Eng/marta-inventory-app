@@ -158,7 +158,6 @@ export default function FleetManager() {
         } catch(e: any) { showToast(e.message.replace('Firebase: ', ''), "error"); }
     };
 
-    // --- NAVIGATION STRUCTURE ---
     const navItems = [
         { id: 'inventory', label: 'Inventory', icon: <Icons.Grid />, adminOnly: false },
         { id: 'input', label: 'Data Entry', icon: <Icons.Edit />, adminOnly: false },
@@ -175,11 +174,11 @@ export default function FleetManager() {
         <div className="min-h-screen flex flex-col bg-slate-900 font-sans">
             {toast && <Toast message={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}
             <div className="flex-grow flex items-center justify-center p-4">
-                <form onSubmit={handleAuth} className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-[#ef7c00] animate-in fade-in zoom-in">
-                    <div className="flex justify-center mb-6"><div className="w-4 h-10 bg-[#ef7c00] rounded-full mr-3"></div><h2 className="text-4xl font-black text-white italic uppercase tracking-tighter">FleetFlow</h2></div>
+                <form onSubmit={handleAuth} className="bg-slate-800 p-8 md:p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-[#ef7c00] animate-in fade-in zoom-in">
+                    <div className="flex justify-center mb-6"><div className="w-4 h-10 bg-[#ef7c00] rounded-full mr-3"></div><h2 className="text-3xl md:text-4xl font-black text-white italic uppercase tracking-tighter">FleetFlow</h2></div>
                     <input className="w-full p-4 mb-4 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold focus:ring-2 focus:ring-[#ef7c00]/50 outline-none transition-all" placeholder="Email Address" value={email} onChange={e=>setEmail(e.target.value)} required />
                     <input className="w-full p-4 mb-6 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold focus:ring-2 focus:ring-[#ef7c00]/50 outline-none transition-all" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} required />
-                    <button className="w-full py-5 bg-[#ef7c00] text-white font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-orange-600 transition-colors">{isSignUp ? 'Register' : 'Login Securely'}</button>
+                    <button className="w-full py-4 md:py-5 bg-[#ef7c00] text-white font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-orange-600 transition-colors">{isSignUp ? 'Register' : 'Login Securely'}</button>
                     <button type="button" onClick={()=>setIsSignUp(!isSignUp)} className="w-full mt-6 text-slate-400 text-xs font-bold hover:text-white transition-colors">{isSignUp ? 'Back to Login' : "Don't have an account? Sign Up"}</button>
                 </form>
             </div>
@@ -189,10 +188,10 @@ export default function FleetManager() {
 
     if (userStatus === 'pending' || userStatus === 'rejected') return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center font-sans">
-            <div className="bg-slate-800 p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-red-500 animate-in zoom-in-95">
+            <div className="bg-slate-800 p-8 md:p-10 rounded-2xl shadow-2xl w-full max-w-md border-t-[12px] border-red-500 animate-in zoom-in-95">
                 <div className="flex justify-center mb-4"><Icons.Shield /></div>
-                <h2 className="text-3xl font-black uppercase italic mb-4">Access Restricted</h2>
-                <p className="opacity-50 font-bold mb-8">Your account is pending administrator approval. Please check back later.</p>
+                <h2 className="text-2xl md:text-3xl font-black uppercase italic mb-4">Access Restricted</h2>
+                <p className="opacity-50 font-bold mb-8 text-sm">Your account is pending administrator approval.</p>
                 <button onClick={()=>signOut(auth)} className="w-full py-4 bg-[#002d72] rounded-xl font-black uppercase tracking-widest shadow-xl hover:bg-blue-800 transition-colors">Sign Out</button>
             </div>
             <div className="absolute bottom-0 w-full"><Footer onShowLegal={setLegalType} darkMode={true} /></div>
@@ -203,7 +202,7 @@ export default function FleetManager() {
     const inactiveNavStyles = darkMode ? 'text-slate-400 hover:bg-slate-800/50 hover:text-white border-r-4 border-transparent' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-r-4 border-transparent';
 
     return (
-        <div className={`flex h-screen w-full font-sans overflow-hidden selection:bg-[#ef7c00] selection:text-white transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+        <div className={`flex h-[100dvh] w-full font-sans overflow-hidden selection:bg-[#ef7c00] selection:text-white transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
             {toast && <Toast message={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}
             {selectedBusDetail && (<div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200"><BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} statusOptions={statusOptions} /></div>)}
             {legalType && <LegalModal type={legalType} onClose={()=>setLegalType(null)} darkMode={darkMode} />}
@@ -226,27 +225,27 @@ export default function FleetManager() {
                     </ul>
                 </nav>
                 <div className={`p-4 border-t space-y-3 ${darkMode ? 'border-slate-800/50' : 'border-slate-200/50'}`}>
-                    <button onClick={exportExcel} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors ${darkMode ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}><Icons.Download /> Export Data</button>
+                    <button onClick={exportExcel} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors ${darkMode ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}><Icons.Download /> Export</button>
                     <div className="flex gap-2">
-                        <button onClick={()=>setDarkMode(!darkMode)} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-slate-800/50 text-yellow-400 border-slate-700/50 hover:bg-slate-700' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
+                        <button onClick={()=>setDarkMode(!darkMode)} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-slate-800/50 text-yellow-400 border-slate-700/50 hover:bg-slate-700' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}>{darkMode ? '☀️' : '🌙'}</button>
                         <button onClick={()=>signOut(auth)} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'}`}>Logout</button>
                     </div>
                 </div>
             </aside>
 
             {/* --- MOBILE HEADER & DRAWER --- */}
-            <div className={`md:hidden flex flex-col w-full h-full`}>
+            <div className={`md:hidden flex flex-col w-full h-full relative`}>
                 <header className={`flex items-center justify-between p-4 border-b flex-shrink-0 z-50 backdrop-blur-xl ${darkMode ? 'bg-slate-900/80 border-slate-800/50' : 'bg-white/80 border-slate-200/50'}`}>
                     <div className="flex items-center gap-2"><div className="w-1.5 h-6 bg-[#ef7c00] rounded-full shadow-[0_0_8px_rgba(239,124,0,0.5)]"></div><h1 className="font-black text-lg italic uppercase tracking-tighter">FleetFlow</h1></div>
                     <div className="flex gap-3 items-center">
                         <button onClick={()=>setDarkMode(!darkMode)} className="text-xl">{darkMode ? '☀️' : '🌙'}</button>
-                        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className={`p-2 rounded-lg ${darkMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-black'}`}><Icons.Menu /></button>
+                        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className={`p-2 rounded-lg ${darkMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-black'}`}>{isMobileMenuOpen ? <span className="text-xl font-bold">✕</span> : <Icons.Menu />}</button>
                     </div>
                 </header>
 
                 {isMobileMenuOpen && (
                     <div className={`absolute inset-0 top-[65px] z-40 flex flex-col backdrop-blur-xl ${darkMode ? 'bg-slate-900/95' : 'bg-white/95'} animate-in slide-in-from-top-2 duration-200`}>
-                        <nav className="flex-1 overflow-y-auto p-4">
+                        <nav className="flex-1 overflow-y-auto p-4 pb-20">
                             <ul className="space-y-2">
                                 {navItems.filter(item => !item.adminOnly || isAdmin).map(item => (
                                     <li key={item.id}>
@@ -255,24 +254,25 @@ export default function FleetManager() {
                                 ))}
                             </ul>
                         </nav>
-                        <div className={`p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                            <button onClick={exportExcel} className={`w-full flex items-center justify-center gap-2 py-4 mb-3 rounded-xl text-sm font-black uppercase tracking-widest ${darkMode ? 'bg-green-900/40 text-green-400' : 'bg-green-100 text-green-700'}`}><Icons.Download /> Export Data</button>
-                            <button onClick={()=>signOut(auth)} className={`w-full py-4 rounded-xl text-sm font-black uppercase tracking-widest ${darkMode ? 'bg-red-900/20 text-red-500' : 'bg-red-50 text-red-600'}`}>Logout</button>
+                        <div className={`p-4 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'} bg-inherit`}>
+                            <div className="flex gap-3">
+                                <button onClick={exportExcel} className={`flex-1 py-4 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 ${darkMode ? 'bg-green-900/40 text-green-400' : 'bg-green-100 text-green-700'}`}><Icons.Download /> Export</button>
+                                <button onClick={()=>signOut(auth)} className={`flex-1 py-4 rounded-xl text-xs font-black uppercase tracking-widest ${darkMode ? 'bg-red-900/20 text-red-500' : 'bg-red-50 text-red-600'}`}>Logout</button>
+                            </div>
                         </div>
                     </div>
                 )}
 
                 <div className={`flex-1 overflow-hidden ${isMobileMenuOpen ? 'hidden' : 'block'}`}>
-                    <main className="h-full overflow-y-auto p-4">
-                        {/* Render Mobile Views */}
+                    <main className="h-full overflow-y-auto p-3 md:p-4">
                         {view === 'admin' ? <AdminPanel showToast={showToast} darkMode={darkMode} /> :
                          view === 'input' ? <BusInputForm showToast={showToast} darkMode={darkMode} buses={buses} isAdmin={isAdmin} statusOptions={statusOptions} /> :
-                         view === 'analytics' ? <div className="space-y-10 animate-in fade-in duration-500"><StatusCharts buses={buses} statusOptions={statusOptions} darkMode={darkMode} /><AnalyticsDashboard buses={buses} showToast={showToast} darkMode={darkMode} /></div> :
+                         view === 'analytics' ? <div className="space-y-6 md:space-y-10 animate-in fade-in duration-500"><StatusCharts buses={buses} statusOptions={statusOptions} darkMode={darkMode} /><AnalyticsDashboard buses={buses} showToast={showToast} darkMode={darkMode} /></div> :
                          view === 'parts' ? <PartsInventory showToast={showToast} darkMode={darkMode} /> :
                          view === 'handover' ? <ShiftHandover buses={buses} showToast={showToast} /> :
                          view === 'personnel' ? <PersonnelManager showToast={showToast} darkMode={darkMode} /> :
                          view === 'disposition' ? <DispositionReport showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} /> :
-                         view === 'tracker' ? <div className={`h-[80vh] rounded-3xl border shadow-sm overflow-hidden relative ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}><BusTracker darkMode={darkMode} /></div> : (
+                         view === 'tracker' ? <div className={`h-[80vh] w-full rounded-2xl border shadow-sm overflow-hidden relative flex flex-col ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}><BusTracker darkMode={darkMode} /></div> : (
                             <InventoryView buses={buses} sortedBuses={sortedBuses} searchTerm={searchTerm} setSearchTerm={setSearchTerm} inventoryMode={inventoryMode} setInventoryMode={setInventoryMode} activeFilter={activeFilter} setActiveFilter={setActiveFilter} sortConfig={sortConfig} requestSort={requestSort} getStatusType={getStatusType} setSelectedBusDetail={setSelectedBusDetail} toggleFullScreen={toggleFullScreen} isFullscreen={isFullscreen} tvBoardRef={tvBoardRef} darkMode={darkMode} isAdmin={isAdmin} />
                          )}
                     </main>
@@ -288,7 +288,7 @@ export default function FleetManager() {
                  view === 'handover' ? <ShiftHandover buses={buses} showToast={showToast} /> :
                  view === 'personnel' ? <PersonnelManager showToast={showToast} darkMode={darkMode} /> :
                  view === 'disposition' ? <DispositionReport showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} /> :
-                 view === 'tracker' ? <div className={`h-[85vh] rounded-3xl border shadow-2xl overflow-hidden relative ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}><BusTracker darkMode={darkMode} /></div> : (
+                 view === 'tracker' ? <div className={`h-[85vh] rounded-3xl border shadow-2xl overflow-hidden relative flex flex-col ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}><BusTracker darkMode={darkMode} /></div> : (
                     <InventoryView buses={buses} sortedBuses={sortedBuses} searchTerm={searchTerm} setSearchTerm={setSearchTerm} inventoryMode={inventoryMode} setInventoryMode={setInventoryMode} activeFilter={activeFilter} setActiveFilter={setActiveFilter} sortConfig={sortConfig} requestSort={requestSort} getStatusType={getStatusType} setSelectedBusDetail={setSelectedBusDetail} toggleFullScreen={toggleFullScreen} isFullscreen={isFullscreen} tvBoardRef={tvBoardRef} darkMode={darkMode} isAdmin={isAdmin} />
                  )}
                  {view !== 'input' && view !== 'admin' && view !== 'personnel' && view !== 'analytics' && view !== 'disposition' && <div className="mt-12"><Footer onShowLegal={setLegalType} darkMode={darkMode} /></div>}
@@ -297,10 +297,9 @@ export default function FleetManager() {
     );
 }
 
-// --- SUB-COMPONENT: INVENTORY VIEW (Glassmorphism & Pastel Badges) ---
+// --- SUB-COMPONENT: INVENTORY VIEW (Optimized for Mobile) ---
 const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventoryMode, setInventoryMode, activeFilter, setActiveFilter, sortConfig, requestSort, getStatusType, setSelectedBusDetail, toggleFullScreen, isFullscreen, tvBoardRef, darkMode, isAdmin }: any) => {
     
-    // Helper to generate soft pastel badges for status (True Red)
     const getBadgeStyle = (type: string) => {
         if (type === 'ready') return darkMode ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border border-emerald-200';
         if (type === 'shop') return darkMode ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-200';
@@ -309,15 +308,15 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-[1600px] mx-auto h-full flex flex-col">
-            <div className="flex justify-between items-end mb-6">
+            <div className="flex justify-between items-end mb-4 md:mb-6">
                 <div>
-                    <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Fleet Inventory</h2>
-                    <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Live Status Board</p>
+                    <h2 className={`text-2xl md:text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Fleet Inventory</h2>
+                    <p className={`text-[9px] md:text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Live Status Board</p>
                 </div>
             </div>
 
-            {/* TOP METRIC CARDS (Glassy/Gradients) */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            {/* TOP METRIC CARDS (Responsive Gap) */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
                 {['Total', 'Ready', 'In Shop', 'Hold'].map(l => {
                     const count = l==='Total' ? buses.length : buses.filter((b: any)=> {
                         const type = getStatusType(b.status);
@@ -333,36 +332,35 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                         : (isSelected ? 'bg-gradient-to-br from-white to-blue-50 border-[#002d72] shadow-lg shadow-blue-900/5' : 'bg-gradient-to-br from-white to-slate-50 border-slate-200 hover:border-slate-300 shadow-sm');
 
                     return (
-                        <div key={l} onClick={()=>setActiveFilter(l==='Total'?'Total Fleet':l)} className={`cursor-pointer p-6 rounded-2xl border transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm ${cardBg}`}>
-                            <p className={`text-[9px] font-black uppercase tracking-widest mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{l}</p>
-                            <p className={`text-4xl font-black ${l==='Ready'?'text-emerald-500':l==='In Shop'?'text-amber-500':l==='Hold'?'text-red-500':(darkMode ? 'text-white' : 'text-slate-900')}`}>{count}</p>
+                        <div key={l} onClick={()=>setActiveFilter(l==='Total'?'Total Fleet':l)} className={`cursor-pointer p-4 md:p-6 rounded-xl md:rounded-2xl border transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm ${cardBg}`}>
+                            <p className={`text-[8px] md:text-[9px] font-black uppercase tracking-widest mb-1 md:mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{l}</p>
+                            <p className={`text-3xl md:text-4xl font-black ${l==='Ready'?'text-emerald-500':l==='In Shop'?'text-amber-500':l==='Hold'?'text-red-500':(darkMode ? 'text-white' : 'text-slate-900')}`}>{count}</p>
                         </div>
                     );
                 })}
             </div>
             
-            {/* SEARCH & FILTERS */}
-            <div className="flex flex-col xl:flex-row justify-between items-end gap-4 mb-6">
-                <input className={`w-full xl:max-w-md p-3.5 rounded-xl border-2 font-bold outline-none transition-all duration-300 focus:ring-4 focus:ring-[#ef7c00]/20 focus:border-[#ef7c00] ${darkMode ? 'bg-slate-900/50 border-slate-800 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-black placeholder:text-slate-400 shadow-sm'}`} placeholder="Search Unit # or Location..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
-                <div className={`flex w-full xl:w-auto gap-2 p-1.5 border rounded-xl shadow-sm ${darkMode ? 'bg-slate-900/50 border-slate-800 backdrop-blur-md' : 'bg-white border-slate-200'}`}>
-                    {['list', 'grid', 'tv'].map(m => <button key={m} onClick={()=>setInventoryMode(m as any)} className={`flex-1 xl:flex-none px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all duration-300 ${inventoryMode === m ? 'bg-[#ef7c00] text-white shadow-md' : (darkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-[#002d72] hover:bg-slate-50')}`}>{m}</button>)}
-                    {inventoryMode === 'tv' && <button onClick={toggleFullScreen} className={`flex-1 xl:flex-none px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all flex items-center justify-center gap-1 ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]'}`}>⛶ Fullscreen</button>}
+            {/* SEARCH & FILTERS (Stacked on Mobile) */}
+            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-end gap-3 md:gap-4 mb-6">
+                <input className={`w-full md:max-w-md p-3 md:p-3.5 rounded-xl border-2 font-bold outline-none transition-all duration-300 focus:ring-4 focus:ring-[#ef7c00]/20 focus:border-[#ef7c00] text-sm md:text-base ${darkMode ? 'bg-slate-900/50 border-slate-800 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-black placeholder:text-slate-400 shadow-sm'}`} placeholder="Search Unit # or Location..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+                <div className={`flex w-full md:w-auto gap-1 md:gap-2 p-1.5 border rounded-xl shadow-sm ${darkMode ? 'bg-slate-900/50 border-slate-800 backdrop-blur-md' : 'bg-white border-slate-200'}`}>
+                    {['list', 'grid', 'tv'].map(m => <button key={m} onClick={()=>setInventoryMode(m as any)} className={`flex-1 md:flex-none px-4 md:px-6 py-2.5 md:py-2 text-[9px] md:text-[10px] font-black uppercase rounded-lg transition-all duration-300 ${inventoryMode === m ? 'bg-[#ef7c00] text-white shadow-md' : (darkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-[#002d72] hover:bg-slate-50')}`}>{m}</button>)}
+                    {inventoryMode === 'tv' && <button onClick={toggleFullScreen} className={`hidden md:flex px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all items-center justify-center gap-1 ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#002d72]'}`}>⛶ Fullscreen</button>}
                 </div>
             </div>
             
             {/* INVENTORY CONTAINER */}
-            <div className={`rounded-3xl border shadow-xl overflow-hidden backdrop-blur-xl flex-grow flex flex-col ${darkMode ? 'bg-slate-900/50 border-slate-800/50' : 'bg-white/80 border-slate-200/50'}`}>
+            <div className={`rounded-2xl md:rounded-3xl border shadow-xl overflow-hidden backdrop-blur-xl flex-grow flex flex-col min-h-[400px] md:min-h-[500px] ${darkMode ? 'bg-slate-900/50 border-slate-800/50' : 'bg-white/80 border-slate-200/50'}`}>
                 
                 {/* TV MODE */}
                 {inventoryMode === 'tv' && (
-                    <div ref={tvBoardRef} className={`p-4 sm:p-8 overflow-y-auto custom-scrollbar w-full ${isFullscreen ? (darkMode ? 'bg-slate-950 text-white h-screen' : 'bg-slate-50 text-slate-900 h-screen') : 'min-h-[500px]'}`}>
+                    <div ref={tvBoardRef} className={`p-4 sm:p-8 overflow-y-auto custom-scrollbar w-full ${isFullscreen ? (darkMode ? 'bg-slate-950 text-white h-screen' : 'bg-slate-50 text-slate-900 h-screen') : 'h-full'}`}>
                         {isFullscreen && (
                             <div className={`flex justify-between items-end mb-8 border-b-2 pb-6 ${darkMode ? 'border-slate-800' : 'border-slate-300'}`}>
-                                <div><h2 className="text-6xl font-black uppercase tracking-tighter text-[#ef7c00]">Fleet Status Board</h2><p className={`text-2xl font-bold mt-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Total Units: {buses.length} | Down: <span className="text-red-500">{buses.filter((b:any)=>b.status!=='Active').length}</span></p></div>
-                                <button onClick={toggleFullScreen} className="px-10 py-5 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest text-lg shadow-2xl transition-all transform active:scale-95">Exit Fullscreen</button>
+                                <div><h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter text-[#ef7c00]">Fleet Status Board</h2><p className={`text-xl md:text-2xl font-bold mt-2 md:mt-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Total Units: {buses.length} | Down: <span className="text-red-500">{buses.filter((b:any)=>b.status!=='Active').length}</span></p></div>
                             </div>
                         )}
-                        <div className={`grid gap-4 sm:gap-6 pb-20 ${isFullscreen ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5'}`}>
+                        <div className={`grid gap-3 sm:gap-6 pb-20 ${isFullscreen ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5'}`}>
                             {sortedBuses.map((b: any) => {
                                 const type = getStatusType(b.status);
                                 const cardBg = darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200';
@@ -370,11 +368,11 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                                 const borderColor = type==='ready'?'border-emerald-500/30':type==='shop'?'border-amber-500/30':'border-red-600/30';
                                 
                                 return (
-                                    <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`cursor-pointer p-5 rounded-2xl flex flex-col justify-between border-[3px] shadow-lg transition-transform hover:scale-105 ${borderColor} ${cardBg}`}>
-                                        <div className="flex justify-between items-start mb-4"><span className={`text-5xl font-black leading-none tracking-tighter ${color}`}>#{b.number}</span><span className={`w-fit px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-sm ${getBadgeStyle(type)}`}>{b.status}</span></div>
-                                        <div className={`text-base font-black mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'Location Unavailable'}</div>
-                                        <div className={`text-sm font-bold leading-relaxed mb-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.notes || 'No active faults recorded.'}</div>
-                                        <div className="mt-auto pt-2">{b.status !== 'Active' && <div className={`text-sm font-black px-3 py-2 rounded-xl text-center tracking-widest ${type==='shop'?'bg-amber-500/10 text-amber-600 border border-amber-500/20':'bg-red-500/10 text-red-500 border border-red-500/20'}`}>DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}</div>
+                                    <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`cursor-pointer p-4 md:p-5 rounded-xl md:rounded-2xl flex flex-col justify-between border-[3px] shadow-md transition-transform hover:scale-105 ${borderColor} ${cardBg}`}>
+                                        <div className="flex justify-between items-start mb-3 md:mb-4"><span className={`text-4xl md:text-5xl font-black leading-none tracking-tighter ${color}`}>#{b.number}</span><span className={`w-fit px-2 md:px-3 py-1 md:py-1.5 rounded-full text-[10px] md:text-xs font-black uppercase tracking-widest shadow-sm ${getBadgeStyle(type)}`}>{b.status}</span></div>
+                                        <div className={`text-sm md:text-base font-black mb-2 md:mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📍 {b.location || 'Location Unavailable'}</div>
+                                        <div className={`text-xs md:text-sm font-bold leading-relaxed mb-3 md:mb-4 line-clamp-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{b.notes || 'No active faults recorded.'}</div>
+                                        <div className="mt-auto pt-2">{b.status !== 'Active' && <div className={`text-xs md:text-sm font-black px-2 md:px-3 py-1.5 md:py-2 rounded-lg md:rounded-xl text-center tracking-widest ${type==='shop'?'bg-amber-500/10 text-amber-600 border border-amber-500/20':'bg-red-500/10 text-red-500 border border-red-500/20'}`}>DOWN {calculateDaysOOS(b.oosStartDate)} DAYS</div>}</div>
                                     </div>
                                 );
                             })}
@@ -382,27 +380,27 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                     </div>
                 )}
 
-                {/* GRID MODE */}
+                {/* GRID MODE (Fixed for Mobile - 1 column on smallest screens) */}
                 {inventoryMode === 'grid' && (
-                    <div className="p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-5 overflow-y-auto custom-scrollbar">
+                    <div className="p-4 md:p-6 grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-5 overflow-y-auto custom-scrollbar h-full">
                         {sortedBuses.map((b: any) => {
                             const type = getStatusType(b.status);
                             const cardBg = darkMode ? 'bg-gradient-to-br from-slate-800 to-slate-800/80 border-slate-700 hover:border-slate-500' : 'bg-gradient-to-br from-white to-slate-50/50 border-slate-200 hover:border-slate-300';
                             
                             return (
-                                <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`group cursor-pointer p-5 rounded-2xl border transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 flex flex-col ${cardBg}`}>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <span className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>#{b.number}</span>
-                                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm ${getBadgeStyle(type)}`}>{b.status}</span>
+                                <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`group cursor-pointer p-4 md:p-5 rounded-xl md:rounded-2xl border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 flex flex-col ${cardBg}`}>
+                                    <div className="flex justify-between items-start mb-3 md:mb-4">
+                                        <span className={`text-xl md:text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>#{b.number}</span>
+                                        <span className={`px-2 md:px-2.5 py-1 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest shadow-sm ${getBadgeStyle(type)}`}>{b.status}</span>
                                     </div>
-                                    <div className={`flex items-center gap-2 text-xs font-bold mb-2 truncate ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                    <div className={`flex items-center gap-1.5 md:gap-2 text-[10px] md:text-xs font-bold mb-2 truncate ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                                         <span className="opacity-50">📍</span> {b.location || 'Location Unavailable'}
                                     </div>
-                                    <div className={`text-[11px] font-medium leading-snug line-clamp-2 mb-4 h-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    <div className={`text-[10px] md:text-[11px] font-medium leading-snug line-clamp-2 mb-3 md:mb-4 h-7 md:h-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                         {b.notes || <span className="italic opacity-50">No active faults recorded.</span>}
                                     </div>
                                     {b.status !== 'Active' && (
-                                        <div className={`mt-auto text-[9px] font-black uppercase tracking-widest px-3 py-2 rounded-lg text-center ${type==='shop'?'bg-amber-500/10 text-amber-600 border border-amber-500/20 dark:text-amber-400':'bg-red-500/10 text-red-500 border border-red-500/20 dark:text-red-400'}`}>
+                                        <div className={`mt-auto text-[8px] md:text-[9px] font-black uppercase tracking-widest px-2 md:px-3 py-1.5 md:py-2 rounded-lg text-center ${type==='shop'?'bg-amber-500/10 text-amber-600 border border-amber-500/20 dark:text-amber-400':'bg-red-500/10 text-red-500 border border-red-500/20 dark:text-red-400'}`}>
                                             Down {calculateDaysOOS(b.oosStartDate)} Days
                                         </div>
                                     )}
@@ -412,17 +410,17 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                     </div>
                 )}
 
-                {/* LIST MODE */}
+                {/* LIST MODE (Optimized Table Paddings) */}
                 {inventoryMode === 'list' && (
                     <div className="overflow-x-auto overflow-y-auto flex-grow custom-scrollbar">
-                        <table className="w-full text-left text-sm">
-                            <thead className={`font-black uppercase text-[10px] tracking-widest border-b sticky top-0 z-10 ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                        <table className="w-full text-left text-xs md:text-sm">
+                            <thead className={`font-black uppercase text-[8px] md:text-[10px] tracking-widest border-b sticky top-0 z-10 ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                                 <tr>
-                                    <th className="p-5 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('number')}>Unit #</th>
-                                    <th className="p-5">Status</th>
-                                    <th className="p-5">Location</th>
-                                    <th className="p-5">Notes</th>
-                                    <th className="p-5 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('daysOOS')}>Days OOS</th>
+                                    <th className="p-3 md:p-5 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('number')}>Unit #</th>
+                                    <th className="p-3 md:p-5">Status</th>
+                                    <th className="p-3 md:p-5">Location</th>
+                                    <th className="p-3 md:p-5 hidden sm:table-cell">Notes</th>
+                                    <th className="p-3 md:p-5 cursor-pointer hover:text-[#ef7c00] transition-colors text-right md:text-left" onClick={()=>requestSort('daysOOS')}>Days OOS</th>
                                 </tr>
                             </thead>
                             <tbody className={`divide-y ${darkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
@@ -430,11 +428,11 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                                     const type = getStatusType(b.status);
                                     return (
                                         <tr key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`cursor-pointer transition-colors duration-200 ${darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-blue-50/50'}`}>
-                                            <td className="p-5 font-black text-lg">#{b.number}</td>
-                                            <td className="p-5"><span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${getBadgeStyle(type)}`}>{b.status}</span></td>
-                                            <td className="p-5 font-bold text-xs">{b.location || '-'}</td>
-                                            <td className="p-5 font-medium text-xs opacity-70 max-w-xs truncate">{b.notes || '-'}</td>
-                                            <td className={`p-5 font-black ${type==='shop'?'text-amber-500':type==='hold'?'text-red-500':''}`}>{b.status !== 'Active' ? calculateDaysOOS(b.oosStartDate) : '-'}</td>
+                                            <td className="p-3 md:p-5 font-black text-base md:text-lg">#{b.number}</td>
+                                            <td className="p-3 md:p-5"><span className={`px-2 py-1 md:px-2.5 md:py-1 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${getBadgeStyle(type)}`}>{b.status}</span></td>
+                                            <td className="p-3 md:p-5 font-bold text-[10px] md:text-xs truncate max-w-[100px] md:max-w-none">{b.location || '-'}</td>
+                                            <td className="p-3 md:p-5 font-medium text-[10px] md:text-xs opacity-70 max-w-[120px] md:max-w-xs truncate hidden sm:table-cell">{b.notes || '-'}</td>
+                                            <td className={`p-3 md:p-5 font-black text-right md:text-left ${type==='shop'?'text-amber-500':type==='hold'?'text-red-500':''}`}>{b.status !== 'Active' ? calculateDaysOOS(b.oosStartDate) : '-'}</td>
                                         </tr>
                                     );
                                 })}

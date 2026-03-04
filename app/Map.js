@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
 // --- CUSTOM CSS MARKERS ---
-const createBusIcon = (isStale: boolean, isSelected: boolean) => {
+const createBusIcon = (isStale, isSelected) => {
     const color = isStale ? '#f43f5e' : '#10b981'; // Rose for stale (Ghost), Emerald for live
     const size = isSelected ? 24 : 14; // Make the selected bus larger
     const ringSize = isSelected ? 4 : 2;
@@ -53,7 +53,7 @@ const createBusIcon = (isStale: boolean, isSelected: boolean) => {
 };
 
 // --- MAP CONTROLLER (For Auto-Zooming) ---
-const MapController = ({ center, zoom }: { center: [number, number] | null, zoom: number }) => {
+const MapController = ({ center, zoom }) => {
     const map = useMap();
     useEffect(() => {
         if (center) {
@@ -64,12 +64,12 @@ const MapController = ({ center, zoom }: { center: [number, number] | null, zoom
 };
 
 // --- MAIN MAP COMPONENT ---
-export default function Map({ buses, selectedId, routes, darkMode }: any) {
-    const defaultCenter: [number, number] = [33.7490, -84.3880]; // Atlanta Center
+export default function Map({ buses, selectedId, routes, darkMode }) {
+    const defaultCenter = [33.7490, -84.3880]; // Atlanta Center
     
     // Find the currently selected bus to center the map
-    const selectedBus = buses.find((b: any) => b.vehicle?.vehicle?.id === selectedId);
-    const centerPoint: [number, number] | null = selectedBus && selectedBus.vehicle?.position?.latitude 
+    const selectedBus = buses?.find((b) => b.vehicle?.vehicle?.id === selectedId);
+    const centerPoint = selectedBus && selectedBus.vehicle?.position?.latitude 
         ? [selectedBus.vehicle.position.latitude, selectedBus.vehicle.position.longitude] 
         : null;
 
@@ -93,7 +93,7 @@ export default function Map({ buses, selectedId, routes, darkMode }: any) {
             {/* Triggers the "Fly-to" animation when you click a bus in the sidebar */}
             {centerPoint && <MapController center={centerPoint} zoom={16} />}
 
-            {buses.map((v: any) => {
+            {buses?.map((v) => {
                 const vehicle = v.vehicle;
                 const lat = vehicle?.position?.latitude;
                 const lng = vehicle?.position?.longitude;

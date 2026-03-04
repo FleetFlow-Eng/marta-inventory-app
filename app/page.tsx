@@ -25,7 +25,7 @@ const BusTracker = dynamic(() => import('./BusTracker'), {
     loading: () => <div className="flex items-center justify-center h-[50vh] bg-slate-100 rounded-2xl"><div className="w-12 h-12 border-4 border-[#002d72] border-t-transparent rounded-full animate-spin"></div></div> 
 });
 
-// --- ICONS (Inline SVGs) ---
+// --- ICONS ---
 const Icons = {
     Grid: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
     Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
@@ -147,18 +147,6 @@ export default function FleetManager() {
         const buf = await wb.xlsx.writeBuffer(); saveAs(new Blob([buf]), `Fleet_Status_Report.xlsx`); showToast("Excel Downloaded", 'success');
     };
 
-    const handleAuth = async (e: any) => {
-        e.preventDefault();
-        try {
-            if (isSignUp) {
-                const cred = await createUserWithEmailAndPassword(auth, email, password);
-                await setDoc(doc(db, "users", cred.user.uid), { email: email.toLowerCase(), status: 'pending', role: 'user', createdAt: serverTimestamp() });
-                showToast("Account Created. Pending Approval.", "success");
-            } else { await signInWithEmailAndPassword(auth, email, password); }
-        } catch(e: any) { showToast(e.message.replace('Firebase: ', ''), "error"); }
-    };
-
-    // --- NAVIGATION STRUCTURE ---
     const navItems = [
         { id: 'inventory', label: 'Inventory', icon: <Icons.Grid />, adminOnly: false },
         { id: 'input', label: 'Data Entry', icon: <Icons.Edit />, adminOnly: false },
@@ -229,7 +217,7 @@ export default function FleetManager() {
                     <button onClick={exportExcel} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors ${darkMode ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}><Icons.Download /> Export Data</button>
                     <div className="flex gap-2">
                         <button onClick={()=>setDarkMode(!darkMode)} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-slate-800/50 text-yellow-400 border-slate-700/50 hover:bg-slate-700' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
-                        <button onClick={()=>signOut(auth)} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100'}`}>Logout</button>
+                        <button onClick={()=>signOut(auth)} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${darkMode ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'}`}>Logout</button>
                     </div>
                 </div>
             </aside>
@@ -255,16 +243,11 @@ export default function FleetManager() {
                                 ))}
                             </ul>
                         </nav>
-                        <div className={`p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                            <button onClick={exportExcel} className={`w-full flex items-center justify-center gap-2 py-4 mb-3 rounded-xl text-sm font-black uppercase tracking-widest ${darkMode ? 'bg-green-900/40 text-green-400' : 'bg-green-100 text-green-700'}`}><Icons.Download /> Export Data</button>
-                            <button onClick={()=>signOut(auth)} className={`w-full py-4 rounded-xl text-sm font-black uppercase tracking-widest ${darkMode ? 'bg-red-900/20 text-red-500' : 'bg-red-50 text-red-600'}`}>Logout</button>
-                        </div>
                     </div>
                 )}
 
                 <div className={`flex-1 overflow-hidden ${isMobileMenuOpen ? 'hidden' : 'block'}`}>
                     <main className="h-full overflow-y-auto p-4">
-                        {/* Render Mobile Views */}
                         {view === 'admin' ? <AdminPanel showToast={showToast} darkMode={darkMode} /> :
                          view === 'input' ? <BusInputForm showToast={showToast} darkMode={darkMode} buses={buses} isAdmin={isAdmin} statusOptions={statusOptions} /> :
                          view === 'analytics' ? <div className="space-y-10 animate-in fade-in duration-500"><StatusCharts buses={buses} statusOptions={statusOptions} darkMode={darkMode} /><AnalyticsDashboard buses={buses} showToast={showToast} darkMode={darkMode} /></div> :
@@ -297,10 +280,8 @@ export default function FleetManager() {
     );
 }
 
-// --- SUB-COMPONENT: INVENTORY VIEW (Glassmorphism & Pastel Badges) ---
 const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventoryMode, setInventoryMode, activeFilter, setActiveFilter, sortConfig, requestSort, getStatusType, setSelectedBusDetail, toggleFullScreen, isFullscreen, tvBoardRef, darkMode, isAdmin }: any) => {
     
-    // Helper to generate soft pastel badges for status (True Red)
     const getBadgeStyle = (type: string) => {
         if (type === 'ready') return darkMode ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border border-emerald-200';
         if (type === 'shop') return darkMode ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-200';
@@ -310,13 +291,9 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-[1600px] mx-auto h-full flex flex-col">
             <div className="flex justify-between items-end mb-6">
-                <div>
-                    <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Fleet Inventory</h2>
-                    <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Live Status Board</p>
-                </div>
+                <div><h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Fleet Inventory</h2><p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Live Status Board</p></div>
             </div>
 
-            {/* TOP METRIC CARDS (Glassy/Gradients) */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 {['Total', 'Ready', 'In Shop', 'Hold'].map(l => {
                     const count = l==='Total' ? buses.length : buses.filter((b: any)=> {
@@ -328,20 +305,13 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                     }).length;
                     
                     const isSelected = activeFilter === (l==='Total'?'Total Fleet':l);
-                    const cardBg = darkMode 
-                        ? (isSelected ? 'bg-gradient-to-br from-slate-800 to-slate-800 border-[#ef7c00] shadow-[0_0_15px_rgba(239,124,0,0.1)]' : 'bg-gradient-to-br from-slate-900 to-slate-900/50 border-slate-800 hover:border-slate-700')
-                        : (isSelected ? 'bg-gradient-to-br from-white to-blue-50 border-[#002d72] shadow-lg shadow-blue-900/5' : 'bg-gradient-to-br from-white to-slate-50 border-slate-200 hover:border-slate-300 shadow-sm');
-
+                    const cardBg = darkMode ? (isSelected ? 'bg-gradient-to-br from-slate-800 to-slate-800 border-[#ef7c00] shadow-[0_0_15px_rgba(239,124,0,0.1)]' : 'bg-gradient-to-br from-slate-900 to-slate-900/50 border-slate-800 hover:border-slate-700') : (isSelected ? 'bg-gradient-to-br from-white to-blue-50 border-[#002d72] shadow-lg shadow-blue-900/5' : 'bg-gradient-to-br from-white to-slate-50 border-slate-200 hover:border-slate-300 shadow-sm');
                     return (
-                        <div key={l} onClick={()=>setActiveFilter(l==='Total'?'Total Fleet':l)} className={`cursor-pointer p-6 rounded-2xl border transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm ${cardBg}`}>
-                            <p className={`text-[9px] font-black uppercase tracking-widest mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{l}</p>
-                            <p className={`text-4xl font-black ${l==='Ready'?'text-emerald-500':l==='In Shop'?'text-amber-500':l==='Hold'?'text-red-500':(darkMode ? 'text-white' : 'text-slate-900')}`}>{count}</p>
-                        </div>
+                        <div key={l} onClick={()=>setActiveFilter(l==='Total'?'Total Fleet':l)} className={`cursor-pointer p-6 rounded-2xl border transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm ${cardBg}`}><p className={`text-[9px] font-black uppercase tracking-widest mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{l}</p><p className={`text-4xl font-black ${l==='Ready'?'text-emerald-500':l==='In Shop'?'text-amber-500':l==='Hold'?'text-red-500':(darkMode ? 'text-white' : 'text-slate-900')}`}>{count}</p></div>
                     );
                 })}
             </div>
             
-            {/* SEARCH & FILTERS */}
             <div className="flex flex-col xl:flex-row justify-between items-end gap-4 mb-6">
                 <input className={`w-full xl:max-w-md p-3.5 rounded-xl border-2 font-bold outline-none transition-all duration-300 focus:ring-4 focus:ring-[#ef7c00]/20 focus:border-[#ef7c00] ${darkMode ? 'bg-slate-900/50 border-slate-800 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-black placeholder:text-slate-400 shadow-sm'}`} placeholder="Search Unit # or Location..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
                 <div className={`flex w-full xl:w-auto gap-2 p-1.5 border rounded-xl shadow-sm ${darkMode ? 'bg-slate-900/50 border-slate-800 backdrop-blur-md' : 'bg-white border-slate-200'}`}>
@@ -350,16 +320,12 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                 </div>
             </div>
             
-            {/* INVENTORY CONTAINER */}
             <div className={`rounded-3xl border shadow-xl overflow-hidden backdrop-blur-xl flex-grow flex flex-col ${darkMode ? 'bg-slate-900/50 border-slate-800/50' : 'bg-white/80 border-slate-200/50'}`}>
-                
-                {/* TV MODE */}
                 {inventoryMode === 'tv' && (
-                    <div ref={tvBoardRef} className={`p-4 sm:p-8 overflow-y-auto custom-scrollbar w-full ${isFullscreen ? (darkMode ? 'bg-slate-950 text-white h-screen' : 'bg-slate-50 text-slate-900 h-screen') : 'min-h-[500px]'}`}>
+                    <div ref={tvBoardRef} className={`p-4 sm:p-8 overflow-y-auto custom-scrollbar w-full ${isFullscreen ? (darkMode ? 'bg-slate-950 text-white min-h-screen' : 'bg-slate-50 text-slate-900 min-h-screen') : 'min-h-[500px]'}`}>
                         {isFullscreen && (
                             <div className={`flex justify-between items-end mb-8 border-b-2 pb-6 ${darkMode ? 'border-slate-800' : 'border-slate-300'}`}>
                                 <div><h2 className="text-6xl font-black uppercase tracking-tighter text-[#ef7c00]">Fleet Status Board</h2><p className={`text-2xl font-bold mt-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Total Units: {buses.length} | Down: <span className="text-red-500">{buses.filter((b:any)=>b.status!=='Active').length}</span></p></div>
-                                <button onClick={toggleFullScreen} className="px-10 py-5 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest text-lg shadow-2xl transition-all transform active:scale-95">Exit Fullscreen</button>
                             </div>
                         )}
                         <div className={`grid gap-4 sm:gap-6 pb-20 ${isFullscreen ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5'}`}>
@@ -368,7 +334,6 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                                 const cardBg = darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200';
                                 const color = type==='ready'?'text-emerald-500':type==='shop'?'text-amber-500':'text-red-500';
                                 const borderColor = type==='ready'?'border-emerald-500/30':type==='shop'?'border-amber-500/30':'border-red-600/30';
-                                
                                 return (
                                     <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`cursor-pointer p-5 rounded-2xl flex flex-col justify-between border-[3px] shadow-lg transition-transform hover:scale-105 ${borderColor} ${cardBg}`}>
                                         <div className="flex justify-between items-start mb-4"><span className={`text-5xl font-black leading-none tracking-tighter ${color}`}>#{b.number}</span><span className={`w-fit px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-sm ${getBadgeStyle(type)}`}>{b.status}</span></div>
@@ -382,48 +347,28 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                     </div>
                 )}
 
-                {/* GRID MODE */}
                 {inventoryMode === 'grid' && (
                     <div className="p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-5 overflow-y-auto custom-scrollbar">
                         {sortedBuses.map((b: any) => {
                             const type = getStatusType(b.status);
                             const cardBg = darkMode ? 'bg-gradient-to-br from-slate-800 to-slate-800/80 border-slate-700 hover:border-slate-500' : 'bg-gradient-to-br from-white to-slate-50/50 border-slate-200 hover:border-slate-300';
-                            
                             return (
                                 <div key={b.docId} onClick={()=>setSelectedBusDetail(b)} className={`group cursor-pointer p-5 rounded-2xl border transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 flex flex-col ${cardBg}`}>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <span className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>#{b.number}</span>
-                                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm ${getBadgeStyle(type)}`}>{b.status}</span>
-                                    </div>
-                                    <div className={`flex items-center gap-2 text-xs font-bold mb-2 truncate ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                                        <span className="opacity-50">📍</span> {b.location || 'Location Unavailable'}
-                                    </div>
-                                    <div className={`text-[11px] font-medium leading-snug line-clamp-2 mb-4 h-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                        {b.notes || <span className="italic opacity-50">No active faults recorded.</span>}
-                                    </div>
-                                    {b.status !== 'Active' && (
-                                        <div className={`mt-auto text-[9px] font-black uppercase tracking-widest px-3 py-2 rounded-lg text-center ${type==='shop'?'bg-amber-500/10 text-amber-600 border border-amber-500/20 dark:text-amber-400':'bg-red-500/10 text-red-500 border border-red-500/20 dark:text-red-400'}`}>
-                                            Down {calculateDaysOOS(b.oosStartDate)} Days
-                                        </div>
-                                    )}
+                                    <div className="flex justify-between items-start mb-4"><span className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>#{b.number}</span><span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm ${getBadgeStyle(type)}`}>{b.status}</span></div>
+                                    <div className={`flex items-center gap-2 text-xs font-bold mb-2 truncate ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}><span className="opacity-50">📍</span> {b.location || 'Location Unavailable'}</div>
+                                    <div className={`text-[11px] font-medium leading-snug line-clamp-2 mb-4 h-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{b.notes || <span className="italic opacity-50">No active faults recorded.</span>}</div>
+                                    {b.status !== 'Active' && <div className={`mt-auto text-[9px] font-black uppercase tracking-widest px-3 py-2 rounded-lg text-center ${type==='shop'?'bg-amber-500/10 text-amber-600 border border-amber-500/20 dark:text-amber-400':'bg-red-500/10 text-red-500 border border-red-500/20 dark:text-red-400'}`}>Down {calculateDaysOOS(b.oosStartDate)} Days</div>}
                                 </div>
                             );
                         })}
                     </div>
                 )}
 
-                {/* LIST MODE */}
                 {inventoryMode === 'list' && (
                     <div className="overflow-x-auto overflow-y-auto flex-grow custom-scrollbar">
                         <table className="w-full text-left text-sm">
                             <thead className={`font-black uppercase text-[10px] tracking-widest border-b sticky top-0 z-10 ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                <tr>
-                                    <th className="p-5 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('number')}>Unit #</th>
-                                    <th className="p-5">Status</th>
-                                    <th className="p-5">Location</th>
-                                    <th className="p-5">Notes</th>
-                                    <th className="p-5 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('daysOOS')}>Days OOS</th>
-                                </tr>
+                                <tr><th className="p-5 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('number')}>Unit #</th><th className="p-5">Status</th><th className="p-5">Location</th><th className="p-5">Notes</th><th className="p-5 cursor-pointer hover:text-[#ef7c00] transition-colors" onClick={()=>requestSort('daysOOS')}>Days OOS</th></tr>
                             </thead>
                             <tbody className={`divide-y ${darkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
                                 {sortedBuses.map((b: any) => {

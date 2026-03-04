@@ -21,6 +21,9 @@ export default function BusTracker({ darkMode = false }: { darkMode?: boolean })
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("unit");
   const [filterStatus, setFilterStatus] = useState("all");
+  
+  // NEW: State to track if the user is looking at the Map or the List on mobile
+  const [mobileView, setMobileView] = useState<'map' | 'list'>('map');
 
   // Configuration: 1 Year timeout (ghost buses essentially never disappear)
   const GHOST_TIMEOUT = 31536000000; 
@@ -106,8 +109,14 @@ export default function BusTracker({ darkMode = false }: { darkMode?: boolean })
   return (
     <div className={`flex h-full overflow-hidden rounded-3xl border shadow-xl relative ${darkMode ? 'border-slate-800' : 'border-slate-300'}`}>
       
-      {/* SIDEBAR COMMAND CENTER */}
-      <div className={`w-80 flex flex-col flex-shrink-0 border-r z-10 hidden sm:flex ${sidebarBg}`}>
+      {/* FLOATING MOBILE TOGGLE */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[2000] sm:hidden flex bg-slate-900/90 backdrop-blur-md p-1.5 rounded-full shadow-2xl border border-slate-700">
+         <button onClick={() => setMobileView('map')} className={`px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-300 ${mobileView === 'map' ? 'bg-[#ef7c00] text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Map</button>
+         <button onClick={() => setMobileView('list')} className={`px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-300 ${mobileView === 'list' ? 'bg-[#ef7c00] text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>List</button>
+      </div>
+
+      {/* SIDEBAR COMMAND CENTER (Toggles visibility on mobile) */}
+      <div className={`w-full sm:w-80 flex-col flex-shrink-0 border-r z-10 ${mobileView === 'list' ? 'flex' : 'hidden'} sm:flex ${sidebarBg}`}>
         
         {/* Header & Search */}
         <div className={`p-5 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
@@ -156,7 +165,7 @@ export default function BusTracker({ darkMode = false }: { darkMode?: boolean })
         </div>
 
         {/* Bus List */}
-        <div className="flex-grow overflow-y-auto custom-scrollbar p-2 space-y-1">
+        <div className="flex-grow overflow-y-auto custom-scrollbar p-2 space-y-1 pb-24 sm:pb-2">
           {processedVehicles.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 opacity-40">
                   <span className="text-2xl mb-2">📡</span>
@@ -180,7 +189,10 @@ export default function BusTracker({ darkMode = false }: { darkMode?: boolean })
             return (
               <button 
                   key={v.id} 
-                  onClick={() => setSelectedId(vehicle?.vehicle?.id)} 
+                  onClick={() => {
+                      setSelectedId(vehicle?.vehicle?.id);
+                      setMobileView('map'); // Auto-switch to map on mobile when a bus is clicked
+                  }} 
                   className={`w-full p-3 rounded-xl border-l-4 text-left flex items-center justify-between group transition-all duration-200 ${itemBg}`}
               >
                 <div>
@@ -203,8 +215,8 @@ export default function BusTracker({ darkMode = false }: { darkMode?: boolean })
         </div>
       </div>
 
-      {/* MAP CONTAINER */}
-      <div className={`flex-grow relative bg-slate-100 ${darkMode ? 'bg-[#0f172a]' : 'bg-[#e2e8f0]'}`}>
+      {/* MAP CONTAINER (Toggles visibility on mobile) */}
+      <div className={`flex-grow relative bg-slate-100 ${darkMode ? 'bg-[#0f172a]' : 'bg-[#e2e8f0]'} ${mobileView === 'map' ? 'block' : 'hidden'} sm:block`}>
         <Map buses={vehicles} selectedId={selectedId} routes={routes} darkMode={darkMode} />
         {/* Subtle interior shadow for depth */}
         <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_50px_rgba(0,0,0,0.1)] z-[400]"></div>

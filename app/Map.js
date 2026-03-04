@@ -3,15 +3,15 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// --- CUSTOM CSS MARKERS ---
-const createBusIcon = (isStale, isSelected) => {
+// --- CUSTOM CSS MARKERS WITH TEXT LABELS ---
+const createBusIcon = (isStale, isSelected, busNum, darkMode) => {
     const color = isStale ? '#f43f5e' : '#10b981'; // Rose for stale (Ghost), Emerald for live
     const size = isSelected ? 24 : 14; // Make the selected bus larger
     const ringSize = isSelected ? 4 : 2;
     const shadow = isSelected ? `0 0 15px ${color}` : `0 0 8px ${color}88`;
     
     const html = `
-        <div style="position: relative; display: flex; align-items: center; justify-content: center; width: ${size}px; height: ${size}px;">
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; width: ${size}px; height: ${size}px;">
             <div style="
                 background-color: ${color};
                 width: 100%;
@@ -34,6 +34,20 @@ const createBusIcon = (isStale, isSelected) => {
                 z-index: 1;
             "></div>
             ` : ''}
+            <div style="
+                position: absolute;
+                top: ${size + 4}px;
+                background: ${darkMode ? '#0f172a' : '#ffffff'};
+                color: ${darkMode ? '#ffffff' : '#0f172a'};
+                font-size: 9px;
+                font-weight: 900;
+                padding: 2px 5px;
+                border-radius: 4px;
+                border: 1px solid ${color};
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                white-space: nowrap;
+                z-index: 3;
+            ">${busNum}</div>
         </div>
         <style>
             @keyframes pulse {
@@ -48,7 +62,7 @@ const createBusIcon = (isStale, isSelected) => {
         html: html,
         iconSize: [size, size],
         iconAnchor: [size/2, size/2],
-        popupAnchor: [0, -size/2]
+        popupAnchor: [0, -size/2 - 10] // Adjusted so popup opens above the label
     });
 };
 
@@ -113,7 +127,8 @@ export default function Map({ buses, selectedId, routes, darkMode }) {
                     <Marker 
                         key={v.id} 
                         position={[lat, lng]} 
-                        icon={createBusIcon(isStale, isSelected)}
+                        // PASS THE BUS NUMBER AND DARK MODE HERE
+                        icon={createBusIcon(isStale, isSelected, busNum, darkMode)}
                         zIndexOffset={isSelected ? 1000 : (isStale ? 1 : 100)}
                     >
                         <Popup closeButton={false}>

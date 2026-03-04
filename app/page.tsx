@@ -272,7 +272,13 @@ export default function FleetManager() {
                          view === 'handover' ? <ShiftHandover buses={buses} showToast={showToast} /> :
                          view === 'personnel' ? <PersonnelManager showToast={showToast} darkMode={darkMode} /> :
                          view === 'disposition' ? <DispositionReport showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} /> :
-                         view === 'tracker' ? <div className={`h-[80vh] rounded-2xl border shadow-sm overflow-hidden relative ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}><BusTracker /></div> : (
+                         view === 'tracker' ? <div className={`h-[80vh] rounded-2xl border shadow-sm overflow-hidden relative ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>// Inside app/page.tsx:
+view === 'tracker' ? (
+    <div className="h-[85vh] w-full relative">
+        <BusTracker darkMode={darkMode} />
+    </div>
+) : (
+</div> : (
                             <InventoryView buses={buses} sortedBuses={sortedBuses} searchTerm={searchTerm} setSearchTerm={setSearchTerm} inventoryMode={inventoryMode} setInventoryMode={setInventoryMode} activeFilter={activeFilter} setActiveFilter={setActiveFilter} sortConfig={sortConfig} requestSort={requestSort} getStatusType={getStatusType} setSelectedBusDetail={setSelectedBusDetail} toggleFullScreen={toggleFullScreen} isFullscreen={isFullscreen} tvBoardRef={tvBoardRef} darkMode={darkMode} isAdmin={isAdmin} />
                          )}
                     </main>
@@ -288,7 +294,13 @@ export default function FleetManager() {
                  view === 'handover' ? <ShiftHandover buses={buses} showToast={showToast} /> :
                  view === 'personnel' ? <PersonnelManager showToast={showToast} darkMode={darkMode} /> :
                  view === 'disposition' ? <DispositionReport showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} /> :
-                 view === 'tracker' ? <div className={`h-[85vh] rounded-3xl border shadow-2xl overflow-hidden relative ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}><BusTracker /></div> : (
+                 view === 'tracker' ? <div className={`h-[85vh] rounded-3xl border shadow-2xl overflow-hidden relative ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>// Inside app/page.tsx:
+view === 'tracker' ? (
+    <div className="h-[85vh] w-full relative">
+        <BusTracker darkMode={darkMode} />
+    </div>
+) : (
+</div> : (
                     <InventoryView buses={buses} sortedBuses={sortedBuses} searchTerm={searchTerm} setSearchTerm={setSearchTerm} inventoryMode={inventoryMode} setInventoryMode={setInventoryMode} activeFilter={activeFilter} setActiveFilter={setActiveFilter} sortConfig={sortConfig} requestSort={requestSort} getStatusType={getStatusType} setSelectedBusDetail={setSelectedBusDetail} toggleFullScreen={toggleFullScreen} isFullscreen={isFullscreen} tvBoardRef={tvBoardRef} darkMode={darkMode} isAdmin={isAdmin} />
                  )}
                  {view !== 'input' && view !== 'admin' && view !== 'personnel' && view !== 'analytics' && view !== 'disposition' && <div className="mt-12"><Footer onShowLegal={setLegalType} darkMode={darkMode} /></div>}

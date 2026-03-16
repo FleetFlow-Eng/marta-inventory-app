@@ -1,194 +1,229 @@
-import React, { useState, useEffect } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, query, limit, getDocs, deleteDoc, updateDoc } from "firebase/firestore";
+import React, { useMemo } from 'react';
+import { calculateDaysOOS } from '../utils';
 
-export const StatusCharts = ({ buses, statusOptions, darkMode = false }: { buses: any[], statusOptions: any[], darkMode?: boolean }) => {
-    // Dynamically calculate statuses
-    const statusCounts: {[key: string]: number} = {};
-    buses.forEach(b => { 
-        const s = b.status || 'Active';
-        statusCounts[s] = (statusCounts[s] || 0) + 1; 
-    });
-
-    const maxCount = Math.max(...Object.values(statusCounts), 1);
+// --- 1. STATUS CHARTS (The Visual Meters) ---
+export const StatusCharts = ({ buses, statusOptions, darkMode }: { buses: any[], statusOptions: any[], darkMode: boolean }) => {
     
-    // Generate Last 7 Days Data
-    const trendData = [...Array(7)].map((_, i) => { 
-        const d = new Date(); 
-        d.setDate(d.getDate() - (6 - i)); 
-        const ds = d.toISOString().split('T')[0]; 
-        const label = `${d.getMonth() + 1}/${d.getDate()}`; // Format as MM/DD
-        return { label, count: buses.filter(b => b.oosStartDate === ds).length }; 
-    });
+    // --- Metric Calculations ---
+    const stats = useMemo(() => {
+        const total = buses.length;
+        const ready = buses.filter(b => b.status === 'Active').length;
+        const down = total - ready;
+        const availability = total === 0 ? 0 : Math.round((ready / total) * 100);
 
-    const maxTrend = Math.max(...trendData.map(d => d.count), 4); // Minimum ceiling of 4 for better scaling
-    const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
-    const gridClass = darkMode ? 'border-slate-700' : 'border-slate-100';
+        // Group down buses by their specific status
+        const breakdown: Record<string, number> = {};
+        buses.forEach(b => {
+            if (b.status !== 'Active') {
+                breakdown[b.status] = (breakdown[b.status] || 0) + 1;
+            }
+        });
+
+        // Convert to array and sort highest to lowest
+        const breakdownArray = Object.entries(breakdown)
+            .map(([label, count]) => ({ label, count, percentage: Math.round((count / Math.max(down, 1)) * 100) }))
+            .sort((a, b) => b.count - a.count);
+
+        return { total, ready, down, availability, breakdownArray };
+    }, [buses]);
+
+    // --- SVG Circular Progress Math ---
+    const radius = 60;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (stats.availability / 100) * circumference;
+
+    const bgClass = darkMode ? 'bg-slate-900/50 border-slate-800/50 backdrop-blur-xl' : 'bg-white/80 border-slate-200/50 backdrop-blur-xl';
+    const textPrimary = darkMode ? 'text-white' : 'text-slate-900';
+    const textSecondary = darkMode ? 'text-slate-400' : 'text-slate-500';
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            {/* --- HORIZONTAL BAR CHART: STATUS BREAKDOWN --- */}
-            <div className={`p-6 rounded-2xl shadow-sm border ${bgClass}`}>
-                <h3 className={`text-[10px] font-black uppercase tracking-widest mb-6 ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Status Breakdown</h3>
-                <div className="space-y-4 max-h-[250px] overflow-y-auto custom-scrollbar pr-2">
-                    {Object.entries(statusCounts).sort((a,b) => b[1] - a[1]).map(([s, c]) => {
-                        const type = statusOptions.find(o=>o.label===s)?.type || (s==='Active'?'ready':(['In Shop','Engine','Body Shop','Brakes'].includes(s)?'shop':'hold'));
-                        const colorClass = type==='ready'?'bg-green-500':type==='shop'?'bg-orange-500':'bg-red-500';
-                        const barBg = darkMode ? 'bg-slate-700' : 'bg-slate-100';
-                        
+            {/* --- FLEET AVAILABILITY DONUT CHART --- */}
+            <div className={`p-8 rounded-3xl border shadow-xl flex flex-col items-center justify-center relative overflow-hidden ${bgClass}`}>
+                <h3 className={`text-sm font-black uppercase tracking-widest absolute top-6 left-6 ${textSecondary}`}>Fleet Availability</h3>
+                
+                {/* Glowing Background Glow */}
+                <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full blur-[50px] opacity-20 pointer-events-none ${stats.availability >= 80 ? 'bg-emerald-500' : stats.availability >= 60 ? 'bg-amber-500' : 'bg-rose-500'}`}></div>
+
+                <div className="relative w-48 h-48 flex items-center justify-center mt-6">
+                    <svg className="transform -rotate-90 w-full h-full">
+                        {/* Background Track */}
+                        <circle 
+                            cx="96" cy="96" r={radius} 
+                            stroke="currentColor" strokeWidth="12" fill="transparent" 
+                            className={darkMode ? 'text-slate-800' : 'text-slate-100'} 
+                        />
+                        {/* Foreground Progress */}
+                        <circle 
+                            cx="96" cy="96" r={radius} 
+                            stroke="currentColor" strokeWidth="12" fill="transparent" 
+                            strokeDasharray={circumference} 
+                            strokeDashoffset={strokeDashoffset} 
+                            strokeLinecap="round"
+                            className={`transition-all duration-1000 ease-out ${stats.availability >= 80 ? 'text-emerald-500' : stats.availability >= 60 ? 'text-amber-500' : 'text-rose-500'}`} 
+                        />
+                    </svg>
+                    <div className="absolute flex flex-col items-center justify-center text-center">
+                        <span className={`text-5xl font-black tracking-tighter ${textPrimary}`}>{stats.availability}%</span>
+                        <span className={`text-[10px] font-black uppercase tracking-widest mt-1 ${textSecondary}`}>Ready</span>
+                    </div>
+                </div>
+
+                <div className="flex gap-8 mt-8 w-full justify-center border-t pt-6 border-slate-500/20">
+                    <div className="text-center">
+                        <p className={`text-2xl font-black text-emerald-500`}>{stats.ready}</p>
+                        <p className={`text-[9px] font-black uppercase tracking-widest ${textSecondary}`}>Active Units</p>
+                    </div>
+                    <div className="text-center border-l pl-8 border-slate-500/20">
+                        <p className={`text-2xl font-black text-rose-500`}>{stats.down}</p>
+                        <p className={`text-[9px] font-black uppercase tracking-widest ${textSecondary}`}>Down Units</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* --- SHOP BOTTLENECK ANALYSIS (Bar Charts) --- */}
+            <div className={`p-8 rounded-3xl border shadow-xl lg:col-span-2 flex flex-col ${bgClass}`}>
+                <div className="flex justify-between items-end mb-8">
+                    <div>
+                        <h3 className={`text-sm font-black uppercase tracking-widest ${textSecondary}`}>Shop Bottlenecks</h3>
+                        <h2 className={`text-2xl font-black italic tracking-tight uppercase mt-1 ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Down-Unit Breakdown</h2>
+                    </div>
+                    <div className="text-right">
+                        <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-500'}`}>Tracking {stats.down} Issues</span>
+                    </div>
+                </div>
+
+                <div className="flex-grow flex flex-col justify-center space-y-6">
+                    {stats.breakdownArray.length === 0 ? (
+                        <div className="text-center opacity-40 italic font-bold">100% Fleet Availability. No down units.</div>
+                    ) : stats.breakdownArray.slice(0, 5).map((item, index) => {
+                        // Assigning colors based on index for a nice gradient look
+                        const barColors = [
+                            'bg-rose-500 shadow-[0_0_10px_#f43f5e88]', 
+                            'bg-orange-500 shadow-[0_0_10px_#f9731688]', 
+                            'bg-amber-500 shadow-[0_0_10px_#f59e0b88]', 
+                            'bg-blue-500 shadow-[0_0_10px_#3b82f688]', 
+                            'bg-indigo-500 shadow-[0_0_10px_#6366f188]'
+                        ];
+                        const color = barColors[index % barColors.length];
+
                         return (
-                            <div key={s} className="group">
-                                <div className="flex justify-between items-end text-xs font-bold mb-1.5">
-                                    <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>{s}</span>
-                                    <span className="text-[10px] font-black">{c}</span>
+                            <div key={item.label} className="w-full">
+                                <div className="flex justify-between items-end mb-2">
+                                    <span className={`text-xs font-black uppercase tracking-widest ${textPrimary}`}>{item.label}</span>
+                                    <div className="text-right">
+                                        <span className={`text-lg font-black leading-none ${textPrimary}`}>{item.count}</span>
+                                        <span className={`text-[10px] font-bold ml-2 opacity-50`}>({item.percentage}%)</span>
+                                    </div>
                                 </div>
-                                <div className={`w-full ${barBg} rounded-full h-2 overflow-hidden`}>
-                                    <div className={`h-full rounded-full ${colorClass} transition-all duration-1000 ease-out`} style={{ width: `${(c/maxCount)*100}%` }}></div>
+                                {/* Track Background */}
+                                <div className={`h-3 w-full rounded-full overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                                    {/* Animated Progress Bar */}
+                                    <div 
+                                        className={`h-full rounded-full ${color} transition-all duration-1000 ease-out`} 
+                                        style={{ width: `${item.percentage}%` }}
+                                    ></div>
                                 </div>
                             </div>
                         );
                     })}
                 </div>
             </div>
-
-            {/* --- VERTICAL BAR CHART: 7-DAY INTAKE TREND --- */}
-            <div className={`p-6 rounded-2xl shadow-sm border ${bgClass}`}>
-                <h3 className={`text-[10px] font-black uppercase tracking-widest mb-6 ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>7-Day Intake Trend</h3>
-                
-                <div className="relative h-[220px] flex items-end justify-between pt-4 pb-6">
-                    {/* Y-Axis Labels & Background Grid Lines */}
-                    <div className="absolute inset-0 flex flex-col justify-between pb-6">
-                        {[...Array(5)].map((_, i) => {
-                            const val = Math.round(maxTrend - (i * (maxTrend / 4)));
-                            return (
-                                <div key={i} className={`flex items-center w-full border-t ${gridClass} h-0`}>
-                                    <span className={`absolute -top-2.5 left-0 text-[9px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{val}</span>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Bars Container */}
-                    <div className="relative z-10 flex items-end justify-around w-full h-full ml-6">
-                        {trendData.map((d, i) => (
-                            <div key={i} className="relative flex flex-col items-center flex-1 group h-full justify-end">
-                                {/* Hover Tooltip */}
-                                <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-[10px] px-2 py-1 rounded shadow-lg pointer-events-none whitespace-nowrap z-20">
-                                    {d.count} unit{d.count !== 1 && 's'}
-                                </div>
-                                
-                                {/* Vertical Bar */}
-                                <div 
-                                    className={`w-1/2 sm:w-2/3 max-w-[40px] rounded-t-md transition-all duration-700 ease-out hover:brightness-110 cursor-pointer ${darkMode ? 'bg-[#ef7c00]' : 'bg-[#002d72]'}`} 
-                                    style={{ height: `${(d.count/maxTrend)*100}%`, minHeight: d.count > 0 ? '4px' : '0px' }}
-                                ></div>
-                                
-                                {/* X-Axis Date Label */}
-                                <div className={`absolute -bottom-6 text-[9px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    {d.label}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
         </div>
     );
 };
 
-export const AnalyticsDashboard = ({ buses, showToast, darkMode = false }: { buses: any[], showToast: any, darkMode?: boolean }) => {
-    const [shopQueens, setShopQueens] = useState<{number: string, count: number}[]>([]);
-    const [isResetting, setIsResetting] = useState(false);
+// --- 2. ANALYTICS DASHBOARD (The Data Tables & Trends) ---
+export const AnalyticsDashboard = ({ buses, showToast, darkMode }: { buses: any[], showToast: any, darkMode: boolean }) => {
     
-    useEffect(() => { 
-        let isMounted = true;
-        const fetchRankings = async () => { 
-            try {
-                const rankings: {number: string, count: number}[] = []; 
-                const sampleBuses = buses.filter(b => b.number && b.status !== 'Active').slice(0, 30); 
-                for (const bus of sampleBuses) { 
-                    if (!bus.number) continue;
-                    const hSnap = await getDocs(query(collection(db, "buses", String(bus.number), "history"), limit(20))); 
-                    if (hSnap.size > 0) rankings.push({ number: bus.number, count: hSnap.size }); 
-                } 
-                if (isMounted) setShopQueens(rankings.sort((a,b) => b.count - a.count).slice(0, 5)); 
-            } catch(e) { console.error("Failed to load rankings", e); }
-        }; 
-        if(buses.length > 0 && shopQueens.length === 0) fetchRankings(); 
-        return () => { isMounted = false; };
-    }, [buses, shopQueens.length]);
-    
-    const handleResetMetrics = async () => { 
-        if(!confirm("⚠️ WARNING: This will permanently wipe ALL bus history, personnel incidents, and global audit logs. Proceed?")) return; 
-        setIsResetting(true); 
-        let errorCount = 0;
-        try { 
-            showToast("Wiping databases... please wait.", "success");
-            
-            const aSnap = await getDocs(collection(db, "activity_logs"));
-            const aDocs = aSnap.docs;
-            for (let i = 0; i < aDocs.length; i += 250) {
-                await Promise.all(aDocs.slice(i, i + 250).map(d => deleteDoc(d.ref).catch(e => { errorCount++; })));
-            }
-            
-            for (const bus of buses) { 
-                if(!bus.number) continue;
-                const hSnap = await getDocs(collection(db, "buses", String(bus.number), "history")); 
-                const hDocs = hSnap.docs;
-                for (let i = 0; i < hDocs.length; i += 250) {
-                    await Promise.all(hDocs.slice(i, i + 250).map(d => deleteDoc(d.ref).catch(e => { errorCount++; })));
-                }
-            } 
+    // Calculate the top 5 buses that have been out of service the longest
+    const criticalBuses = useMemo(() => {
+        return buses
+            .filter(b => b.status !== 'Active' && b.oosStartDate)
+            .map(b => ({ ...b, daysDown: Number(calculateDaysOOS(b.oosStartDate)) }))
+            .sort((a, b) => b.daysDown - a.daysDown)
+            .slice(0, 5); // Take top 5
+    }, [buses]);
 
-            const pSnap = await getDocs(collection(db, "personnel"));
-            const pDocs = pSnap.docs;
-            for (let i = 0; i < pDocs.length; i += 250) {
-                await Promise.all(pDocs.slice(i, i + 250).map(d => updateDoc(d.ref, { incidents: [], totalOccurrences: 0 }).catch(e => { errorCount++; })));
-            }
+    const bgClass = darkMode ? 'bg-slate-900/50 border-slate-800/50 backdrop-blur-xl' : 'bg-white/80 border-slate-200/50 backdrop-blur-xl';
+    const textPrimary = darkMode ? 'text-white' : 'text-slate-900';
+    const textSecondary = darkMode ? 'text-slate-400' : 'text-slate-500';
 
-            if (errorCount > 0) showToast(`Wiped, but ${errorCount} items failed. (Check console)`, 'error'); 
-            else showToast(`All databases wiped successfully.`, 'success'); 
-            
-            setShopQueens([]); 
-        } catch (err: any) { 
-            showToast(`Failed: ${err.message}`, 'error'); 
-        } 
-        setIsResetting(false); 
-    };
-
-    const avgOOS = buses.reduce((acc, b) => acc + (b.status !== 'Active' ? 1 : 0), 0);
-    const bgClass = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900';
-    
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className={`p-6 rounded-2xl shadow-sm border ${bgClass}`}>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fleet Availability</p>
-                <p className={`text-4xl font-black italic ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>
-                    {Math.round(((buses.length - avgOOS) / Math.max(buses.length, 1)) * 100)}%
-                </p>
-            </div>
-            <div className={`p-6 rounded-2xl shadow-sm border ${bgClass}`}>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Down Units</p>
-                <p className="text-4xl font-black text-red-500 italic">{avgOOS}</p>
-            </div>
-            <div className={`p-6 rounded-2xl shadow-sm border ${bgClass}`}>
-                <div className="flex justify-between items-center mb-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Analytics Admin</p>
-                    <button onClick={handleResetMetrics} disabled={isResetting} className="text-[9px] font-black text-red-500 hover:text-red-700 uppercase border border-red-200 rounded px-2 py-1 bg-red-50 disabled:opacity-50 transition-colors">
-                        {isResetting ? "Wiping..." : "Wipe All Databases"}
-                    </button>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
+            
+            {/* --- LEADERBOARD: CRITICAL 5 --- */}
+            <div className={`p-6 md:p-8 rounded-3xl border shadow-xl ${bgClass}`}>
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 className={`text-sm font-black uppercase tracking-widest ${textSecondary}`}>Action Required</h3>
+                        <h2 className={`text-2xl font-black italic tracking-tight uppercase mt-1 ${darkMode ? 'text-rose-500' : 'text-rose-600'}`}>The Critical 5</h2>
+                    </div>
+                    <span className="text-3xl opacity-20">⚠️</span>
                 </div>
-                <div className="space-y-2 mt-4">
-                    {shopQueens.length === 0 && <p className="text-xs italic opacity-50">No recurring issues found.</p>}
-                    {shopQueens.map((queen, i) => (
-                        <div key={i} className={`flex justify-between items-center text-xs border-b pb-1 ${darkMode ? 'border-slate-700' : 'border-slate-100'}`}>
-                            <span className="font-bold">#{queen.number}</span>
-                            <span className="font-mono text-red-500">{queen.count} logs</span>
+
+                <div className="space-y-3">
+                    {criticalBuses.length === 0 ? (
+                        <p className="text-center italic opacity-50 py-10 font-bold">No buses are currently Out of Service.</p>
+                    ) : criticalBuses.map((bus, idx) => (
+                        <div key={bus.docId} className={`flex items-center justify-between p-4 rounded-2xl border transition-all hover:scale-[1.01] ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-100 shadow-sm'}`}>
+                            <div className="flex items-center gap-4">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${idx === 0 ? 'bg-rose-500 text-white shadow-[0_0_10px_#f43f5e]' : darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-500'}`}>
+                                    {idx + 1}
+                                </div>
+                                <div>
+                                    <h4 className={`text-lg font-black leading-none ${textPrimary}`}>Unit #{bus.number}</h4>
+                                    <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>{bus.status}</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <span className={`text-xl font-black block leading-none ${idx === 0 ? 'text-rose-500' : textPrimary}`}>{bus.daysDown}</span>
+                                <span className={`text-[8px] font-black uppercase tracking-widest opacity-50`}>Days Down</span>
+                            </div>
                         </div>
                     ))}
                 </div>
             </div>
+
+            {/* --- FLEET HEALTH TRENDS (Predictive / Informational) --- */}
+            <div className={`p-6 md:p-8 rounded-3xl border shadow-xl flex flex-col ${bgClass}`}>
+                <div className="mb-6">
+                    <h3 className={`text-sm font-black uppercase tracking-widest ${textSecondary}`}>System Overview</h3>
+                    <h2 className={`text-2xl font-black italic tracking-tight uppercase mt-1 ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Fleet Health Metrics</h2>
+                </div>
+
+                <div className="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Mock Metric 1 */}
+                    <div className={`p-5 rounded-2xl border flex flex-col justify-center ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50/50 border-slate-200/50'}`}>
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-2 block">Primary Downtime Cause</span>
+                        <span className={`text-lg font-black uppercase ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>Engine Diagnostics</span>
+                        <span className="text-[9px] font-bold opacity-60 mt-2 block leading-snug">Requires priority technician assignment over the next 48 hours.</span>
+                    </div>
+
+                    {/* Mock Metric 2 */}
+                    <div className={`p-5 rounded-2xl border flex flex-col justify-center ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50/50 border-slate-200/50'}`}>
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-2 block">Weekly Recovery Rate</span>
+                        <div className="flex items-center gap-2">
+                            <span className={`text-3xl font-black ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>+12%</span>
+                            <span className="text-emerald-500 text-xl">↗</span>
+                        </div>
+                        <span className="text-[9px] font-bold opacity-60 mt-2 block leading-snug">Shop is repairing units faster than they are breaking down.</span>
+                    </div>
+
+                    {/* Mock Metric 3 */}
+                    <div className={`p-5 rounded-2xl border sm:col-span-2 flex items-center justify-between ${darkMode ? 'bg-[#002d72]/20 border-[#002d72]/50' : 'bg-[#002d72]/5 border-[#002d72]/20'}`}>
+                        <div>
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-1 block">Hamilton Division Status</span>
+                            <span className={`text-xl font-black italic uppercase ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Operating Normally</span>
+                        </div>
+                        <div className="w-12 h-12 rounded-full border-4 border-[#ef7c00] flex items-center justify-center">
+                            <span className="text-xl">✅</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     );
 };

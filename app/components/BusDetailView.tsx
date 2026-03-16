@@ -3,7 +3,8 @@ import { db, auth } from '../firebaseConfig';
 import { doc, getDoc, setDoc, deleteDoc, collection, onSnapshot, query, orderBy, serverTimestamp } from "firebase/firestore";
 import { logHistory, logActivity, formatTime } from '../utils';
 
-export const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptions }: { bus: any; onClose: () => void; showToast: any, darkMode: boolean, isAdmin: boolean, statusOptions: any[] }) => {
+// NOTICE: Added canEdit: boolean to the props here
+export const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, statusOptions, canEdit }: { bus: any; onClose: () => void; showToast: any, darkMode: boolean, isAdmin: boolean, statusOptions: any[], canEdit: boolean }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [historyLogs, setHistoryLogs] = useState<any[]>([]); 
@@ -126,7 +127,10 @@ export const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, stat
                 </div>
                 <div className="flex flex-col items-end gap-2 md:gap-3 md:flex-row md:items-start">
                     <button onClick={onClose} className={`p-1.5 rounded-full transition-colors order-first md:order-last md:ml-2 ${darkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-400'}`}><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-                    <button onClick={handleResetBus} className="text-red-500 text-[9px] md:text-[10px] tracking-widest font-black uppercase border border-red-500/30 bg-red-500/10 px-3 md:px-4 py-1.5 md:py-2 rounded-lg hover:bg-red-500 hover:text-white transition-colors">Reset Unit</button>
+                    {/* ONLY SHOW RESET IF USER CAN EDIT */}
+                    {canEdit && (
+                        <button onClick={handleResetBus} className="text-red-500 text-[9px] md:text-[10px] tracking-widest font-black uppercase border border-red-500/30 bg-red-500/10 px-3 md:px-4 py-1.5 md:py-2 rounded-lg hover:bg-red-500 hover:text-white transition-colors">Reset Unit</button>
+                    )}
                 </div>
             </div>
 
@@ -159,7 +163,10 @@ export const BusDetailView = ({ bus, onClose, showToast, darkMode, isAdmin, stat
                     History
                 </button>
                 <div className="flex gap-2 md:gap-3">
-                    <button onClick={()=>setIsEditing(true)} className={`flex-1 sm:flex-none px-6 md:px-8 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors ${darkMode ? 'bg-[#ef7c00]/10 text-[#ef7c00] hover:bg-[#ef7c00]/20' : 'bg-[#002d72]/10 text-[#002d72] hover:bg-[#002d72]/20'}`}>Edit Unit</button>
+                    {/* ONLY SHOW EDIT IF USER CAN EDIT */}
+                    {canEdit && (
+                        <button onClick={()=>setIsEditing(true)} className={`flex-1 sm:flex-none px-6 md:px-8 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors ${darkMode ? 'bg-[#ef7c00]/10 text-[#ef7c00] hover:bg-[#ef7c00]/20' : 'bg-[#002d72]/10 text-[#002d72] hover:bg-[#002d72]/20'}`}>Edit Unit</button>
+                    )}
                     <button onClick={onClose} className="flex-1 sm:flex-none px-6 md:px-8 py-3.5 bg-[#002d72] hover:bg-[#ef7c00] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg">Close</button>
                 </div>
             </div>

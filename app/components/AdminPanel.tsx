@@ -30,7 +30,7 @@ export const AdminPanel = ({ showToast, darkMode }: { showToast: any, darkMode: 
     };
 
     const toggleApproval = async (uid: string, current: string) => updateDoc(doc(db, "users", uid), { status: current === 'approved' ? 'pending' : 'approved' });
-    const toggleRole = async (uid: string, current: string) => updateDoc(doc(db, "users", uid), { role: current === 'admin' ? 'user' : 'admin' });
+    const updateRole = async (uid: string, newRole: string) => updateDoc(doc(db, "users", uid), { role: newRole });
     const deleteUser = async (uid: string) => { if (confirm("Delete user permanently?")) await deleteDoc(doc(db, "users", uid)); };
     
     const fetchUserHistory = async (email: string) => {
@@ -90,15 +90,23 @@ export const AdminPanel = ({ showToast, darkMode }: { showToast: any, darkMode: 
                                     <td className="p-4 font-bold cursor-pointer text-[#ef7c00] hover:underline" onClick={()=>fetchUserHistory(u.email)}>
                                         {u.email} {isMaster && <span className="text-[8px] bg-purple-500 text-white px-1 py-0.5 rounded ml-2">MASTER</span>}
                                     </td>
-                                    <td className="p-4 text-center"><span className={`px-2 py-1 rounded text-[9px] font-black uppercase ${u.role==='admin'||isMaster?'bg-purple-100 text-purple-700 border border-purple-200':'bg-slate-100 text-slate-500 border border-slate-200'}`}>{u.role==='admin'||isMaster?'Admin (OP)':'Standard'}</span></td>
+                                    <td className="p-4 text-center">
+                                        <span className={`px-2 py-1 rounded text-[9px] font-black uppercase ${isMaster ? 'bg-purple-100 text-purple-700 border border-purple-200' : u.role === 'admin' ? 'bg-purple-100 text-purple-700 border border-purple-200' : u.role === 'basic' ? 'bg-slate-200 text-slate-600 border border-slate-300' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
+                                            {isMaster ? 'Master Admin' : u.role === 'admin' ? 'Admin' : u.role === 'basic' ? 'Basic (View)' : 'Standard'}
+                                        </span>
+                                    </td>
                                     <td className="p-4 text-center"><span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase text-white ${u.status==='approved'||isMaster?'bg-green-500':'bg-orange-500'}`}>{u.status==='approved'||isMaster?'Approved':'Pending'}</span></td>
-                                    <td className="p-4 text-right pr-6 space-x-2">
+                                    <td className="p-4 pr-6">
                                         {!isMaster && (
-                                            <>
+                                            <div className="flex justify-end gap-2 items-center">
                                                 <button onClick={()=>toggleApproval(u.id, u.status)} className={`px-3 py-1.5 rounded font-black text-[9px] uppercase shadow-sm ${u.status==='approved'?'bg-orange-100 text-orange-700':'bg-green-500 text-white'}`}>{u.status==='approved'?'Revoke':'Approve'}</button>
-                                                <button onClick={()=>toggleRole(u.id, u.role)} className={`px-3 py-1.5 rounded font-black text-[9px] uppercase shadow-sm ${u.role==='admin'?'bg-slate-200 text-slate-700':'bg-purple-600 text-white'}`}>{u.role==='admin'?'De-OP':'OP'}</button>
+                                                <select value={u.role || 'user'} onChange={(e)=>updateRole(u.id, e.target.value)} className={`px-2 py-1.5 rounded font-black text-[9px] uppercase outline-none shadow-sm border ${darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-200'}`}>
+                                                    <option value="basic">Basic</option>
+                                                    <option value="user">Standard</option>
+                                                    <option value="admin">Admin</option>
+                                                </select>
                                                 <button onClick={()=>deleteUser(u.id)} className="px-3 py-1.5 rounded font-black text-[9px] uppercase shadow-sm bg-red-600 hover:bg-red-700 text-white">Delete</button>
-                                            </>
+                                            </div>
                                         )}
                                     </td>
                                 </tr>

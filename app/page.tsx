@@ -44,7 +44,7 @@ export default function FleetManager() {
     const [user, setUser] = useState<any>(null);
     const [isSignUp, setIsSignUp] = useState(false);
     const [userStatus, setUserStatus] = useState<'loading' | 'approved' | 'pending' | 'rejected'>('loading');
-    const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
+    const [userRole, setUserRole] = useState<'admin' | 'user' | 'basic'>('user');
     const [view, setView] = useState<'inventory' | 'tracker' | 'input' | 'analytics' | 'handover' | 'personnel' | 'parts' | 'disposition' | 'admin'>('inventory');
     const [inventoryMode, setInventoryMode] = useState<'list' | 'grid' | 'tv'>('grid');
     const [buses, setBuses] = useState<any[]>([]);
@@ -65,6 +65,7 @@ export default function FleetManager() {
 
     const isMasterAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '');
     const isAdmin = isMasterAdmin || userRole === 'admin';
+    const effectiveRole = isAdmin ? 'admin' : userRole;
     const showToast = (msg: string, type: 'success' | 'error') => { setToast({ msg, type }); };
 
     useEffect(() => { onAuthStateChanged(auth, u => setUser(u)); }, []);
@@ -158,16 +159,17 @@ export default function FleetManager() {
         } catch(e: any) { showToast(e.message.replace('Firebase: ', ''), "error"); }
     };
 
+
     const navItems = [
-        { id: 'inventory', label: 'Inventory', icon: <Icons.Grid />, adminOnly: false },
-        { id: 'input', label: 'Data Entry', icon: <Icons.Edit />, adminOnly: false },
-        { id: 'tracker', label: 'Live Map', icon: <Icons.Map />, adminOnly: false },
-        { id: 'handover', label: 'Shift Report', icon: <Icons.Clipboard />, adminOnly: false },
-        { id: 'parts', label: 'Parts DB', icon: <Icons.Wrench />, adminOnly: false },
-        { id: 'disposition', label: 'Route Delivery', icon: <Icons.Route />, adminOnly: false },
-        { id: 'analytics', label: 'Analytics', icon: <Icons.Activity />, adminOnly: true },
-        { id: 'personnel', label: 'Personnel', icon: <Icons.Users />, adminOnly: true },
-        { id: 'admin', label: 'Admin Panel', icon: <Icons.Shield />, adminOnly: true },
+        { id: 'inventory', label: 'Inventory', icon: <Icons.Grid />, roles: ['admin', 'user', 'basic'] },
+        { id: 'tracker', label: 'Live Map', icon: <Icons.Map />, roles: ['admin', 'user', 'basic'] },
+        { id: 'analytics', label: 'Analytics', icon: <Icons.Activity />, roles: ['admin', 'basic'] },
+        { id: 'input', label: 'Data Entry', icon: <Icons.Edit />, roles: ['admin', 'user'] },
+        { id: 'handover', label: 'Shift Report', icon: <Icons.Clipboard />, roles: ['admin', 'user'] },
+        { id: 'parts', label: 'Parts DB', icon: <Icons.Wrench />, roles: ['admin', 'user'] },
+        { id: 'disposition', label: 'Route Delivery', icon: <Icons.Route />, roles: ['admin', 'user'] },
+        { id: 'personnel', label: 'Personnel', icon: <Icons.Users />, roles: ['admin'] },
+        { id: 'admin', label: 'Admin Panel', icon: <Icons.Shield />, roles: ['admin'] },
     ];
 
     if (!user) return (
@@ -204,7 +206,7 @@ export default function FleetManager() {
     return (
         <div className={`flex h-[100dvh] w-full font-sans overflow-hidden selection:bg-[#ef7c00] selection:text-white transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
             {toast && <Toast message={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}
-            {selectedBusDetail && (<div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200"><BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} statusOptions={statusOptions} /></div>)}
+            {selectedBusDetail && (<div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200"><BusDetailView bus={selectedBusDetail} onClose={() => setSelectedBusDetail(null)} showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} statusOptions={statusOptions} canEdit={effectiveRole !== 'basic'} /></div>)}
             {legalType && <LegalModal type={legalType} onClose={()=>setLegalType(null)} darkMode={darkMode} />}
 
             {/* --- DESKTOP SIDEBAR --- */}
@@ -215,7 +217,7 @@ export default function FleetManager() {
                 </div>
                 <nav className="flex-1 overflow-y-auto py-4 custom-scrollbar">
                     <ul className="space-y-1 px-3">
-                        {navItems.filter(item => !item.adminOnly || isAdmin).map(item => (
+                        {navItems.filter(item => item.roles.includes(effectiveRole)).map(item => (
                             <li key={item.id}>
                                 <button onClick={() => setView(item.id as any)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold transition-all duration-200 ${view === item.id ? activeNavStyles : inactiveNavStyles}`}>
                                     <span className={view === item.id ? 'opacity-100' : 'opacity-50'}>{item.icon}</span>{item.label}
@@ -247,7 +249,7 @@ export default function FleetManager() {
                     <div className={`absolute inset-0 top-[65px] z-40 flex flex-col backdrop-blur-xl ${darkMode ? 'bg-slate-900/95' : 'bg-white/95'} animate-in slide-in-from-top-2 duration-200`}>
                         <nav className="flex-1 overflow-y-auto p-4 pb-20">
                             <ul className="space-y-2">
-                                {navItems.filter(item => !item.adminOnly || isAdmin).map(item => (
+                                {navItems.filter(item => item.roles.includes(effectiveRole)).map(item => (
                                     <li key={item.id}>
                                         <button onClick={() => { setView(item.id as any); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-4 p-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all ${view === item.id ? (darkMode ? 'bg-[#ef7c00] text-white shadow-lg shadow-orange-500/20' : 'bg-[#002d72] text-white shadow-lg shadow-blue-900/20') : (darkMode ? 'bg-slate-800/50 text-slate-300' : 'bg-slate-100/50 text-slate-600')}`}>{item.icon} {item.label}</button>
                                     </li>

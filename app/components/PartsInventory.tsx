@@ -1,50 +1,117 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import localParts from '../partsData.json';
 
-// --- SUB-COMPONENT: MOBILE CAMERA SCANNER ---
-const ScannerModal = ({ onScan, onClose, darkMode }: { onScan: (text: string) => void, onClose: () => void, darkMode: boolean }) => {
+// --- SUB-COMPONENT: AI CAMERA SCANNER ---
+const AICameraModal = ({ onAnalyze, onClose, darkMode }: { onAnalyze: (text: string) => void, onClose: () => void, darkMode: boolean }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    // Turn on the phone's rear camera
     useEffect(() => {
-        // Initialize the scanner on the 'reader' div
-        const html5QrCode = new Html5Qrcode("reader");
-        const config = { fps: 10, qrbox: { width: 250, height: 100 } }; // Wide box for barcodes
-
-        html5QrCode.start(
-            { facingMode: "environment" }, // Forces the rear camera
-            config,
-            (decodedText) => {
-                // Success! Stop the camera and pass the text back
-                html5QrCode.stop().then(() => onScan(decodedText)).catch(console.error);
-            },
-            (errorMessage) => {
-                // Background scan errors happen constantly while searching for a code, ignore them
-            }
-        ).catch((err) => {
-            console.error("Camera permission denied or not supported.", err);
-            alert("Camera access is required to scan barcodes.");
-            onClose();
-        });
-
-        // Cleanup: Stop camera when modal is closed
-        return () => {
-            if (html5QrCode.isScanning) {
-                html5QrCode.stop().catch(console.error);
+        let stream: MediaStream | null = null;
+        const startCamera = async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+            } catch (err) {
+                console.error("Camera error:", err);
+                alert("Please allow camera access to use the AI Part Finder.");
+                onClose();
             }
         };
-    }, [onScan, onClose]);
+        startCamera();
+
+        // Turn off camera when modal closes
+        return () => {
+            if (stream) stream.getTracks().forEach(track => track.stop());
+        };
+    }, [onClose]);
+
+    const takePhotoAndAnalyze = async () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        setIsAnalyzing(true);
+
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        // Draw the current video frame onto the canvas
+        const context = canvas.getContext('2d');
+        if (context) context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Convert canvas to a base64 image string to send to the AI
+        const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
+
+        try {
+            // Send the photo to our new AI route
+            const response = await fetch('/api/analyze-part', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageBase64 })
+            });
+            const data = await response.json();
+            
+            if (data.partName) {
+                onAnalyze(data.partName);
+            } else {
+                alert("AI could not identify the part. Try another angle.");
+                setIsAnalyzing(false);
+            }
+        } catch (error) {
+            console.error("Analysis failed", error);
+            setIsAnalyzing(false);
+        }
+    };
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 animate-in zoom-in-95 duration-200">
             <div className="w-full max-w-md relative flex flex-col items-center">
-                <div className="w-full flex justify-between items-center mb-4">
-                    <h3 className="text-white font-black uppercase tracking-widest text-lg italic">Scan Part Barcode</h3>
-                    <button onClick={onClose} className="text-red-500 font-black uppercase tracking-widest text-xs bg-red-500/20 px-4 py-2 rounded-xl hover:bg-red-500 hover:text-white transition-colors">Cancel</button>
+                
+                <div className="w-full flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-2">
+                        <span className="relative flex h-3 w-3">
+                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isAnalyzing ? 'bg-purple-400' : 'bg-emerald-400'}`}></span>
+                            <span className={`relative inline-flex rounded-full h-3 w-3 ${isAnalyzing ? 'bg-purple-500' : 'bg-emerald-500'}`}></span>
+                        </span>
+                        <h3 className={`font-black uppercase tracking-widest text-lg italic ${isAnalyzing ? 'text-purple-400' : 'text-emerald-400'}`}>
+                            {isAnalyzing ? 'AI Processing...' : 'AI Part Lens'}
+                        </h3>
+                    </div>
+                    <button onClick={onClose} disabled={isAnalyzing} className="text-white opacity-50 hover:opacity-100 font-bold text-2xl">✕</button>
                 </div>
                 
-                {/* The camera feed injects here */}
-                <div id="reader" className="w-full rounded-3xl overflow-hidden shadow-[0_0_50px_#ef7c00] border-4 border-[#ef7c00]/50 bg-black min-h-[300px]"></div>
+                {/* Camera Viewfinder */}
+                <div className="relative w-full rounded-3xl overflow-hidden shadow-[0_0_50px_#ef7c0044] border-2 border-slate-700 bg-black aspect-[3/4]">
+                    <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover ${isAnalyzing ? 'blur-sm opacity-50' : ''}`}></video>
+                    <canvas ref={canvasRef} className="hidden"></canvas>
+
+                    {/* Sci-Fi Scanning Animation */}
+                    {isAnalyzing && (
+                        <div className="absolute inset-0 z-10 pointer-events-none">
+                            <div className="w-full h-1 bg-purple-500 shadow-[0_0_20px_#a855f7] animate-[scan_2s_ease-in-out_infinite]"></div>
+                            <style>{`
+                                @keyframes scan {
+                                    0% { transform: translateY(0); }
+                                    50% { transform: translateY(100vh); }
+                                    100% { transform: translateY(0); }
+                                }
+                            `}</style>
+                        </div>
+                    )}
+                </div>
                 
-                <p className="text-[#ef7c00] font-black uppercase tracking-widest mt-8 animate-pulse text-sm">Align Barcode within frame...</p>
+                <button 
+                    onClick={takePhotoAndAnalyze} 
+                    disabled={isAnalyzing}
+                    className={`mt-8 w-20 h-20 rounded-full border-4 flex items-center justify-center transition-all ${isAnalyzing ? 'border-purple-500 bg-purple-500/20 scale-90' : 'border-emerald-500 bg-emerald-500/20 active:scale-95 shadow-[0_0_30px_#10b98166]'}`}
+                >
+                    <div className={`w-14 h-14 rounded-full ${isAnalyzing ? 'bg-purple-500' : 'bg-emerald-500'}`}></div>
+                </button>
+                <p className="text-slate-400 font-bold uppercase tracking-widest mt-6 text-xs text-center px-8">Center the part in the frame, ensure good lighting, and tap to analyze.</p>
             </div>
         </div>
     );
@@ -76,25 +143,25 @@ export const PartsInventory = ({ showToast, darkMode }: { showToast: (msg: strin
         showToast(`Part #${num} copied!`, 'success');
     };
 
-    const handleScanResult = (scannedText: string) => {
-        // Clean up the scanned text (sometimes scanners pick up extra spaces)
-        const cleanText = scannedText.trim();
-        setSearchTerm(cleanText);
+    const handleAIResult = (identifiedPart: string) => {
+        setSearchTerm(identifiedPart);
         setIsScanning(false);
-        showToast(`Scanned: ${cleanText}`, 'success');
+        showToast(`AI Identified: ${identifiedPart}`, 'success');
     };
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col space-y-4 sm:space-y-6 max-w-[1400px] mx-auto">
             
-            {/* SCANNER MODAL */}
-            {isScanning && <ScannerModal onScan={handleScanResult} onClose={() => setIsScanning(false)} darkMode={darkMode} />}
+            {/* AI CAMERA MODAL */}
+            {isScanning && <AICameraModal onAnalyze={handleAIResult} onClose={() => setIsScanning(false)} darkMode={darkMode} />}
 
             {/* --- HEADER --- */}
             <div className="flex justify-between items-end gap-4 flex-wrap">
                 <div>
                     <h2 className={`text-3xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Parts Registry</h2>
-                    <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Tap to copy part number</p>
+                    <p className={`text-[10px] font-black uppercase tracking-widest mt-1 flex items-center gap-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span className="text-emerald-500">✨ AI VISION ENABLED</span>
+                    </p>
                 </div>
                 <div className={`px-5 py-2 rounded-2xl border font-black text-sm hidden sm:block ${bgClass}`}>
                     <span className="opacity-50 mr-2 text-[10px] uppercase">Results:</span>
@@ -102,13 +169,13 @@ export const PartsInventory = ({ showToast, darkMode }: { showToast: (msg: strin
                 </div>
             </div>
 
-            {/* --- SEARCH BAR WITH CAMERA BUTTON --- */}
+            {/* --- SEARCH BAR WITH AI CAMERA BUTTON --- */}
             <div className={`p-3 sm:p-4 rounded-2xl sm:rounded-3xl border shadow-md sm:shadow-xl flex gap-2 ${bgClass}`}>
                 <div className="relative flex-grow">
                     <span className="absolute left-4 sm:left-5 top-1/2 -translate-y-1/2 sm:text-xl opacity-30">🔍</span>
                     <input 
                         type="text" 
-                        placeholder="Search by part number or description..." 
+                        placeholder="Search part name or tap AI Lens..." 
                         className={`w-full pl-12 sm:pl-14 pr-4 sm:pr-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold sm:text-lg outline-none transition-all ${inputClass}`} 
                         value={searchTerm} 
                         onChange={e => setSearchTerm(e.target.value)} 
@@ -116,13 +183,20 @@ export const PartsInventory = ({ showToast, darkMode }: { showToast: (msg: strin
                 </div>
                 <button 
                     onClick={() => setIsScanning(true)} 
-                    className="px-4 sm:px-6 bg-[#002d72] hover:bg-[#ef7c00] text-white rounded-xl sm:rounded-2xl flex items-center justify-center transition-colors shadow-lg group"
-                    title="Scan Barcode"
+                    className="px-4 sm:px-6 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl sm:rounded-2xl flex items-center justify-center transition-all shadow-[0_0_15px_#10b98166] group"
+                    title="AI Part Finder"
                 >
-                    {/* Camera Icon */}
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform">
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                        <circle cx="12" cy="13" r="4"></circle>
+                    {/* AI Sparkle Icon */}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:rotate-12 transition-transform">
+                        <path d="M12 3v3"></path>
+                        <path d="M18.4 5.6l-2.1 2.1"></path>
+                        <path d="M21 12h-3"></path>
+                        <path d="M18.4 18.4l-2.1-2.1"></path>
+                        <path d="M12 21v-3"></path>
+                        <path d="M5.6 18.4l2.1-2.1"></path>
+                        <path d="M3 12h3"></path>
+                        <path d="M5.6 5.6l2.1 2.1"></path>
+                        <circle cx="12" cy="12" r="4"></circle>
                     </svg>
                 </button>
             </div>

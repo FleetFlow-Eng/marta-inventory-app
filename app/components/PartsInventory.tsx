@@ -46,8 +46,7 @@ const AICameraModal = ({ onAnalyze, onClose, darkMode }: { onAnalyze: (text: str
         // Convert canvas to a base64 image string to send to the AI
         const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
 
-        try {
-            // Send the photo to our new AI route
+      try {
             const response = await fetch('/api/analyze-part', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -55,10 +54,14 @@ const AICameraModal = ({ onAnalyze, onClose, darkMode }: { onAnalyze: (text: str
             });
             const data = await response.json();
             
-            if (data.partName) {
+            if (data.partName && data.partName !== "Unknown") {
+                // If confidence is low, warn the user but still insert the guess
+                if (data.confidence < 60) {
+                    alert(`AI is only ${data.confidence}% sure. Double-check the result.\n\nReasoning: ${data.reasoning}`);
+                }
                 onAnalyze(data.partName);
             } else {
-                alert("AI could not identify the part. Try another angle.");
+                alert("AI could not confidently identify this part. Try getting closer or improving lighting.");
                 setIsAnalyzing(false);
             }
         } catch (error) {

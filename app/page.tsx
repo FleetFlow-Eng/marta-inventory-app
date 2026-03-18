@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebaseConfig'; 
 import { collection, onSnapshot, query, orderBy, doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
@@ -40,6 +40,49 @@ const Icons = {
     Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 };
 
+// --- WAKE LOCK LOGIC ---
+function useScreenWakeLock() {
+    const [isLocked, setIsLocked] = useState(false);
+    const wakeLockRef = useRef<any>(null);
+
+    const requestWakeLock = useCallback(async () => {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLockRef.current = await navigator.wakeLock.request('screen');
+                setIsLocked(true);
+                console.log('Fullscreen active: Screen Wake Lock engaged.');
+
+                wakeLockRef.current.addEventListener('release', () => {
+                    setIsLocked(false);
+                });
+            }
+        } catch (err: any) {
+            console.error(`Wake Lock failed: ${err.message}`);
+        }
+    }, []);
+
+    const releaseWakeLock = useCallback(async () => {
+        if (wakeLockRef.current) {
+            await wakeLockRef.current.release();
+            wakeLockRef.current = null;
+            setIsLocked(false);
+            console.log('Fullscreen exited: Wake Lock released.');
+        }
+    }, []);
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && document.fullscreenElement && !isLocked) {
+                requestWakeLock();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [isLocked, requestWakeLock]);
+
+    return { isLocked, requestWakeLock, releaseWakeLock };
+}
+
 export default function FleetManager() {
     const [user, setUser] = useState<any>(null);
     const [isSignUp, setIsSignUp] = useState(false);
@@ -62,6 +105,7 @@ export default function FleetManager() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     
     const tvBoardRef = useRef<HTMLDivElement>(null);
+    const { isLocked, requestWakeLock, releaseWakeLock } = useScreenWakeLock();
 
     const isMasterAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '');
     const isAdmin = isMasterAdmin || userRole === 'admin';
@@ -97,10 +141,15 @@ export default function FleetManager() {
     };
 
     useEffect(() => {
-        const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+        const handleFsChange = () => {
+            const isFs = !!document.fullscreenElement;
+            setIsFullscreen(isFs);
+            if (isFs) requestWakeLock();
+            else releaseWakeLock();
+        };
         document.addEventListener('fullscreenchange', handleFsChange);
         return () => document.removeEventListener('fullscreenchange', handleFsChange);
-    }, []);
+    }, [requestWakeLock, releaseWakeLock]);
 
     useEffect(() => {
         let animationFrameId: number; let isPaused = false; let scrollPos = 0;
@@ -273,7 +322,7 @@ export default function FleetManager() {
                          view === 'personnel' ? <PersonnelManager showToast={showToast} darkMode={darkMode} /> :
                          view === 'disposition' ? <DispositionReport showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} /> :
                          view === 'tracker' ? <div className={`h-[80vh] rounded-3xl border shadow-sm overflow-hidden relative ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}><BusTracker darkMode={darkMode} /></div> : (
-                            <InventoryView buses={buses} sortedBuses={sortedBuses} searchTerm={searchTerm} setSearchTerm={setSearchTerm} inventoryMode={inventoryMode} setInventoryMode={setInventoryMode} activeFilter={activeFilter} setActiveFilter={setActiveFilter} sortConfig={sortConfig} requestSort={requestSort} getStatusType={getStatusType} setSelectedBusDetail={setSelectedBusDetail} toggleFullScreen={toggleFullScreen} isFullscreen={isFullscreen} tvBoardRef={tvBoardRef} darkMode={darkMode} isAdmin={isAdmin} showToast={showToast} />
+                            <InventoryView buses={buses} sortedBuses={sortedBuses} searchTerm={searchTerm} setSearchTerm={setSearchTerm} inventoryMode={inventoryMode} setInventoryMode={setInventoryMode} activeFilter={activeFilter} setActiveFilter={setActiveFilter} sortConfig={sortConfig} requestSort={requestSort} getStatusType={getStatusType} setSelectedBusDetail={setSelectedBusDetail} toggleFullScreen={toggleFullScreen} isFullscreen={isFullscreen} tvBoardRef={tvBoardRef} darkMode={darkMode} isAdmin={isAdmin} showToast={showToast} isLocked={isLocked} />
                          )}
                     </main>
                 </div>
@@ -289,7 +338,7 @@ export default function FleetManager() {
                  view === 'personnel' ? <PersonnelManager showToast={showToast} darkMode={darkMode} /> :
                  view === 'disposition' ? <DispositionReport showToast={showToast} darkMode={darkMode} isAdmin={isAdmin} /> :
                  view === 'tracker' ? <div className={`h-[85vh] rounded-3xl border shadow-2xl overflow-hidden relative ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}><BusTracker darkMode={darkMode} /></div> : (
-                    <InventoryView buses={buses} sortedBuses={sortedBuses} searchTerm={searchTerm} setSearchTerm={setSearchTerm} inventoryMode={inventoryMode} setInventoryMode={setInventoryMode} activeFilter={activeFilter} setActiveFilter={setActiveFilter} sortConfig={sortConfig} requestSort={requestSort} getStatusType={getStatusType} setSelectedBusDetail={setSelectedBusDetail} toggleFullScreen={toggleFullScreen} isFullscreen={isFullscreen} tvBoardRef={tvBoardRef} darkMode={darkMode} isAdmin={isAdmin} showToast={showToast} />
+                    <InventoryView buses={buses} sortedBuses={sortedBuses} searchTerm={searchTerm} setSearchTerm={setSearchTerm} inventoryMode={inventoryMode} setInventoryMode={setInventoryMode} activeFilter={activeFilter} setActiveFilter={setActiveFilter} sortConfig={sortConfig} requestSort={requestSort} getStatusType={getStatusType} setSelectedBusDetail={setSelectedBusDetail} toggleFullScreen={toggleFullScreen} isFullscreen={isFullscreen} tvBoardRef={tvBoardRef} darkMode={darkMode} isAdmin={isAdmin} showToast={showToast} isLocked={isLocked} />
                  )}
                  {view !== 'input' && view !== 'admin' && view !== 'personnel' && view !== 'analytics' && view !== 'disposition' && <div className="mt-12"><Footer onShowLegal={setLegalType} darkMode={darkMode} /></div>}
             </main>
@@ -297,8 +346,8 @@ export default function FleetManager() {
     );
 }
 
-// --- SUB-COMPONENT: INVENTORY VIEW (Glassmorphism, Drag & Drop Floor Map) ---
-const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventoryMode, setInventoryMode, activeFilter, setActiveFilter, sortConfig, requestSort, getStatusType, setSelectedBusDetail, toggleFullScreen, isFullscreen, tvBoardRef, darkMode, isAdmin, showToast }: any) => {
+// --- SUB-COMPONENT: INVENTORY VIEW ---
+const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventoryMode, setInventoryMode, activeFilter, setActiveFilter, sortConfig, requestSort, getStatusType, setSelectedBusDetail, toggleFullScreen, isFullscreen, tvBoardRef, darkMode, isAdmin, showToast, isLocked }: any) => {
     
     const getBadgeStyle = (type: string) => {
         if (type === 'ready') return darkMode ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border border-emerald-200';
@@ -474,7 +523,19 @@ const InventoryView = ({ buses, sortedBuses, searchTerm, setSearchTerm, inventor
                         {isFullscreen && (
                             <div className={`flex justify-between items-end mb-8 border-b-2 pb-6 ${darkMode ? 'border-slate-800' : 'border-slate-300'}`}>
                                 <div><h2 className="text-6xl font-black uppercase tracking-tighter text-[#ef7c00]">Fleet Status Board</h2><p className={`text-2xl font-bold mt-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Total Units: {buses.length} | Down: <span className="text-red-500">{buses.filter((b:any)=>b.status!=='Active').length}</span></p></div>
-                                <button onClick={toggleFullScreen} className="px-10 py-5 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest text-lg shadow-2xl transition-all transform active:scale-95">Exit Fullscreen</button>
+                                <div className="flex items-center gap-6">
+                                    {/* WAKE LOCK INDICATOR */}
+                                    <div className={`flex items-center gap-3 px-5 py-3 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'} shadow-sm`}>
+                                        <span className="relative flex h-4 w-4">
+                                            {isLocked && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+                                            <span className={`relative inline-flex rounded-full h-4 w-4 ${isLocked ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                                        </span>
+                                        <span className={`text-sm font-black uppercase tracking-widest ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                            {isLocked ? 'Screen Locked On' : 'Sleep Allowed'}
+                                        </span>
+                                    </div>
+                                    <button onClick={toggleFullScreen} className="px-10 py-5 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest text-lg shadow-2xl transition-all transform active:scale-95">Exit Fullscreen</button>
+                                </div>
                             </div>
                         )}
                         <div className={`grid gap-4 sm:gap-6 pb-20 ${isFullscreen ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5'}`}>

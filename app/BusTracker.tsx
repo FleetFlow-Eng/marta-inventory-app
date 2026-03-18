@@ -2,13 +2,16 @@
 import { useEffect, useState, useMemo } from "react";
 import dynamic from 'next/dynamic';
 
-// Dynamically import the Map to prevent SSR issues
 const Map = dynamic(() => import("./Map"), { 
     ssr: false,
     loading: () => (
-        <div className="h-full w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 text-[#002d72] dark:text-[#ef7c00] italic font-black animate-pulse rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <svg className="w-12 h-12 mb-4 animate-spin opacity-50" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            INITIALIZING SATELLITE LINK...
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-[#ef7c00] italic font-black">
+            <div className="relative flex items-center justify-center w-32 h-32 mb-6">
+                <div className="absolute inset-0 border-4 border-[#ef7c00]/20 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-[#ef7c00] rounded-full border-t-transparent animate-spin"></div>
+                <span className="text-3xl">📡</span>
+            </div>
+            <span className="tracking-widest uppercase animate-pulse">Establishing Satellite Link...</span>
         </div>
     )
 });
@@ -22,7 +25,6 @@ export default function BusTracker({ darkMode = false }: { darkMode?: boolean })
   const [sortBy, setSortBy] = useState("unit");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  // Configuration: 1 Year timeout (ghost buses essentially never disappear)
   const GHOST_TIMEOUT = 31536000000; 
 
   useEffect(() => {
@@ -67,7 +69,6 @@ export default function BusTracker({ darkMode = false }: { darkMode?: boolean })
     let filtered = vList.filter(v => {
       const lastSeen = (v.vehicle?.timestamp || 0) * 1000;
       const isStale = (Date.now() - lastSeen) > GHOST_TIMEOUT;
-      
       if (filterStatus === 'active') return !isStale;
       if (filterStatus === 'hold') return isStale;
       return true;
@@ -92,33 +93,35 @@ export default function BusTracker({ darkMode = false }: { darkMode?: boolean })
     });
   }, [vehicles, routes, searchTerm, sortBy, filterStatus]);
 
-  if (loading) return (
-    <div className="h-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 text-[#002d72] dark:text-[#ef7c00] font-black italic animate-pulse rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        <svg className="w-12 h-12 mb-4 animate-spin opacity-50" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-        LOADING FLEET DATA...
-    </div>
-  );
+  if (loading) return null; // Let the dynamic import loading state handle this
 
-  const sidebarBg = darkMode ? 'bg-slate-900/80 border-slate-800 backdrop-blur-xl' : 'bg-white/90 border-slate-200 backdrop-blur-xl';
+  const hudBg = darkMode ? 'bg-slate-900/85 border-slate-700/50' : 'bg-white/85 border-white/50';
   const textPrimary = darkMode ? 'text-white' : 'text-slate-900';
   const textSecondary = darkMode ? 'text-slate-400' : 'text-slate-500';
 
   return (
-    <div className={`flex h-full overflow-hidden rounded-3xl border shadow-xl relative ${darkMode ? 'border-slate-800' : 'border-slate-300'}`}>
+    <div className="relative h-full w-full overflow-hidden rounded-3xl">
       
-      {/* SIDEBAR COMMAND CENTER */}
-      <div className={`w-80 flex flex-col flex-shrink-0 border-r z-10 hidden sm:flex ${sidebarBg}`}>
+      {/* MAP LAYER - FULL SCREEN */}
+      <div className="absolute inset-0 z-0">
+        <Map buses={vehicles} selectedId={selectedId} routes={routes} darkMode={darkMode} />
+        {/* Screen Glare/Vignette overlay for that modern tactical feel */}
+        <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.3)] z-[400]"></div>
+      </div>
+
+      {/* FLOATING HUD PANEL */}
+      <div className={`absolute top-4 left-4 bottom-4 w-80 flex flex-col z-10 rounded-2xl border shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-xl pointer-events-auto ${hudBg} hidden sm:flex`}>
         
         {/* Header & Search */}
-        <div className={`p-5 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
-            <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-lg font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Fleet Radar</h2>
-                <div className="flex items-center gap-1.5">
+        <div className={`p-5 border-b ${darkMode ? 'border-slate-700/50' : 'border-slate-200/50'}`}>
+            <div className="flex items-center justify-between mb-5">
+                <h2 className={`text-xl font-black italic uppercase tracking-tighter ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>Fleet Radar</h2>
+                <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
                     <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
-                    <span className={`text-[9px] font-black uppercase tracking-widest ${textSecondary}`}>Live</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500">Live</span>
                 </div>
             </div>
 
@@ -127,40 +130,40 @@ export default function BusTracker({ darkMode = false }: { darkMode?: boolean })
                     type="text" 
                     placeholder="Search Unit #..." 
                     value={searchTerm} 
-                    className={`w-full pl-10 pr-4 py-3 rounded-xl text-xs font-bold outline-none transition-all focus:ring-2 focus:ring-[#ef7c00]/50 ${darkMode ? 'bg-slate-950 text-white placeholder-slate-600' : 'bg-slate-100 text-slate-900 placeholder-slate-400'}`} 
+                    className={`w-full pl-10 pr-4 py-3.5 rounded-xl text-xs font-bold outline-none transition-all focus:ring-2 focus:ring-[#ef7c00]/50 shadow-inner ${darkMode ? 'bg-slate-950/50 text-white placeholder-slate-500 border border-slate-800' : 'bg-slate-100 text-slate-900 placeholder-slate-400 border border-slate-200'}`} 
                     onChange={(e) => setSearchTerm(e.target.value)} 
                 />
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 opacity-40">🔍</span>
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 opacity-40 text-sm">🔍</span>
             </div>
 
-            {/* Segmented Control for Filters */}
-            <div className={`flex p-1 rounded-lg ${darkMode ? 'bg-slate-950' : 'bg-slate-100'}`}>
-                <button onClick={() => setFilterStatus("all")} className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-md transition-all ${filterStatus === 'all' ? (darkMode ? 'bg-slate-800 text-white shadow' : 'bg-white text-[#002d72] shadow-sm') : textSecondary}`}>
+            {/* Segmented Control */}
+            <div className={`flex p-1 rounded-xl shadow-inner ${darkMode ? 'bg-slate-950/50 border border-slate-800' : 'bg-slate-100 border border-slate-200'}`}>
+                <button onClick={() => setFilterStatus("all")} className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${filterStatus === 'all' ? (darkMode ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-[#002d72] shadow-md') : textSecondary}`}>
                     All ({stats.total})
                 </button>
-                <button onClick={() => setFilterStatus("active")} className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-md transition-all ${filterStatus === 'active' ? (darkMode ? 'bg-emerald-500/20 text-emerald-400 shadow' : 'bg-emerald-50 text-emerald-600 shadow-sm') : textSecondary}`}>
-                    Live
+                <button onClick={() => setFilterStatus("active")} className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${filterStatus === 'active' ? (darkMode ? 'bg-emerald-500/20 text-emerald-400 shadow-md' : 'bg-emerald-50 text-emerald-600 shadow-md') : textSecondary}`}>
+                    Active
                 </button>
-                <button onClick={() => setFilterStatus("hold")} className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-md transition-all ${filterStatus === 'hold' ? (darkMode ? 'bg-rose-500/20 text-rose-400 shadow' : 'bg-rose-50 text-rose-600 shadow-sm') : textSecondary}`}>
+                <button onClick={() => setFilterStatus("hold")} className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${filterStatus === 'hold' ? (darkMode ? 'bg-rose-500/20 text-rose-400 shadow-md' : 'bg-rose-50 text-rose-600 shadow-md') : textSecondary}`}>
                     Ghost
                 </button>
             </div>
 
-            <div className="flex items-center justify-between mt-4 px-1">
-               <span className={`text-[8px] font-black uppercase tracking-widest ${textSecondary}`}>Sort By:</span>
-               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`bg-transparent text-[9px] font-black uppercase outline-none cursor-pointer ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>
+            <div className="flex items-center justify-between mt-5 px-1">
+               <span className={`text-[8px] font-black uppercase tracking-widest ${textSecondary}`}>Sort Feed By:</span>
+               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer hover:opacity-80 transition-opacity ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>
                   <option value="unit">Bus #</option>
-                  <option value="route">Route</option>
+                  <option value="route">Route ID</option>
                </select>
             </div>
         </div>
 
         {/* Bus List */}
-        <div className="flex-grow overflow-y-auto custom-scrollbar p-2 space-y-1">
+        <div className="flex-grow overflow-y-auto custom-scrollbar p-3 space-y-2">
           {processedVehicles.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 opacity-40">
-                  <span className="text-2xl mb-2">📡</span>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-center">No Signals Found</p>
+              <div className="flex flex-col items-center justify-center h-40 opacity-40 mt-10">
+                  <span className="text-3xl mb-3">📡</span>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-center">No Signals Detected</p>
               </div>
           ) : processedVehicles.map((v) => {
             const vehicle = v.vehicle;
@@ -170,30 +173,26 @@ export default function BusTracker({ darkMode = false }: { darkMode?: boolean })
             let routeInfo = routes?.[cleanId] || (cleanId ? `Route ${cleanId}` : "Special/NIS");
             
             const lastSeenMs = (vehicle?.timestamp || 0) * 1000;
-            const isStale = (Date.now() - lastSeenMs) > (5 * 60 * 1000); // 5 minutes stale threshold
+            const isStale = (Date.now() - lastSeenMs) > (5 * 60 * 1000); 
 
             const isSelected = selectedId === vehicle?.vehicle?.id;
             const itemBg = isSelected 
-                ? (darkMode ? 'bg-slate-800 border-[#ef7c00]' : 'bg-blue-50 border-[#002d72]') 
-                : (darkMode ? 'border-transparent hover:bg-slate-800/50' : 'border-transparent hover:bg-slate-50');
+                ? (darkMode ? 'bg-slate-800/80 border-[#ef7c00] shadow-lg scale-[1.02]' : 'bg-white border-[#002d72] shadow-lg scale-[1.02]') 
+                : (darkMode ? 'border-transparent hover:bg-slate-800/50 bg-transparent' : 'border-transparent hover:bg-white/50 bg-transparent');
 
             return (
               <button 
                   key={v.id} 
                   onClick={() => setSelectedId(vehicle?.vehicle?.id)} 
-                  className={`w-full p-3 rounded-xl border-l-4 text-left flex items-center justify-between group transition-all duration-200 ${itemBg}`}
+                  className={`w-full p-3.5 rounded-xl border-l-4 text-left flex items-center justify-between group transition-all duration-200 ${itemBg}`}
               >
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                      <p className={`text-sm font-black tracking-tight ${isStale ? 'opacity-50' : textPrimary}`}>Unit {busNum}</p>
-                      {/* Status LED */}
-                      {isStale ? (
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_5px_#f43f5e]" title="Signal Lost"></span>
-                      ) : (
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981]" title="Signal Active"></span>
-                      )}
+                <div className="flex-grow">
+                  <div className="flex items-center justify-between mb-1">
+                      <p className={`text-base font-black tracking-tight ${isStale ? 'opacity-50' : textPrimary}`}>Unit {busNum}</p>
+                      {/* Pulse dot indicator inside the list */}
+                      <span className={`w-2 h-2 rounded-full shadow-sm ${isStale ? 'bg-rose-500' : 'bg-emerald-400'}`}></span>
                   </div>
-                  <p className={`text-[9px] font-bold uppercase truncate w-48 ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>
+                  <p className={`text-[9px] font-bold uppercase truncate pr-2 ${darkMode ? 'text-[#ef7c00]' : 'text-[#002d72]'}`}>
                       {routeInfo.split(' - ')[1] || routeInfo}
                   </p>
                 </div>
@@ -202,14 +201,6 @@ export default function BusTracker({ darkMode = false }: { darkMode?: boolean })
           })}
         </div>
       </div>
-
-      {/* MAP CONTAINER */}
-      <div className={`flex-grow relative bg-slate-100 ${darkMode ? 'bg-[#0f172a]' : 'bg-[#e2e8f0]'}`}>
-        <Map buses={vehicles} selectedId={selectedId} routes={routes} darkMode={darkMode} />
-        {/* Subtle interior shadow for depth */}
-        <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_50px_rgba(0,0,0,0.1)] z-[400]"></div>
-      </div>
-
     </div>
   );
 }

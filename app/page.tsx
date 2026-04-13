@@ -262,7 +262,7 @@ export default function FleetManager() {
             <aside className={`hidden md:flex flex-col w-64 flex-shrink-0 border-r shadow-2xl z-20 ${darkMode ? 'bg-slate-900/80 border-slate-800/50 backdrop-blur-xl' : 'bg-white/80 border-slate-200/50 backdrop-blur-xl'}`}>
                 <div className={`p-6 flex items-center gap-3 border-b ${darkMode ? 'border-slate-800/50' : 'border-slate-200/50'}`}>
                     <div className="w-2 h-8 bg-[#ef7c00] rounded-full shadow-[0_0_10px_rgba(239,124,0,0.5)]"></div>
-                    <div><h1 className="font-black text-xl italic uppercase tracking-tighter leading-none">FleetFlow</h1><p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Hamilton Division</p></div>
+                    <div><h1 className="font-black text-xl italic uppercase tracking-tighter leading-none">FleetFlow</h1><p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>FleetFlow</p></div>
                 </div>
                 <nav className="flex-1 overflow-y-auto py-4 custom-scrollbar">
                     <ul className="space-y-1 px-3">

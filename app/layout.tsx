@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MARTA Fleet Operations",
+  title: "Fleet Flow Operations",
   description: "Fleet management dashboard",
 };
 
